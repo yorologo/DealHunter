@@ -1,0 +1,77 @@
+#!/data/data/com.termux/files/usr/bin/python3
+import argparse
+import urllib.request
+import urllib.error
+import json
+import time
+import sys
+
+def main():
+    parser = argparse.ArgumentParser(description="Rappi Deal Hunter - Direct Catalog Probe")
+    parser.add_argument('--store-id', required=True, help='Store ID (e.g. 990006029)')
+    parser.add_argument('--query', required=True, help='Search query (e.g. leche)')
+    parser.add_argument('--size', type=int, default=10, help='Number of results to fetch')
+    args = parser.parse_args()
+
+    # Rate limiting (1 second delay)
+    time.sleep(1)
+
+    url = f"https://services.mxgrability.rappi.com/api/cpgs/search/v2/store/{args.store_id}/products"
+    payload = json.dumps({
+        "query": args.query,
+        "size": args.size
+    }).encode('utf-8')
+    
+    headers = {
+        "Accept": "application/json",
+        "Content-Type": "application/json",
+        "User-Agent": "okhttp/4.11.0"
+    }
+
+    req = urllib.request.Request(url, data=payload, headers=headers, method='POST')
+
+    try:
+        with urllib.request.urlopen(req, timeout=10) as response:
+            data = json.loads(response.read().decode('utf-8'))
+            
+            normalized = []
+            for p in data.get('products', []):
+                promotion = ""
+                if isinstance(p.get("discount_step"), dict) and p["discount_step"].get("label"):
+                    promotion = p["discount_step"]["label"]
+                elif p.get("discount_tag_color"):
+                    promotion = "Tag: " + p["discount_tag_color"]
+                
+                # Image URL resolution
+                image_base = "https://images.rappi.com.mx/products/"
+                img = p.get("image", "")
+                if img and not img.startswith("http"):
+                    img = image_base + img
+
+                normalized.append({
+                    "store": p.get("store_type", ""),
+                    "store_id": str(p.get("store_id", "")),
+                    "product": p.get("name", ""),
+                    "product_id": str(p.get("product_id", "")),
+                    "price": float(p.get("price", 0)),
+                    "original_price": float(p.get("real_price", 0)),
+                    "discount": int(p.get("discount", 0)),
+                    "promotion": promotion,
+                    "stock": int(p.get("stock", 0)),
+                    "in_stock": bool(p.get("in_stock", False)),
+                    "image": img
+                })
+            
+            print(json.dumps(normalized, indent=2, ensure_ascii=False))
+            
+    except urllib.error.HTTPError as e:
+        print(f"HTTP Error: {e.code} - {e.reason}", file=sys.stderr)
+        if e.code == 401 or e.code == 403:
+            print("AUTH_REQUIRED", file=sys.stderr)
+        sys.exit(1)
+    except Exception as e:
+        print(f"Error: {e}", file=sys.stderr)
+        sys.exit(1)
+
+if __name__ == '__main__':
+    main()

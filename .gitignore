@@ -1,0 +1,30 @@
+# SQLite Databases
+*.db
+*.db-shm
+*.db-wal
+*pre-history*
+
+# Caches and logs
+__pycache__/
+*.pyc
+.pytest_cache/
+*.log
+*.txt
+
+# Virtual Environment
+venv/
+.venv/
+env/
+
+# Real dumps and outputs
+audit_deals.json
+coverage-audit.json
+history-analysis.json
+stores.json
+tec_log.txt
+mas_log.txt
+audit_results.txt
+
+# OS generated files
+.DS_Store
+Thumbs.db

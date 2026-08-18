@@ -1,0 +1,258 @@
+#!/data/data/com.termux/files/usr/bin/python3
+import argparse
+import urllib.request
+import urllib.error
+import json
+import time
+import sqlite3
+import os
+import sys
+from datetime import datetime
+
+DB_PATH = os.environ.get("RAPPI_DB_PATH", os.path.expanduser("~/rappi-deal-hunter/rappi-deals.db"))
+
+VERTICALS = {
+    "supermercado": ["super", "mercado", "oferta", "descuento", "2x1", "carne", "leche", "fruta"],
+    "farmacia": ["farmacia", "medicamentos", "vitaminas", "suplementos", "pastillas", "jarabe", "similares", "condesa"],
+    "mascotas": ["mascotas", "perro", "gato", "croquetas", "petco", "maskota"],
+    "bebe": ["bebe", "pañales", "formula", "biberon", "toallitas", "papilla"],
+    "higiene": ["higiene", "jabon", "shampoo", "desodorante", "pasta dental", "crema", "bed bath"],
+    "hogar": ["hogar", "limpieza", "detergente", "limpiador", "escoba", "suavizante"],
+    "tecnologia": ["tecnologia", "cables", "audifonos", "usb", "electronica", "macstore", "lumen"],
+    "test_run": ["frutarindo"]
+}
+
+def setup_db():
+    conn = sqlite3.connect(DB_PATH)
+    return conn
+
+def calculate_discount(p):
+    price = float(p.get("price") or 0)
+    real_price = float(p.get("real_price") or 0)
+    
+    discount_price = 0.0
+    if real_price > 0 and price < real_price:
+        discount_price = (1 - (price / real_price)) * 100.0
+        
+    discount_promo = 0.0
+    promo_type = ""
+    promo_label = ""
+    
+    bundle = p.get("discounts_bundle", {})
+    if bundle and bundle.get("deal"):
+        deal = bundle["deal"][0]
+        p_val = float(deal.get("promotion_value") or 0)
+        u_cond = float(deal.get("units_condition") or 0)
+        if p_val > 0 and u_cond > 0 and p_val > u_cond:
+            discount_promo = (1 - (u_cond / p_val)) * 100.0
+            promo_type = "NxM"
+            promo_label = deal.get("label", f"{int(p_val)}x{int(u_cond)}")
+            
+    if discount_promo > discount_price:
+        discount_effective = discount_promo
+        discount_source = "bundle"
+        eff_real_price = p_val * (real_price if real_price > 0 else price)
+        eff_price = u_cond * price
+    else:
+        discount_effective = discount_price
+        discount_source = "price"
+        if discount_price > 0:
+            promo_type = "Direct"
+        eff_real_price = real_price
+        eff_price = price
+        
+    return discount_price, discount_promo, discount_effective, discount_source, promo_type, promo_label, eff_price, eff_real_price
+
+def fetch_unified_search(query, lat, lng):
+    url = "https://services.mxgrability.rappi.com/api/pns-global-search-api/v1/unified-search"
+    payload = json.dumps({"query": query, "lat": lat, "lng": lng, "limit": 1000}).encode('utf-8')
+    headers = {
+        "Accept": "application/json",
+        "Content-Type": "application/json",
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120.0.0.0 Safari/537.36"
+    }
+    req = urllib.request.Request(url, data=payload, headers=headers, method='POST')
+    try:
+        with urllib.request.urlopen(req, timeout=15) as response:
+            return json.loads(response.read().decode('utf-8'))
+    except urllib.error.HTTPError as e:
+        if e.code in [429, 1015]:
+            return "RATE_LIMIT"
+    except Exception as e:
+        pass
+    return None
+
+def run_vertical(v_name, base_queries, lat, lng, conn, run_id, seen_in_run):
+    c = conn.cursor()
+    queries = list(base_queries)
+    visited = set()
+    candidate_keywords = {}
+    
+    vertical_new_products = 0
+    vertical_total_valid = 0
+    vertical_stores_touched = set()
+    vertical_deals_50 = 0
+    store_product_counts = {}
+    
+    query_stats = []
+    state = "LOW_COVERAGE"
+    
+    while queries:
+        q = queries.pop(0).lower().strip()
+        if q in visited or len(q) < 3:
+            continue
+            
+        visited.add(q)
+        print(f"    [{v_name}] Query: '{q}'", file=sys.stderr)
+        data = fetch_unified_search(q, lat, lng)
+        
+        if data == "RATE_LIMIT":
+            state = "RATE_LIMITED"
+            break
+        elif not data:
+            continue
+            
+        stores = data.get("stores", []) or []
+        new_in_query = 0
+        total_in_query = 0
+        
+        for s in stores:
+            s_id = str(s.get("store_id"))
+            vertical_stores_touched.add(s_id)
+            s_name = s.get("store_name", s_id)
+            
+            c.execute('INSERT OR IGNORE INTO stores (store_id, name, brand, type) VALUES (?, ?, ?, ?)', 
+                      (s_id, s_name, s.get("store_brand_name", ""), s.get("parent_store_type", "")))
+            
+            prods = s.get("products", [])
+            store_product_counts[s_id] = store_product_counts.get(s_id, 0) + len(prods)
+            
+            if 0 < store_product_counts[s_id] < 10 and s_name.lower() not in visited and s_name.lower() not in queries:
+                queries.append(s_name.lower())
+                
+            for p in prods:
+                total_in_query += 1
+                vertical_total_valid += 1
+                p_id = str(p.get("product_id"))
+                uid = f"{s_id}_{p_id}"
+                
+                cat = p.get("category_name", "")
+                brand = p.get("trademark", "")
+                pname = p.get("name", "")
+                
+                if cat:
+                    for w in cat.split():
+                        if len(w) > 3: candidate_keywords[w.lower()] = candidate_keywords.get(w.lower(), 0) + 1
+                if brand:
+                    candidate_keywords[brand.lower()] = candidate_keywords.get(brand.lower(), 0) + 1
+                if pname:
+                    for w in pname.split()[:2]:
+                        if len(w) > 3: candidate_keywords[w.lower()] = candidate_keywords.get(w.lower(), 0) + 1
+                        
+                if uid not in seen_in_run:
+                    seen_in_run.add(uid)
+                    new_in_query += 1
+                    vertical_new_products += 1
+                    
+                    if not p.get("in_stock", False) or p.get("stock", 0) <= 0:
+                        continue
+                        
+                    d_price, d_promo, d_eff, d_src, p_type, p_label, eff_price, eff_real = calculate_discount(p)
+                    
+                    if p_type:
+                        candidate_keywords[p_type.lower()] = candidate_keywords.get(p_type.lower(), 0) + 1
+                    
+                    if d_eff >= 50.0:
+                        vertical_deals_50 += 1
+                        
+                    img = p.get("image", "")
+                    if img and not img.startswith("http") and not img.startswith("data:"):
+                        img = "https://images.rappi.com.mx/products/" + img
+                        
+                    # Product identity is stable
+                    c.execute('INSERT OR IGNORE INTO products (product_id, store_id, name, brand, image) VALUES (?, ?, ?, ?, ?)', 
+                              (p_id, s_id, pname, brand, img))
+                    
+                    # Observation tied to Run ID (Unique composite handles intra-run dupes gracefully)
+                    c.execute('''INSERT OR IGNORE INTO observations (run_id, store_id, product_id, price, original_price, stock, timestamp, 
+                                 discount_price, discount_promotion, discount_effective, discount_source, promotion_type, promotion_label, query_term)
+                                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''', 
+                                 (run_id, s_id, p_id, eff_price, eff_real, p.get("stock", 0), datetime.now().isoformat(), 
+                                  d_price, d_promo, d_eff, d_src, p_type, p_label, q))
+                                  
+        conn.commit()
+        
+        eff = new_in_query / total_in_query if total_in_query > 0 else 0
+        query_stats.append({"query": q, "new": new_in_query, "valid": total_in_query, "eff": eff})
+        
+        cands = sorted(candidate_keywords.items(), key=lambda x: x[1], reverse=True)
+        added = 0
+        for cand, _ in cands:
+            c_cand = cand.lower().strip()
+            if c_cand not in visited and c_cand not in queries:
+                queries.append(c_cand)
+                added += 1
+                if added >= 2: break
+                
+        if len(query_stats) >= 4:
+            recent = query_stats[-4:]
+            if all(qs["eff"] < 0.03 or qs["new"] < 5 for qs in recent):
+                state = "SATURATED"
+                break
+            elif all(qs["eff"] < 0.10 for qs in recent):
+                state = "PARTIALLY_SATURATED"
+                
+        time.sleep(3)
+        
+    novelty = (vertical_new_products / vertical_total_valid) if vertical_total_valid > 0 else 0
+    if state not in ["RATE_LIMITED", "SATURATED"]:
+        if novelty < 0.03: state = "SATURATED"
+        elif novelty < 0.10: state = "PARTIALLY_SATURATED"
+        else: state = "LOW_COVERAGE"
+        
+    return {
+        "vertical": v_name,
+        "stores": len(vertical_stores_touched),
+        "products": vertical_total_valid,
+        "new": vertical_new_products,
+        "novelty": novelty,
+        "deals_50": vertical_deals_50,
+        "state": state,
+        "store_counts": store_product_counts
+    }
+
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--vertical', type=str, default="general", choices=list(VERTICALS.keys()) + ["general"])
+    parser.add_argument('--lat', type=float, default=19.4326)
+    parser.add_argument('--lng', type=float, default=-99.1332)
+    parser.add_argument('--test', action='store_true')
+    args = parser.parse_args()
+    
+    conn = setup_db()
+    c = conn.cursor()
+    
+    run_id = f"run_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+    
+    c.execute('''INSERT INTO runs (run_id, started_at, lat, lng, radius, vertical, status) 
+                 VALUES (?, CURRENT_TIMESTAMP, ?, ?, ?, ?, 'RUNNING')''', 
+              (run_id, args.lat, args.lng, 5.0, args.vertical))
+    conn.commit()
+    
+    seen_in_run = set()
+    
+    v_to_run = list(VERTICALS.keys())[:-1] if args.vertical == "general" else [args.vertical]
+    if args.test:
+        v_to_run = ["test_run"]
+        
+    results = []
+    
+    for v in v_to_run:
+        res = run_vertical(v, VERTICALS[v], args.lat, args.lng, conn, run_id, seen_in_run)
+        results.append(res)
+        
+    c.execute('''UPDATE runs SET status = 'COMPLETED', finished_at = CURRENT_TIMESTAMP WHERE run_id = ?''', (run_id,))
+    conn.commit()
+
+if __name__ == '__main__':
+    main()

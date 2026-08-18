@@ -1,0 +1,17 @@
+{
+  "product_id": "123",
+  "name": "Pan Bimbo",
+  "price": 20.0,
+  "real_price": 40.0,
+  "stock": 5,
+  "in_stock": true,
+  "discounts_bundle": {
+    "deal": [
+      {
+        "promotion_value": 3,
+        "units_condition": 2,
+        "label": "Agregue 3, pague 2"
+      }
+    ]
+  }
+}

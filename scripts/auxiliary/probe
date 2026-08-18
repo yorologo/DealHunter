@@ -1,0 +1,181 @@
+#!/data/data/com.termux/files/usr/bin/python3
+"""
+Rappi Deal Hunter - Proof of Concept
+Extracts structured product/promotion data from Rappi's Ofertas page
+using the Android accessibility tree (uiautomator).
+"""
+import xml.etree.ElementTree as ET
+import subprocess
+import json
+import re
+import sys
+import time
+
+def rish(cmd):
+    return subprocess.check_output(['rish', '-c', cmd], text=True, timeout=15)
+
+def dump_ui():
+    rish('uiautomator dump /data/local/tmp/ui.xml')
+    return rish('cat /data/local/tmp/ui.xml')
+
+def tap(x, y):
+    rish(f'input tap {x} {y}')
+
+def swipe_up():
+    rish('input swipe 640 2000 640 400 300')
+
+def parse_bounds(b):
+    m = re.match(r'\[(\d+),(\d+)\]\[(\d+),(\d+)\]', b)
+    return (int(m.group(1)), int(m.group(2)), int(m.group(3)), int(m.group(4))) if m else (0,0,0,0)
+
+def extract_products_from_xml(xml_text):
+    """Parse the Ofertas/store page XML to extract products with structured data."""
+    tree = ET.fromstring(xml_text)
+    products = []
+    
+    all_nodes = list(tree.iter('node'))
+    
+    for i, node in enumerate(all_nodes):
+        desc = node.attrib.get('content-desc', '')
+        
+        if not (desc and desc.isdigit()):
+            continue
+            
+        product_id = desc
+        bounds = node.attrib.get('bounds', '')
+        x1, y1, x2, y2 = parse_bounds(bounds)
+        card_width = x2 - x1
+        
+        # Collect text nodes that belong to THIS card only
+        # Cards are typically ~500px wide, and vertically from y1 to about y1+500
+        nearby = []
+        for j in range(max(0, i-2), min(len(all_nodes), i+25)):
+            n = all_nodes[j]
+            nb = n.attrib.get('bounds', '')
+            nx1, ny1, nx2, ny2 = parse_bounds(nb)
+            t = n.attrib.get('text', '').strip()
+            if not t:
+                continue
+            # Must overlap horizontally with this card
+            if nx2 < x1 or nx1 > x2:
+                continue
+            # Must be below the card image start and within reasonable range
+            if ny1 < y1 - 50 or ny1 > y2 + 500:
+                continue
+            nearby.append(t)
+        
+        # Parse structured fields
+        price = None
+        original_price = None
+        discount_pct = None
+        name = None
+        store = None
+        promotion = None
+        
+        # Build price: sometimes split as "$" + "37.00"
+        merged = []
+        skip_next = False
+        for idx, t in enumerate(nearby):
+            if skip_next:
+                skip_next = False
+                continue
+            if t == '$' and idx + 1 < len(nearby) and re.match(r'^\d+\.\d+$', nearby[idx+1]):
+                merged.append(f'${nearby[idx+1]}')
+                skip_next = True
+            else:
+                merged.append(t)
+        
+        prices = []
+        for t in merged:
+            if re.match(r'^\$\d+[\d,.]*$', t):
+                try:
+                    prices.append(float(re.sub(r'[^\d.]', '', t)))
+                except:
+                    pass
+            elif re.match(r'^-\d+%$', t):
+                discount_pct = int(t.replace('-', '').replace('%', ''))
+        
+        if prices:
+            price = min(prices)
+            if len(prices) > 1:
+                original_price = max(prices)
+        
+        # Name and store
+        text_fields = [t for t in merged
+                      if not re.match(r'^\$', t)
+                      and not re.match(r'^-?\d+%$', t)
+                      and not re.match(r'^\d+\.\d+$', t)
+                      and not re.match(r'^\$?\d+[\d,.]*/[a-z]+$', t)
+                      and not re.match(r'^(Desde|Aprox|Hoy|Ad|\d+ min|ENVÍO).*', t)
+                      and t not in ('$', 'add', 'Ad')
+                      and len(t) > 2]
+        
+        if text_fields:
+            name = max(text_fields, key=len)
+            store_candidates = [t for t in text_fields
+                              if t != name and not re.match(r'^\d', t)
+                              and len(t) < len(name)]
+            if store_candidates:
+                store = store_candidates[-1]  # Store usually last
+        
+        # Promotion detection
+        for t in merged:
+            if re.match(r'^\d+\s*x\s*\$\d+', t, re.IGNORECASE):
+                promotion = t
+            elif 'gratis' in t.lower() or 'paga' in t.lower():
+                promotion = t
+        
+        if price and name:
+            prod = {
+                "store": store,
+                "store_id": "N/A",
+                "product": name,
+                "product_id": product_id,
+                "price": price,
+                "original_price": original_price,
+                "discount": discount_pct,
+                "promotion": promotion
+            }
+            if not any(p['product_id'] == product_id for p in products):
+                products.append(prod)
+    
+    return products
+
+def navigate_to_ofertas():
+    """Navigate to the Ofertas tab."""
+    xml = dump_ui()
+    tree = ET.fromstring(xml)
+    for node in tree.iter('node'):
+        if node.attrib.get('content-desc') == 'Ofertas':
+            bounds = node.attrib.get('bounds', '')
+            x1, y1, x2, y2 = parse_bounds(bounds)
+            tap((x1+x2)//2, (y1+y2)//2)
+            time.sleep(5)
+            return True
+    return False
+
+def main():
+    all_products = []
+    
+    print("Navegando a Ofertas...", file=sys.stderr)
+    navigate_to_ofertas()
+    
+    # Scroll and collect products across multiple pages
+    for scroll_num in range(8):
+        xml = dump_ui()
+        products = extract_products_from_xml(xml)
+        new_count = 0
+        for p in products:
+            if not any(ep['product_id'] == p['product_id'] for ep in all_products):
+                all_products.append(p)
+                new_count += 1
+        print(f"  Scroll {scroll_num+1}: {new_count} nuevos productos ({len(all_products)} total)", file=sys.stderr)
+        
+        if scroll_num < 7:
+            swipe_up()
+            time.sleep(2)
+    
+    print(json.dumps(all_products, indent=2, ensure_ascii=False))
+
+if __name__ == '__main__':
+    main()
