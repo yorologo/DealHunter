@@ -1,30 +1,69 @@
-# SQLite Databases
-*.db
-*.db-shm
-*.db-wal
-*pre-history*
-
-# Caches and logs
+# Python
 __pycache__/
-*.pyc
+*.py[cod]
 .pytest_cache/
-*.log
-*.txt
+.mypy_cache/
+.ruff_cache/
 
-# Virtual Environment
-venv/
+# Environments
 .venv/
+venv/
 env/
 
-# Real dumps and outputs
+# Build
+build/
+dist/
+*.egg-info/
+
+# SQLite
+*.db
+*.db-journal
+*.db-shm
+*.db-wal
+*.sqlite
+*.sqlite3
+
+# Runtime
+*.log
+logs/
+tmp/
+.cache/
+
+# Secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.jks
+
+# Android research
+*.apk
+*.apks
+*.xapk
+*.dex
+*.odex
+*.vdex
+blutter-out/
+rappi-analysis/
+dumps/
+
+# Dumps locales reales
 audit_deals.json
 coverage-audit.json
 history-analysis.json
 stores.json
+audit_results.txt
 tec_log.txt
 mas_log.txt
-audit_results.txt
 
-# OS generated files
+# Editors
+.vscode/
+.idea/
+*.swp
+*~
+
+# OS
 .DS_Store
 Thumbs.db

@@ -1,0 +1,25 @@
+Nota: Todos los datos de este ejemplo son ficticios y sirven únicamente para ilustrar la salida de la terminal.
+
+=== SALIDA DE RAPPI-OFERTAS ===
+
+===============================================================================================
+VERTICAL        | TIENDAS | PRODUCTOS | NUEVOS | NOVELTY | OFERTAS >=50% | ESTADO              
+-----------------------------------------------------------------------------------------------
+supermercado    | 12      | 2450      | 134    |    5.5% | 15            | PARTIALLY_SATURATED 
+farmacia        | 4       | 600       | 50     |    8.3% | 4             | PARTIALLY_SATURATED 
+tecnologia      | 2       | 120       | 10     |    8.3% | 0             | LOW_COVERAGE        
+
+=== RESUMEN FINAL ===
+* Productos totales antes: 10000
+* Productos totales después: 10194
+* Ofertas >=50% nuevas (en estos barridos): 19
+
+
+=== SALIDA DE RAPPI-HISTORICO ===
+
+SCORE | ESTADO               | ACTUAL   | MEDIANA 30D | MÍNIMO   | CAMBIO   | RAPPI    | TIENDA          | PRODUCTO
+------------------------------------------------------------------------------------------------------------------------
+94    | REAL_DEAL            | $45.0    | $100.0      | $45.0    | -55.0%   | 55.0%    | Tienda Demo 1   | Audífonos Bluetooth Genéricos
+82    | NEW_LOW              | $70.0    | $105.0      | $70.0    | -33.3%   | 33.3%    | Tienda Demo 2   | Alimento Mascota 2KG
+60    | RAPPI_PROMO          | $60.0    | $65.0       | $60.0    | -7.7%    | 60.0%    | Farmacia Demo   | Multivitamínico (Precio Base Inflado)
+0     | INSUFFICIENT_HISTORY | $52.0    | $53.5       | $52.0    | -5.5%    | 0.0%     | Super Demo      | Jugo de Naranja 1L

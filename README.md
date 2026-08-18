@@ -1,61 +1,81 @@
-# Rappi Deal Hunter
+# DealHunter
 
-> **Disclaimer Legal:** Proyecto independiente, experimental y no oficial. No afiliado con Rappi ni sus marcas subsidiarias. Esta herramienta NO efectúa compras, NO altera precios, NO evade mecanismos de autenticación y fue diseñada para consultas automatizadas de tráfico bajo (read-only). El usuario final es responsable de operar esta herramienta cumpliendo los términos de servicio, rate-limits y leyes aplicables.
+Herramienta de recolección, normalización y análisis histórico de precios y promociones.
 
-## Descripción
+[![Python](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-**Rappi Deal Hunter** permite descubrir de manera autónoma tiendas, supermercados, farmacias y comercios disponibles por geolocalización, extrayendo su catálogo y estructurando promociones (como descuentos directos o NxM).
+> **DealHunter** consulta de forma autónoma el catálogo de tiendas disponibles en tu área, audita matemáticamente las promociones presentadas y construye un historial SQLite para evidenciar caídas reales de precio y aislar las falsas promociones.
 
-La herramienta cuenta con un módulo de **Análisis Histórico** que rastrea el precio real a través del tiempo y combate la manipulación de precios de lista (ej. inflar el precio original antes de aplicar un "descuento").
+---
 
-## Características Principales
-- **Búsqueda Estructurada Autónoma:** Emplea el endpoint de `unified-search` para iterar mediante palabras clave adaptativas, extrayendo miles de artículos y superando barreras de catálogo oculto.
-- **Motor de Ofertas Exactas:** Detecta verdaderas promociones resolviendo algebraicamente reglas como "Agregue 3, pague 2" vs. "Descuento directo", guardando siempre el `discount_effective`.
-- **Evolución Histórica Constante:** Su base local SQLite (`runs` y `observations`) es un append-only de captura. 
-- **Auditor Algorítmico:** `rappi-historico` expone la realidad estadística de cada artículo computando medianas a 7 y 30 días (`median_30d`), evidenciando verdaderos Minimums Históricos (`NEW_LOW`).
+## ¿Qué es DealHunter?
+DealHunter es un motor CLI escrito en Python, diseñado para ejecutarse localmente (idealmente en Termux para Android) que:
+1. Rastrea el catálogo público por zonas (General, Supermercado, Farmacia, etc).
+2. Estructura y desambigua matemáticamente los descuentos (diferencia un 2x1 de un descuento directo).
+3. Acumula las observaciones en una base de datos SQLite para combatir la manipulación de "precios de lista".
 
-## Instalación & Quick Start (Termux / Linux)
+## ¿Qué problema resuelve?
+Las plataformas de delivery suelen alterar el "Precio Original" antes de aplicar un descuento, o encimar etiquetas de "2x1" que realmente no son rebajas. DealHunter descubre el catálogo "invisible", normaliza las matemáticas de las promociones y mantiene un registro estricto a través de los días para revelarte el verdadero *Mínimo Histórico*.
 
+## Características
+* **Búsqueda Estructurada:** API nativa sin depender de OCR ni Accessibility Services.
+* **Cobertura Adaptativa:** Detecta tiendas con poco inventario ("huecos") y las inyecta como *keywords* para forzar su aparición.
+* **Deduplicación Automática:** Filtra observaciones repetidas por corrida.
+* **Motor Matemático (Discount Engine):** Descifra promociones NxM (2x1, 3x2) vs Descuento Directo.
+* **Histórico Offline:** SQLite append-only local.
+* **Analizador Analítico:** Computa medianas a 7 y 30 días, declarando ofertas irrebatibles (`NEW_LOW`, `REAL_DEAL`).
+
+## Cómo funciona
+```text
+DealHunter consulta productos disponibles
+        ↓
+normaliza precios y promociones
+        ↓
+detecta descuentos reales (evita sumar 3x2 + rebaja)
+        ↓
+elimina duplicados intra-corrida
+        ↓
+guarda observaciones (SQLite)
+        ↓
+construye histórico a través de ejecuciones diarias
+        ↓
+ordena las mejores ofertas basándose en estadísticas (no en marketing)
+```
+
+## Instalación rápida
+Desde tu terminal en Linux o Termux (Android):
 ```bash
-git clone https://github.com/USERNAME/rappi-deal-hunter.git
-cd rappi-deal-hunter
-# Asegurar dependencias de Python 3 y SQLite3
+pkg update && pkg install git python sqlite
+git clone git@github.com:yorologo/DealHunter.git
+cd DealHunter
 chmod +x bin/rappi-ofertas bin/rappi-historico
-
-# 1. Realiza tu primer barrido en una zona
-./bin/rappi-ofertas --vertical supermercado --lat 19.4326 --lng -99.1332
-
-# 2. Audita los descubrimientos y calcula la autenticidad de cada promoción
-./bin/rappi-historico --top 50
 ```
 
-## Arquitectura Resumida
-
-```mermaid
-flowchart TD
-    CLI([Usuario/Cron]) -->|Parámetros| OF[rappi-ofertas]
-    OF --> API[Unified Search API]
-    API -->|JSON| NM[Normalizer & Dedupe]
-    NM --> DE[Discount Engine]
-    DE -->|Inserta Run & Obs| DB[(SQLite: rappi-deals.db)]
-    
-    CLI2([Usuario]) --> HS[rappi-historico]
-    HS -->|Lee temporalidad| DB
-    HS -->|Computa medianas| OUT[/Reporte de Ofertas/]
+## Primera ejecución
+Ubica una latitud y longitud pública cercana a ti (ejemplo, el Zócalo de CDMX).
+```bash
+./bin/rappi-ofertas --lat 19.4326 --lng -99.1332 --vertical general
 ```
 
-## Limitaciones
-* **Rate Limits Estrictos:** El rastreador detendrá los hilos proactivamente tras detectar códigos `429` o Cloudflare `1015` para no quemar tu IP.
-* **Geolocalización:** El catálogo variará totalmente dependiendo de los parámetros de longitud/latitud que brindes.
-* **Tiempo Biológico:** El análisis histórico requiere... historia. El primer día casi todos los productos aparecerán bajo `INSUFFICIENT_HISTORY`.
+## Documentación
+El proyecto está completamente documentado para tres perfiles (Básico, Avanzado y Desarrollador):
+* [Primeros Pasos (Tutorial)](docs/getting-started.md)
+* [Ejemplos Prácticos](docs/examples.md)
+* [Casos de Uso](docs/use-cases.md)
+* [Motor de Descuentos](docs/discount-engine.md)
+* [Análisis Histórico](docs/historical-analysis.md)
+* [Arquitectura y Diagramas](docs/diagrams/architecture.md)
+* [Glosario](docs/glossary.md)
+* [FAQ](docs/faq.md)
+* [Troubleshooting](docs/troubleshooting.md)
+* [Roadmap](docs/roadmap.md)
 
-## Documentación Técnica
-Revisa la documentación extendida en `/docs` para entender las fórmulas, los esquemas de base de datos y la arquitectura detallada:
-- [Instalación](docs/installation-termux.md)
-- [API Detectada](docs/api.md)
-- [Motor de Descuentos](docs/discount-engine.md)
-- [Modelo Histórico SQLite](docs/database.md)
-- [Análisis y Clasificación de Ofertas](docs/historical-analysis.md)
-- [Uso por Consola](docs/cli.md)
-- [Historia del Descubrimiento Técnico](docs/research-history.md)
-- [Troubleshooting](docs/troubleshooting.md)
+## Contribuir
+Por favor revisa [CONTRIBUTING.md](CONTRIBUTING.md) antes de enviar un Pull Request. Las bases de datos reales y la PII (Personal Identifiable Information) están estrictamente prohibidas en el repositorio.
+
+## Licencia
+[MIT](LICENSE)
+
+## Disclaimer
+Proyecto de uso personal, analítico y offline. No afiliado con Rappi. La herramienta es estrictamente *read-only* y no evade controles de autenticación. Úsela bajo su propio riesgo y respetando los términos de servicio aplicables.
