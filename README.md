@@ -28,6 +28,7 @@ Las plataformas de delivery suelen alterar el "Precio Original" antes de aplicar
 * **Errores Estructurados:** Códigos de error claros con acciones recomendadas.
 * **Runs Parciales:** Los datos ya recolectados sobreviven interrupciones.
 * **Doctor:** Diagnóstico del sistema con `rappi-ofertas doctor`.
+* **Rappi Turbo:** Integración nativa como vertical con análisis histórico de precios.
 
 ## Cómo funciona
 ```text

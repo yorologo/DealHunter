@@ -14,8 +14,15 @@ VERTICALS = {
     "higiene": ["higiene", "jabon", "shampoo", "desodorante", "pasta dental", "crema", "bed bath"],
     "hogar": ["hogar", "limpieza", "detergente", "limpiador", "escoba", "suavizante"],
     "tecnologia": ["tecnologia", "cables", "audifonos", "usb", "electronica", "macstore", "lumen"],
+    "turbo": ["turbo", "turbo fresh", "express", "despensa turbo"],
     "test_run": ["frutarindo"]
 }
+
+def is_turbo_store(store_data):
+    parent = store_data.get("parent_store_type", "").lower()
+    stype = store_data.get("store_type", "").lower()
+    turbo_types = ("chiper_home", "chiper_extended", "chiper_express")
+    return parent in turbo_types or stype in turbo_types
 
 def matches_filters(p_name, brand, s_name, category, config, d_eff, p_type, eff_price):
     if config.get("min_discount", 0) > d_eff:
@@ -160,6 +167,9 @@ def run_discover(config, lat, lng, conn, run_id, dry_run=False):
             total_in_query = 0
             
             for s in stores:
+                if v_name == "turbo" and not is_turbo_store(s):
+                    continue
+                    
                 s_id = str(s.get("store_id"))
                 s_name = s.get("store_name", s_id)
                 

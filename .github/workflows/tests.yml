@@ -22,3 +22,4 @@ jobs:
         python tests/test_filters.py
         python tests/test_e2e.py
         python tests/test_robustness.py
+        python tests/test_turbo.py

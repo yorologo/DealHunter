@@ -228,7 +228,7 @@ def _check_providers():
     """Placeholder provider checks for future implementation."""
     return [
         ("Rappi catalog", "NOT_CHECKED", None),
-        ("Turbo", "NOT_IMPLEMENTED", None),
+        ("Turbo", "AVAILABLE", None),
         ("Restaurants", "NOT_IMPLEMENTED", None),
         ("Account context", "NOT_IMPLEMENTED", None),
     ]

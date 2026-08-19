@@ -301,7 +301,7 @@ def test_doctor_providers_placeholder():
     conn.close()
     checks = run_doctor(db_path=db_path)
     names = {c[0]: c[1] for c in checks}
-    assert names.get("Turbo") == "NOT_IMPLEMENTED"
+    assert names.get("Turbo") == "AVAILABLE"
     assert names.get("Restaurants") == "NOT_IMPLEMENTED"
     assert names.get("Account context") == "NOT_IMPLEMENTED"
     assert names.get("Rappi catalog") == "NOT_CHECKED"

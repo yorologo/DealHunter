@@ -6,8 +6,9 @@
 - feat: minimal checkpoint model for crawl progress tracking
 - feat: `rappi-ofertas doctor` diagnostic command
 - feat: provider placeholders (Turbo, Restaurants, Account context)
-- test: 27 new robustness tests (errors, checkpoints, partial runs, doctor)
-- docs: error-handling.md documentation
+- feat: full integration of **Rappi Turbo** as a first-class vertical
+- test: 27 new robustness tests and 2 new Turbo offline tests
+- docs: error-handling.md and turbo.md documentation
 
 ## [2.1.0] - 2026-08-18
 - feat: persistent configuration (`config.toml`)
