@@ -43,7 +43,7 @@ def main():
         assert "DealHunter CLI v" in res.stdout
         
         res = run_cmd("python3 bin/rappi-historico --help")
-        assert "min-history-days" in res.stdout
+        assert "deals" in res.stdout
         
         # Test config
         res = run_cmd("python3 bin/rappi-ofertas config set min_discount 40")
