@@ -1,0 +1,7 @@
+min_discount = 30
+max_requests = 1000
+
+[profiles.despensa]
+min_discount = 40
+vertical = ["supermercado"]
+query = ["leche", "café"]

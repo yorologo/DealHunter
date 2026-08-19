@@ -1,69 +1,33 @@
-# Python
-__pycache__/
-*.py[cod]
-.pytest_cache/
-.mypy_cache/
-.ruff_cache/
+# Logs
+logs/
+*.log
 
-# Environments
-.venv/
-venv/
-env/
-
-# Build
-build/
-dist/
-*.egg-info/
-
-# SQLite
+# Databases
+rappi-deals.db
+rappi-deals.db.*.bak
 *.db
-*.db-journal
-*.db-shm
-*.db-wal
-*.sqlite
 *.sqlite3
 
-# Runtime
-*.log
-logs/
-tmp/
-.cache/
+# Test DBs and Temp
+temp/
+tests/fixtures/*.db
 
-# Secrets
+# Env and Personal Config
 .env
-.env.*
-!.env.example
-*.pem
-*.key
-*.p12
-*.jks
+.config
+config.toml
 
-# Android research
-*.apk
-*.apks
-*.xapk
-*.dex
-*.odex
-*.vdex
-blutter-out/
-rappi-analysis/
-dumps/
+# Outputs
+*.csv
+*.json
 
-# Dumps locales reales
-audit_deals.json
-coverage-audit.json
-history-analysis.json
-stores.json
+# Cache
+__pycache__/
+*.pyc
+
+# Coverage
+.coverage
+coverage.xml
+htmlcov/
 audit_results.txt
 tec_log.txt
-mas_log.txt
-
-# Editors
-.vscode/
-.idea/
-*.swp
-*~
-
-# OS
-.DS_Store
-Thumbs.db

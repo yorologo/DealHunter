@@ -1,13 +1,14 @@
 #!/data/data/com.termux/files/usr/bin/python3
-import sqlite3
+import sys
+import os
 import argparse
 import json
-import os
-import sys
-import statistics
-from datetime import datetime, timedelta
 
-DB_PATH = os.environ.get("RAPPI_DB_PATH", os.path.expanduser("~/rappi-deal-hunter/rappi-deals.db"))
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../src')))
+
+from dealhunter.historico import analyze_history, compare_stores
+from dealhunter.db import get_default_db_path
+from dealhunter.output import print_results
 
 def main():
     parser = argparse.ArgumentParser()
@@ -16,207 +17,53 @@ def main():
     parser.add_argument('--product', type=str, default=None)
     parser.add_argument('--json', action='store_true')
     parser.add_argument('--top', type=int, default=50)
-    args = parser.parse_args()
+    parser.add_argument('--explain', action='store_true')
+    parser.add_argument('--status', action='append')
+    parser.add_argument('--historical-discount', type=float)
+    parser.add_argument('--min-observations', type=int, default=1)
+    parser.add_argument('--history-days', type=float, default=1.0)
+    parser.add_argument('--new-low', action='store_true')
+    parser.add_argument('--price-drop', type=float)
+    parser.add_argument('--new-deals', action='store_true')
+    parser.add_argument('--price-changes', action='store_true')
     
-    conn = sqlite3.connect(DB_PATH)
-    c = conn.cursor()
+    subparsers = parser.add_subparsers(dest="command")
+    compare_p = subparsers.add_parser("compare")
+    compare_p.add_argument("query")
     
-    # Base query
-    query = '''
-        SELECT o.store_id, o.product_id, p.name, s.name, o.price, o.timestamp, o.discount_effective
-        FROM observations o
-        JOIN products p ON o.product_id = p.product_id AND o.store_id = p.store_id
-        JOIN stores s ON o.store_id = s.store_id
-    '''
+    args, unknown = parser.parse_known_args()
+    db_path = get_default_db_path()
     
-    params = []
-    conditions = []
-    if args.store:
-        conditions.append("o.store_id = ?")
-        params.append(args.store)
-    if args.product:
-        conditions.append("o.product_id = ?")
-        params.append(args.product)
+    if args.command == "compare":
+        res = compare_stores(db_path, args.query)
+        print_results(res, format="json" if args.json else "table")
+        return
         
-    if conditions:
-        query += " WHERE " + " AND ".join(conditions)
-        
-    query += " ORDER BY o.timestamp ASC"
-    
-    c.execute(query, params)
-    rows = c.fetchall()
-    
-    # Group by store_id + product_id
-    grouped = {}
-    for r in rows:
-        store_id, product_id, p_name, s_name, price, ts_str, d_eff = r
-        key = (store_id, product_id)
-        if key not in grouped:
-            grouped[key] = {
-                "product_name": p_name,
-                "store_name": s_name,
-                "obs": []
-            }
-        
-        try:
-            ts = datetime.fromisoformat(ts_str.replace("Z", ""))
-        except:
-            ts = datetime.now()
-            
-        grouped[key]["obs"].append({
-            "price": price,
-            "timestamp": ts,
-            "discount_effective": d_eff
-        })
-        
-    now = datetime.now()
-    results = []
-    
-    counts = {
-        "sufficient": 0,
-        "insufficient": 0,
-        "NEW_LOW": 0,
-        "REAL_DEAL": 0,
-        "GOOD_DEAL": 0,
-        "RAPPI_PROMO": 0,
-        "NORMAL": 0
+    config = {
+        "min_observations": args.min_observations,
+        "history_days": args.history_days if args.history_days != 1.0 else args.min_history_days,
+        "status": args.status,
+        "new_low": args.new_low,
+        "historical_discount": args.historical_discount,
+        "price_drop": args.price_drop,
+        "new_deals": args.new_deals,
+        "price_changes": args.price_changes,
     }
     
-    for key, data in grouped.items():
-        obs_list = data["obs"]
-        if not obs_list: continue
-        
-        current_price = obs_list[-1]["price"]
-        current_discount_effective = obs_list[-1]["discount_effective"]
-        
-        if len(obs_list) > 1:
-            previous_price = obs_list[-2]["price"]
-        else:
-            previous_price = current_price
-            
-        prices_all = [o["price"] for o in obs_list]
-        historical_min = min(prices_all)
-        historical_max = max(prices_all)
-        
-        ts_min = obs_list[0]["timestamp"]
-        ts_max = obs_list[-1]["timestamp"]
-        
-        # Windows
-        window_30d = now - timedelta(days=30)
-        window_7d = now - timedelta(days=7)
-        window_24h = now - timedelta(days=1)
-        
-        obs_30d = [o["price"] for o in obs_list if o["timestamp"] >= window_30d]
-        obs_7d = [o["price"] for o in obs_list if o["timestamp"] >= window_7d]
-        obs_24h = [o for o in obs_list if o["timestamp"] >= window_24h]
-        
-        median_30d = statistics.median(obs_30d) if obs_30d else current_price
-        median_7d = statistics.median(obs_7d) if obs_7d else current_price
-        
-        if len(obs_24h) > 1:
-            price_24h_ago = obs_24h[0]["price"] # oldest in 24h window
-            change_24h = ((current_price - price_24h_ago) / price_24h_ago * 100) if price_24h_ago > 0 else 0
-        else:
-            change_24h = 0.0
-            
-        delta_days = (ts_max - ts_min).total_seconds() / 86400.0
-        
-        # Historical discount
-        if delta_days >= 30:
-            hist_ref = median_30d
-        else:
-            hist_ref = median_7d
-            
-        if hist_ref > 0:
-            historical_discount = (1 - (current_price / hist_ref)) * 100.0
-        else:
-            historical_discount = 0.0
-            
-        # State classification
-        if delta_days < args.min_history_days:
-            estado = "INSUFFICIENT_HISTORY"
-            counts["insufficient"] += 1
-        else:
-            counts["sufficient"] += 1
-            if current_price <= historical_min and current_price < historical_max:
-                estado = "NEW_LOW"
-            elif historical_discount >= 50.0:
-                estado = "REAL_DEAL"
-            elif historical_discount >= 30.0:
-                estado = "GOOD_DEAL"
-            elif current_discount_effective >= 50.0 and historical_discount < 30.0:
-                estado = "RAPPI_PROMO"
-            else:
-                estado = "NORMAL"
-            counts[estado] += 1
-            
-        # Score calculation
-        score = 0
-        if estado != "INSUFFICIENT_HISTORY":
-            if historical_discount > 0:
-                score += min(historical_discount * 1.5, 60)
-            if current_price <= historical_min and current_price < historical_max:
-                score += 20
-            if current_discount_effective >= 50.0:
-                score += 10
-            # small bonus for amount of observations
-            score += min(len(obs_list) * 0.5, 10)
-            
-        score = min(max(int(score), 0), 100)
-        
-        results.append({
-            "store_id": key[0],
-            "product_id": key[1],
-            "product_name": data["product_name"],
-            "store_name": data["store_name"],
-            "current_price": current_price,
-            "previous_price": previous_price,
-            "change_24h": change_24h,
-            "min_7d": min(obs_7d) if obs_7d else current_price,
-            "median_7d": median_7d,
-            "min_30d": min(obs_30d) if obs_30d else current_price,
-            "median_30d": median_30d,
-            "historical_min": historical_min,
-            "historical_max": historical_max,
-            "observations_count": len(obs_list),
-            "current_discount_effective": current_discount_effective,
-            "historical_discount": historical_discount,
-            "state": estado,
-            "deal_score": score,
-            "delta_days": delta_days
-        })
-        
-    results.sort(key=lambda x: (x["deal_score"], x["historical_discount"], x["current_discount_effective"]), reverse=True)
+    res = analyze_history(db_path, config, store=args.store, product=args.product, explain=args.explain)
     
-    # Save JSON
-    with open('/data/data/com.termux/files/home/rappi-deal-hunter/history-analysis.json', 'w') as f:
-        json.dump({
-            "counts": counts,
-            "results": results
-        }, f, indent=2, ensure_ascii=False)
+    if args.explain:
+        for r in res[:args.top]:
+            print(f"Producto: {r['product_name']}\nTienda: {r['store_name']}")
+            print(r.get("explanation", ""))
+            print("-" * 40)
+        return
         
-    # Output to console
-    if not args.json:
-        print(f"{'SCORE':<5} | {'ESTADO':<20} | {'ACTUAL':<8} | {'MEDIANA 30D':<11} | {'MÍNIMO':<8} | {'CAMBIO':<8} | {'RAPPI':<8} | {'TIENDA':<15} | {'PRODUCTO'}")
-        print("-" * 120)
-        for r in results[:args.top]:
-            m30d = f"${r['median_30d']:.1f}"
-            act = f"${r['current_price']:.1f}"
-            cmin = f"${r['historical_min']:.1f}"
-            cambio = f"{r['change_24h']:+.1f}%"
-            rappi = f"{r['current_discount_effective']:.1f}%"
-            store_name = r['store_name'][:15]
-            prod_name = r['product_name'][:35]
-            print(f"{r['deal_score']:<5} | {r['state']:<20} | {act:<8} | {m30d:<11} | {cmin:<8} | {cambio:<8} | {rappi:<8} | {store_name:<15} | {prod_name}")
-            
-    # Always print summary to stderr to keep stdout clean if json is piped
-    print("\n=== RESUMEN HISTÓRICO ===", file=sys.stderr)
-    print(f"Productos con historial suficiente: {counts['sufficient']}", file=sys.stderr)
-    print(f"Productos con historial insuficiente: {counts['insufficient']}", file=sys.stderr)
-    print(f"NEW_LOW: {counts['NEW_LOW']}", file=sys.stderr)
-    print(f"REAL_DEAL: {counts['REAL_DEAL']}", file=sys.stderr)
-    print(f"GOOD_DEAL: {counts['GOOD_DEAL']}", file=sys.stderr)
-    print(f"RAPPI_PROMO: {counts['RAPPI_PROMO']}", file=sys.stderr)
-
+    if args.json:
+        with open("history-analysis.json", "w") as f:
+            json.dump({"results": res}, f, indent=2)
+    else:
+        print_results(res[:args.top], format="table")
+        
 if __name__ == '__main__':
     main()
