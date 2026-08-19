@@ -229,6 +229,6 @@ def _check_providers():
     return [
         ("Rappi catalog", "NOT_CHECKED", None),
         ("Turbo", "AVAILABLE", None),
-        ("Restaurants", "NOT_IMPLEMENTED", None),
+        ("Restaurants", "AVAILABLE", None),
         ("Account context", "NOT_IMPLEMENTED", None),
     ]

@@ -85,6 +85,9 @@ def build_parser():
     discover_p = subparsers.add_parser("discover", help="Discover new deals via crawler", parents=[base_parser])
     update_p = subparsers.add_parser("update", help="Update known deals quickly", parents=[base_parser])
     
+    rest_p = subparsers.add_parser("restaurants", help="Discover deals in restaurants", parents=[base_parser])
+    rest_p.add_argument("--restaurant", action="append", help="Filter by restaurant name (alias for --store)")
+
     db_p = subparsers.add_parser("db", help="Database management")
     db_p.add_argument("action", choices=["status", "integrity", "backup", "vacuum"])
 
@@ -203,7 +206,12 @@ def main(args_list=None):
         return
         
     # Crawler commands
-    if args.command in ("discover", "update", None):
+    if args.command in ("discover", "update", "restaurants", None):
+        if args.command == "restaurants":
+            config["vertical"] = ["restaurants"]
+            if getattr(args, "restaurant", None):
+                config["store"] = args.restaurant
+
         run_id = f"run_{datetime.now().strftime('%Y%m%d_%H%M%S_%f')}"
         c = conn.cursor()
         lat, lng = config.get("lat", 19.4326), config.get("lng", -99.1332)

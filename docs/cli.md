@@ -32,3 +32,15 @@ Consume la base de datos local pre-rastreada para auditar precios sin conectarse
 * `--product` (str, opcional): Filtra un producto exacto a evaluar.
 * `--top` (int, opcional): Número máximo de ofertas reales a imprimir en la tabla estándar output. (Default: `50`).
 * `--json` (flag, opcional): Enmudece la salida tabular humana y deja todo impreso en `history-analysis.json`.
+
+---
+
+## `restaurants`
+Descubre ofertas exclusivamente en el catálogo de restaurantes. Reutiliza el pipeline de `discover`.
+
+```bash
+rappi-ofertas restaurants --query "pizza" --min-discount 20
+```
+
+**Argumentos Adicionales:**
+* `--restaurant <nombre>`: Filtra por nombre de restaurante (funciona como alias de `--store`).

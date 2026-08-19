@@ -15,6 +15,7 @@ VERTICALS = {
     "hogar": ["hogar", "limpieza", "detergente", "limpiador", "escoba", "suavizante"],
     "tecnologia": ["tecnologia", "cables", "audifonos", "usb", "electronica", "macstore", "lumen"],
     "turbo": ["turbo", "turbo fresh", "express", "despensa turbo"],
+    "restaurants": ["hamburguesa", "pizza", "sushi", "tacos", "ensalada", "pollo"],
     "test_run": ["frutarindo"]
 }
 
@@ -23,6 +24,10 @@ def is_turbo_store(store_data):
     stype = store_data.get("store_type", "").lower()
     turbo_types = ("chiper_home", "chiper_extended", "chiper_express")
     return parent in turbo_types or stype in turbo_types
+
+def is_restaurant(store_data):
+    parent = store_data.get("parent_store_type", "").lower()
+    return parent == "restaurants"
 
 def matches_filters(p_name, brand, s_name, category, config, d_eff, p_type, eff_price):
     if config.get("min_discount", 0) > d_eff:
@@ -169,6 +174,8 @@ def run_discover(config, lat, lng, conn, run_id, dry_run=False):
             for s in stores:
                 if v_name == "turbo" and not is_turbo_store(s):
                     continue
+                if v_name == "restaurants" and not is_restaurant(s):
+                    continue
                     
                 s_id = str(s.get("store_id"))
                 s_name = s.get("store_name", s_id)
@@ -192,7 +199,12 @@ def run_discover(config, lat, lng, conn, run_id, dry_run=False):
                         seen_in_run.add(uid)
                         new_in_query += 1
                         
-                        if not p.get("in_stock", False) or p.get("stock", 0) <= 0:
+                        is_in_stock = p.get("in_stock", False) or p.get("is_available", False)
+                        stock_val = p.get("stock")
+                        if stock_val is None:
+                            stock_val = 1 if is_in_stock else 0
+                            
+                        if not is_in_stock or stock_val <= 0:
                             continue
                             
                         d_price, d_promo, d_eff, d_src, p_type, p_label, eff_price, eff_real = calculate_discount(p)
@@ -210,7 +222,7 @@ def run_discover(config, lat, lng, conn, run_id, dry_run=False):
                         c.execute('''INSERT OR IGNORE INTO observations (run_id, store_id, product_id, price, original_price, stock, timestamp, 
                                      discount_price, discount_promotion, discount_effective, discount_source, promotion_type, promotion_label, query_term)
                                      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''', 
-                                     (run_id, s_id, p_id, eff_price, eff_real, p.get("stock", 0), datetime.now().isoformat(), 
+                                     (run_id, s_id, p_id, eff_price, eff_real, stock_val, datetime.now().isoformat(), 
                                       d_price, d_promo, d_eff, d_src, p_type, p_label, q))
                                       
             # Commit after each query to preserve partial data

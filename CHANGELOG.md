@@ -7,8 +7,9 @@
 - feat: `rappi-ofertas doctor` diagnostic command
 - feat: provider placeholders (Turbo, Restaurants, Account context)
 - feat: full integration of **Rappi Turbo** as a first-class vertical
-- test: 27 new robustness tests and 2 new Turbo offline tests
-- docs: error-handling.md and turbo.md documentation
+- feat: initial support for **Restaurants** menus and promotions
+- test: 27 new robustness tests, 2 new Turbo offline tests, 3 restaurant tests
+- docs: error-handling.md, turbo.md, restaurants.md documentation
 
 ## [2.1.0] - 2026-08-18
 - feat: persistent configuration (`config.toml`)

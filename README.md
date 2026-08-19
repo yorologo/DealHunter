@@ -29,6 +29,7 @@ Las plataformas de delivery suelen alterar el "Precio Original" antes de aplicar
 * **Runs Parciales:** Los datos ya recolectados sobreviven interrupciones.
 * **Doctor:** Diagnóstico del sistema con `rappi-ofertas doctor`.
 * **Rappi Turbo:** Integración nativa como vertical con análisis histórico de precios.
+* **Restaurantes:** Soporte inicial para menús, platillos y sus promociones (`rappi-ofertas restaurants`).
 
 ## Cómo funciona
 ```text
