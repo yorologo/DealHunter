@@ -167,6 +167,34 @@ def test_v3_to_v4_migration_adds_pack_count():
         os.remove(test_db)
 
 
+
+def test_v4_to_v5_migration_adds_alerts():
+    test_db = os.path.join(tempfile.gettempdir(), "test_migration_v4.db")
+    if os.path.exists(test_db):
+        os.remove(test_db)
+
+    conn = sqlite3.connect(test_db)
+    c = conn.cursor()
+    c.execute("CREATE TABLE schema_version (version INTEGER PRIMARY KEY)")
+    c.execute("INSERT INTO schema_version (version) VALUES (4)")
+    conn.commit()
+    conn.close()
+
+    conn = setup_db(test_db)
+    c = conn.cursor()
+    c.execute("SELECT version FROM schema_version")
+    assert c.fetchone()[0] == CURRENT_SCHEMA_VERSION
+    
+    # Check alerts table
+    c.execute("PRAGMA table_info(alerts)")
+    columns = [row[1] for row in c.fetchall()]
+    assert "alert_type" in columns
+    assert "seen" in columns
+    conn.close()
+
+    if os.path.exists(test_db):
+        os.remove(test_db)
+
 if __name__ == "__main__":
     tests = [value for name, value in sorted(globals().items()) if name.startswith("test_")]
     passed = 0

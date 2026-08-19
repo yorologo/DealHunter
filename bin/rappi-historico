@@ -9,6 +9,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../s
 from dealhunter.historico import analyze_history, compare_stores
 from dealhunter.db import get_default_db_path
 from dealhunter.output import print_results
+from dealhunter.alerts import AlertEngine
 
 def main():
     parser = argparse.ArgumentParser()
@@ -27,9 +28,35 @@ def main():
     deals_p.add_argument('--explain', action='store_true')
     deals_p.add_argument('--sort', choices=['discount', 'price'], default='discount')
     
+    
+    alerts_p = subparsers.add_parser("alerts")
+    alerts_p.add_argument('action', nargs='?', choices=['list', 'evaluate', 'mark-seen'], default='list')
+    alerts_p.add_argument('--top', type=int, default=50)
+    alerts_p.add_argument('--store', type=str, default=None)
+    alerts_p.add_argument('--type', type=str, default=None)
+    alerts_p.add_argument('--new', action='store_true', help="Show only unseen alerts")
+    alerts_p.add_argument('--format', choices=['table', 'json', 'csv', 'markdown'], default='table')
+    
     args, unknown = parser.parse_known_args()
+
     db_path = get_default_db_path()
     
+    
+    if args.command == "alerts":
+        engine = AlertEngine(db_path)
+        if args.action == "evaluate":
+            res = engine.evaluate()
+            print_results(res, format=args.format)
+            return
+        elif args.action == "mark-seen":
+            engine.mark_seen(all=True)
+            print("All alerts marked as seen.")
+            return
+        else: # list
+            res = engine.get_alerts(new_only=args.new, top=args.top, store=args.store, alert_type=args.type)
+            print_results(res, format=args.format)
+            return
+
     if args.command == "compare":
         res = compare_stores(db_path, args.query, exact_only=args.exact_only, no_fuzzy=args.no_fuzzy)
         print_results(res, format="table")

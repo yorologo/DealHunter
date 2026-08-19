@@ -85,6 +85,7 @@ def analyze_history(db_path, config, store=None, product=None):
             "historical_min": metrics["historical_min"],
             "median_30d": metrics["median_30d"],
             "historical_average": metrics["historical_average"],
+            "previous_price": metrics["previous_price"],
             "price_change": metrics["price_change"],
             "price_change_percent": metrics["price_change_percent"],
             "discount_vs_median_30d": metrics["discount_vs_median_30d"],

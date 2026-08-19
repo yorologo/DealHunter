@@ -4,7 +4,7 @@ import datetime
 import shutil
 import sys
 
-CURRENT_SCHEMA_VERSION = 4
+CURRENT_SCHEMA_VERSION = 5
 
 def get_default_db_path():
     return os.environ.get("RAPPI_DB_PATH", os.path.expanduser("~/rappi-deal-hunter/rappi-deals.db"))
@@ -100,6 +100,21 @@ def migrate(conn, db_path):
             except sqlite3.OperationalError:
                 pass
                 
+
+        if version < 5:
+            c.execute('''CREATE TABLE IF NOT EXISTS alerts (
+                         id INTEGER PRIMARY KEY AUTOINCREMENT,
+                         product_id TEXT,
+                         store_id TEXT,
+                         alert_type TEXT,
+                         triggered_at DATETIME,
+                         price REAL,
+                         previous_price REAL,
+                         deal_status TEXT,
+                         reason TEXT,
+                         seen INTEGER DEFAULT 0,
+                         UNIQUE(product_id, store_id, alert_type, price)
+                         )''')
         # update version
         c.execute('UPDATE schema_version SET version = ?', (CURRENT_SCHEMA_VERSION,))
         conn.commit()
