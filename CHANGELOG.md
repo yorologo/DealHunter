@@ -1,6 +1,6 @@
 # Changelog
 
-## [2.5.0-dev] - Unreleased
+## [2.5.0] - 2026-08-19
 - feat: DealHunter v2.5 Alerts Engine
 - feat: local notification evaluation (TARGET_PRICE, NEW_LOW, REAL_DEAL, PRICE_DROP, BACK_IN_STOCK)
 - feat: deduplication and SEEN/NEW persistence in SQLite
