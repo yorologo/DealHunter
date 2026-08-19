@@ -1,5 +1,11 @@
 # Changelog
 
+## [2.4.0-dev] - Unreleased
+- feat: Price Intelligence engine for historical metrics
+- feat: Deal classifications (NEW_LOW, REAL_DEAL, GOOD_PRICE)
+- feat: Suspicious reference price detection
+- feat: `deals` subcommand in CLI and historical extensions
+
 ## [2.3.0] - 2026-08-19
 - feat: product normalization engine (brand, quantity, unit, and pack count)
 - feat: support metric standardizations (g to kg, ml to L) and pack expansions
