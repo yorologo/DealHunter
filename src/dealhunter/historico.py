@@ -173,27 +173,75 @@ def analyze_history(db_path, config, store=None, product=None, explain=False):
     else:
         return sorted(results, key=lambda x: x["deal_score"], reverse=True)
 
-def compare_stores(db_path, query):
+def compare_stores(db_path, query, exact_only=False):
     conn = sqlite3.connect(db_path)
     c = conn.cursor()
     c.execute('''
-        SELECT p.name, s.name, o.price
+        SELECT p.product_id, p.store_id, p.name, s.name, o.price,
+               p.brand, p.normalized_name, p.quantity, p.unit, p.normalized_quantity, p.normalized_unit, p.fingerprint,
+               o.discount_effective
         FROM observations o
         JOIN products p ON o.product_id = p.product_id AND o.store_id = p.store_id
         JOIN stores s ON o.store_id = s.store_id
-        WHERE p.name LIKE ?
+        WHERE p.name LIKE ? OR p.brand LIKE ? OR o.query_term LIKE ?
         ORDER BY o.timestamp DESC
-    ''', (f"%{query}%",))
+    ''', (f"%{query}%", f"%{query}%", f"%{query}%"))
     
-    # We want latest per store-product. 
-    # simplified group:
+    rows = c.fetchall()
+    
     latest = {}
-    for r in c.fetchall():
+    for r in rows:
         key = (r[0], r[1])
         if key not in latest:
-            latest[key] = r[2]
+            latest[key] = {
+                "product_id": r[0], "store_id": r[1], "product_name": r[2], "store_name": r[3], "price": r[4],
+                "brand": r[5], "normalized_name": r[6], "quantity": r[7], "unit": r[8],
+                "normalized_quantity": r[9], "normalized_unit": r[10], "fingerprint": r[11],
+                "discount_effective": r[12]
+            }
+            
+    products = list(latest.values())
+    if not products:
+        return []
+        
+    from .normalization import compute_match, calculate_unit_price
+    
+    groups = []
+    
+    for p in products:
+        placed = False
+        for g in groups:
+            anchor = g[0]
+            m_type, m_conf = compute_match(anchor, p)
+            if m_type == "EXACT_MATCH" or (not exact_only and m_type == "HIGH_CONFIDENCE_MATCH"):
+                p["match_type"] = m_type
+                p["match_confidence"] = m_conf
+                g.append(p)
+                placed = True
+                break
+        if not placed:
+            p["match_type"] = "EXACT_MATCH"
+            p["match_confidence"] = 1.00
+            groups.append([p])
             
     res = []
-    for (p_name, s_name), price in latest.items():
-        res.append({"product": p_name, "store": s_name, "price": price})
+    for g in groups:
+        g_sorted = sorted(g, key=lambda x: x["price"])
+        best_p = g_sorted[0]
+        best_price = best_p["price"]
+        
+        for item in g_sorted:
+            diff = ((item["price"] / best_price) - 1) * 100 if best_price > 0 else 0
+            u_price = calculate_unit_price(item["price"], item["normalized_quantity"])
+            up_str = f"${u_price}/{item['normalized_unit']}" if u_price else ""
+            res.append({
+                "GRUPO": best_p["product_name"][:20],
+                "TIENDA": item["store_name"][:15],
+                "PRECIO": f"${item['price']:.2f}",
+                "DIFF": f"+{diff:.1f}%" if diff > 0 else "BEST",
+                "UNIT_PRICE": up_str,
+                "MATCH": item["match_type"].replace("_MATCH", ""),
+                "PRODUCTO": item["product_name"][:30]
+            })
+            
     return res

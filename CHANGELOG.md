@@ -6,8 +6,10 @@
 - feat: dynamic `unit_price` calculation in historical analyzer
 - feat: product fingerprints for robust cross-store and temporal matching
 - feat: added `--sort unit-price` support in CLI
-- test: unit and integration tests for parsing and edge cases
-- docs: `product-normalization.md` specification
+- feat: exact and high-confidence product matching logic (no fuzzy yet)
+- feat: `compare` command in `rappi-historico` to find best multi-store prices
+- test: unit and integration tests for parsing, exact/high/no matches, and cross-store
+- docs: `product-normalization.md` and `product-matching.md` specification
 
 ## [2.2.0] - 2026-08-19
 - feat: structured error handling with error catalog and classification
