@@ -12,16 +12,13 @@ def run_cmd(cmd):
 def setup_db(db_path):
     conn = sqlite3.connect(db_path)
     c = conn.cursor()
-    c.execute('''CREATE TABLE IF NOT EXISTS stores (store_id TEXT PRIMARY KEY, name TEXT, brand TEXT, type TEXT)''')
-    c.execute('''CREATE TABLE IF NOT EXISTS products (product_id TEXT, store_id TEXT, name TEXT, brand TEXT, image TEXT, PRIMARY KEY (store_id, product_id))''')
-    c.execute('''CREATE TABLE IF NOT EXISTS runs (run_id TEXT PRIMARY KEY, started_at DATETIME, finished_at DATETIME, lat REAL, lng REAL, radius REAL, vertical TEXT, status TEXT)''')
-    c.execute('''CREATE TABLE IF NOT EXISTS observations (id INTEGER PRIMARY KEY AUTOINCREMENT, run_id TEXT, store_id TEXT, product_id TEXT, price REAL, original_price REAL, stock INTEGER, timestamp DATETIME, discount_price REAL, discount_promotion REAL, discount_effective REAL, discount_source TEXT, promotion_type TEXT, promotion_label TEXT, query_term TEXT, availability TEXT, UNIQUE(run_id, store_id, product_id))''')
-    c.execute('''CREATE TABLE IF NOT EXISTS schema_version (version INTEGER PRIMARY KEY)''')
-    c.execute('''CREATE TABLE IF NOT EXISTS watchlist (id INTEGER PRIMARY KEY AUTOINCREMENT, query TEXT, store_filter TEXT, target_price REAL, min_discount REAL, created_at DATETIME, enabled INTEGER DEFAULT 1)''')
+    sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../src')))
+    from dealhunter.db import setup_db as real_setup
+    real_setup(db_path)
     
     # insert dummy data
     c.execute("INSERT INTO stores VALUES ('s1', 'Test Store', '', 'supermercado')")
-    c.execute("INSERT INTO products VALUES ('p1', 's1', 'Test Product', '', '')")
+    c.execute("INSERT INTO products (product_id, store_id, name, brand, image) VALUES ('p1', 's1', 'Test Product', '', '')")
     c.execute("INSERT INTO observations (run_id, store_id, product_id, price, timestamp, discount_effective) VALUES ('r1', 's1', 'p1', 100, '2020-01-01T00:00:00', 0)")
     c.execute("INSERT INTO observations (run_id, store_id, product_id, price, timestamp, discount_effective) VALUES ('r2', 's1', 'p1', 50, '2020-01-02T00:00:00', 50)")
     conn.commit()
