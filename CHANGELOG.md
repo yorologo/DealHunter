@@ -1,5 +1,11 @@
 # Changelog
 
+## [2.5.0-dev] - Unreleased
+- feat: DealHunter v2.5 Alerts Engine
+- feat: local notification evaluation (TARGET_PRICE, NEW_LOW, REAL_DEAL, PRICE_DROP, BACK_IN_STOCK)
+- feat: deduplication and SEEN/NEW persistence in SQLite
+- feat: CLI commands (`alerts list`, `alerts evaluate`, `alerts mark-seen`)
+
 ## [2.4.0] - 2026-08-19
 - feat: historical price intelligence
 - feat: median_30d, historical min/max/average, previous price, price change metrics
