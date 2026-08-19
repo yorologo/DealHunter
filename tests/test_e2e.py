@@ -78,8 +78,8 @@ def main():
         res = run_cmd("python3 bin/rappi-historico")
         assert res.returncode == 0
         
-        res = run_cmd("python3 bin/rappi-historico --json")
-        assert os.path.exists("history-analysis.json")
+        res = run_cmd("python3 bin/rappi-historico deals --format json")
+        assert "store_id" in res.stdout
         
         print("E2E tests passed!")
 
