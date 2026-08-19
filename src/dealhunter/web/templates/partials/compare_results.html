@@ -1,0 +1,70 @@
+{% if q and q|length >= 3 %}
+    {% if results %}
+        <div class="table-responsive">
+            <table class="table table-hover align-middle shadow-sm rounded overflow-hidden">
+                <thead class="table-light">
+                    <tr>
+                        <th>Producto</th>
+                        <th>Tienda</th>
+                        <th>Precio</th>
+                        <th>Dif vs Mejor</th>
+                        <th>Unitario</th>
+                        <th>vs 30d</th>
+                        <th>Match</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody class="table-group-divider">
+                    {% set current_group = namespace(name="") %}
+                    {% for item in results %}
+                        {% if current_group.name != item.GRUPO %}
+                            {% set current_group.name = item.GRUPO %}
+                            <tr class="table-secondary">
+                                <td colspan="8" class="fw-bold small py-1 text-uppercase">{{ item.GRUPO }}</td>
+                            </tr>
+                        {% endif %}
+                        <tr class="{{ 'table-success' if item.DIFF == 'BEST' else '' }}">
+                            <td class="text-truncate" style="max-width: 200px;" title="{{ item.PRODUCTO }}">{{ item.PRODUCTO }}</td>
+                            <td class="fw-medium">
+                                {% if item.DIFF == 'BEST' %}🏆 {% endif %}{{ item.TIENDA }}
+                            </td>
+                            <td class="fw-bold">{{ item.PRECIO }}</td>
+                            <td>
+                                {% if item.DIFF == 'BEST' %}
+                                    <span class="badge text-bg-success">MEJOR</span>
+                                {% else %}
+                                    <span class="text-danger small">{{ item.DIFF }}</span>
+                                {% endif %}
+                            </td>
+                            <td class="small text-secondary">{{ item.UNIT_PRICE }}</td>
+                            <td>
+                                {% if item.STATUS == 'REAL_DEAL' or item.STATUS == 'NEW_LOW' %}
+                                    <span class="badge text-bg-success">{{ item.VS_MEDIAN }}</span>
+                                {% else %}
+                                    <span class="small">{{ item.VS_MEDIAN }}</span>
+                                {% endif %}
+                            </td>
+                            <td><span class="badge text-bg-light border small">{{ item.MATCH }}</span></td>
+                            <td>
+                                <a href="/compare?q={{ item.PRODUCTO | urlencode }}" class="btn btn-sm btn-outline-secondary py-0">Enfocar</a>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    {% else %}
+        <div class="alert alert-secondary text-center py-5">
+            <div class="fs-2 mb-3">🤷</div>
+            <h5>No hay coincidencias para "{{ q }}"</h5>
+            <p class="text-secondary mb-0">No encontramos productos comparables. Intenta con un término más general.</p>
+        </div>
+    {% endif %}
+{% else %}
+    {% if not q %}
+    <div class="text-center text-secondary py-5">
+        <div class="fs-1 mb-3">⚖</div>
+        <p>Escribe el nombre de un producto arriba para ver en qué tienda está más barato hoy.</p>
+    </div>
+    {% endif %}
+{% endif %}

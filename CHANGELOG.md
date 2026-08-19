@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.7.0-dev] - Unreleased
+- feat: DealHunter Web Phase B (Product Detail & Compare)
+- feat: `/products/<store_id>/<product_id>` layout with Tabs, History Chart, metrics, and Deal explanation
+- feat: `/compare` Cross-Store matching and visual layout with Best Store logic
+- feat: Client-side historical chart using local Chart.js with ranges
+- feat: Basic Products catalog and Breadcrumbs
+
 ## [2.6.0-dev] - Unreleased
 - feat: DealHunter Web Foundation (Flask + HTMX + Bootstrap)
 - feat: Web Application Shell with Desktop Sidebar & Mobile Bottom Nav

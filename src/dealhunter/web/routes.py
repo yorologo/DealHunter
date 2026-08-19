@@ -1,5 +1,5 @@
 from flask import render_template, request, current_app
-from dealhunter.web.queries import get_home_metrics, get_home_deals, get_watchlist, search_local
+from dealhunter.web.queries import get_home_metrics, get_home_deals, get_watchlist, search_local, get_product_detail, get_product_compare
 
 def register_routes(app):
     
@@ -27,6 +27,30 @@ def register_routes(app):
             return render_template('partials/search_results.html', results=results, q=q)
         return render_template('search_results.html', results=results, q=q, current_path='/search')
 
+
+    @app.route('/products')
+    def products():
+        db_path = current_app.config['DATABASE']
+        results = search_local(db_path, "", limit=50) # empty query matches somewhat, wait, empty query matches all with limits.
+        return render_template('products.html', results=results, current_path='/products')
+
+    @app.route('/products/<store_id>/<product_id>')
+    def product_detail(store_id, product_id):
+        db_path = current_app.config['DATABASE']
+        p = get_product_detail(db_path, store_id, product_id)
+        if not p:
+            return render_template('404_product.html', current_path='/products'), 404
+        return render_template('product_detail.html', p=p, current_path='/products')
+        
+    @app.route('/compare')
+    def compare():
+        q = request.args.get('q', '')
+        db_path = current_app.config['DATABASE']
+        res = get_product_compare(db_path, q) if q and len(q) >= 3 else []
+        if request.headers.get('HX-Request'):
+            return render_template('partials/compare_results.html', results=res, q=q)
+        return render_template('compare.html', results=res, q=q, current_path='/compare')
+
     # Placeholders
     @app.route('/deals')
     def deals(): return render_template('placeholder.html', title="Deals", current_path='/deals')
@@ -43,14 +67,12 @@ def register_routes(app):
     @app.route('/categories')
     def categories(): return render_template('placeholder.html', title="Categorías", current_path='/categories')
     
-    @app.route('/products')
-    def products(): return render_template('placeholder.html', title="Productos", current_path='/products')
+
     
     @app.route('/stores')
     def stores(): return render_template('placeholder.html', title="Tiendas", current_path='/stores')
     
-    @app.route('/compare')
-    def compare(): return render_template('placeholder.html', title="Comparar", current_path='/compare')
+
     
     @app.route('/watchlist')
     def watchlist_view(): return render_template('placeholder.html', title="Watchlist", current_path='/watchlist')

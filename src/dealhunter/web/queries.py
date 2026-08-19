@@ -51,7 +51,7 @@ def search_local(db_path, query, limit=10):
         SELECT DISTINCT p.product_id, p.store_id, p.name, s.name, p.image, p.brand
         FROM products p
         JOIN stores s ON p.store_id = s.store_id
-        WHERE p.name LIKE ? OR p.brand LIKE ? OR p.normalized_name LIKE ?
+        WHERE (p.name LIKE ? OR p.brand LIKE ? OR p.normalized_name LIKE ?)
         LIMIT ?
     ''', (f'%{query}%', f'%{query}%', f'%{query}%', limit))
     
@@ -85,3 +85,84 @@ def search_local(db_path, query, limit=10):
     
     return res
 
+import sqlite3
+from dealhunter.db import get_default_db_path
+from dealhunter.historico import compute_price_metrics, calculate_unit_price
+from datetime import datetime
+
+def get_product_detail(db_path, store_id, product_id):
+    c = sqlite3.connect(db_path).cursor()
+    c.execute('''
+        SELECT p.product_id, p.store_id, p.name, s.name, p.brand, 
+               p.quantity, p.unit, p.normalized_quantity, p.normalized_unit, p.pack_count
+        FROM products p
+        JOIN stores s ON p.store_id = s.store_id
+        WHERE p.store_id = ? AND p.product_id = ?
+    ''', (store_id, product_id))
+    row = c.fetchone()
+    if not row:
+        return None
+        
+    p = {
+        "product_id": row[0],
+        "store_id": row[1],
+        "product_name": row[2],
+        "store_name": row[3],
+        "brand": row[4],
+        "quantity": row[5],
+        "unit": row[6],
+        "normalized_quantity": row[7],
+        "normalized_unit": row[8],
+        "pack_count": row[9]
+    }
+    
+    # Get obs
+    c.execute('''
+        SELECT price, timestamp, original_price, availability, discount_promotion, promotion_type, promotion_label, run_id
+        FROM observations
+        WHERE store_id = ? AND product_id = ?
+        ORDER BY timestamp ASC
+    ''', (store_id, product_id))
+    
+    obs_rows = c.fetchall()
+    
+    obs = []
+    for r in obs_rows:
+        try:
+            ts = datetime.fromisoformat(r[1].replace("Z", ""))
+        except:
+            ts = datetime.now()
+        obs.append({
+            "price": r[0],
+            "timestamp": ts,
+            "original_price": r[2],
+            "availability": r[3],
+            "discount_promotion": r[4],
+            "promotion_type": r[5],
+            "promotion_label": r[6],
+            "run_id": r[7]
+        })
+        
+    p["observations"] = obs
+    p["metrics"] = compute_price_metrics(obs) if obs else None
+    if p["metrics"]:
+        p["unit_price"] = calculate_unit_price(p["metrics"]["current_price"], p["normalized_quantity"])
+    else:
+        p["unit_price"] = None
+        
+    # Alerts
+    c.execute("SELECT alert_type, triggered_at FROM alerts WHERE product_id = ? AND store_id = ? ORDER BY triggered_at DESC", (product_id, store_id))
+    alerts = c.fetchall()
+    p["alerts"] = [{"alert_type": a[0], "triggered_at": a[1]} for a in alerts]
+    
+    # Watchlist
+    c.execute("SELECT target_price FROM watchlist WHERE query = ? AND enabled = 1", (p["product_name"],))
+    w = c.fetchone()
+    p["target_price"] = w[0] if w else None
+    
+    return p
+
+def get_product_compare(db_path, product_name):
+    from dealhunter.historico import compare_stores
+    res = compare_stores(db_path, product_name)
+    return res
