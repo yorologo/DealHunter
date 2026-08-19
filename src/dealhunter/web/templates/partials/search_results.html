@@ -1,0 +1,28 @@
+<div class="p-2">
+{% if results.products or results.stores %}
+    {% if results.products %}
+    <div class="small fw-bold text-secondary text-uppercase mb-1 px-2">Productos</div>
+    {% for p in results.products[:5] %}
+    <a href="/products/{{ p.store_id }}/{{ p.product_id }}" class="dropdown-item rounded d-flex justify-content-between">
+        <span class="text-truncate" style="max-width: 70%;">{{ p.name }}</span>
+        <span class="small text-secondary">{{ p.store_name }}</span>
+    </a>
+    {% endfor %}
+    {% endif %}
+    
+    {% if results.stores %}
+    {% if results.products %}<hr class="my-1">{% endif %}
+    <div class="small fw-bold text-secondary text-uppercase mb-1 px-2 mt-2">Tiendas</div>
+    {% for s in results.stores[:3] %}
+    <a href="/stores/{{ s.store_id }}" class="dropdown-item rounded">
+        {{ s.name }}
+    </a>
+    {% endfor %}
+    {% endif %}
+    
+    <hr class="my-1">
+    <a href="/search?q={{ q }}" class="dropdown-item text-primary text-center small fw-bold">Ver todos los resultados</a>
+{% else %}
+    <div class="text-secondary text-center small py-2">Sin resultados</div>
+{% endif %}
+</div>

@@ -1,0 +1,13 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="d-flex flex-column align-items-center justify-content-center py-5 text-center">
+    <div class="fs-1 mb-3">🚧</div>
+    <h2 class="fw-bold">{{ title }}</h2>
+    {% if subtitle %}
+        <p class="text-secondary">{{ subtitle }}</p>
+    {% else %}
+        <p class="text-secondary">Próximamente. Esta vista está planificada para una fase futura.</p>
+    {% endif %}
+    <a href="/" class="btn btn-primary mt-3">Volver al inicio</a>
+</div>
+{% endblock %}

@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.6.0-dev] - Unreleased
+- feat: DealHunter Web Foundation (Flask + HTMX + Bootstrap)
+- feat: Web Application Shell with Desktop Sidebar & Mobile Bottom Nav
+- feat: Theme (Light/Dark/System) & Density preferences
+- feat: Local UI Search with `LIMIT`
+- feat: Home Dashboard integrating deals and system status
+- feat: `--port` argument in `bin/rappi-historico web`
+
 ## [2.5.0] - 2026-08-19
 - feat: DealHunter v2.5 Alerts Engine
 - feat: local notification evaluation (TARGET_PRICE, NEW_LOW, REAL_DEAL, PRICE_DROP, BACK_IN_STOCK)

@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="es" data-bs-theme="system">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DealHunter Web</title>
+    <link href="{{ url_for('static', filename='css/bootstrap.min.css') }}" rel="stylesheet">
+    <link href="{{ url_for('static', filename='css/style.css') }}" rel="stylesheet">
+    <script src="{{ url_for('static', filename='js/htmx.min.js') }}"></script>
+    <script>
+        // Init theme and density
+        const theme = localStorage.getItem('dealhunter_theme') || 'system';
+        const density = localStorage.getItem('dealhunter_density') || 'comfortable';
+        
+        function applyTheme(t) {
+            if (t === 'system') {
+                const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+                document.documentElement.setAttribute('data-bs-theme', prefersDark ? 'dark' : 'light');
+            } else {
+                document.documentElement.setAttribute('data-bs-theme', t);
+            }
+        }
+        applyTheme(theme);
+        
+        document.documentElement.setAttribute('data-density', density);
+    </script>
+</head>
+<body class="d-flex flex-column flex-md-row min-vh-100 bg-body-tertiary">
+
+    <!-- Mobile Top Bar -->
+    <header class="d-md-none bg-body border-bottom p-3 d-flex justify-content-between align-items-center sticky-top shadow-sm">
+        <h5 class="m-0 fw-bold">DealHunter</h5>
+        <div class="d-flex align-items-center gap-3">
+            <span class="badge text-bg-success rounded-pill d-flex align-items-center gap-1">
+                <span class="status-dot bg-white rounded-circle d-inline-block" style="width: 8px; height: 8px;"></span>
+                OK
+            </span>
+            <button class="btn btn-sm btn-outline-secondary" data-bs-toggle="offcanvas" data-bs-target="#mobileMenu">☰</button>
+        </div>
+    </header>
+
+    <!-- Desktop Sidebar -->
+    <aside class="d-none d-md-flex flex-column flex-shrink-0 p-3 bg-body border-end vh-100 sticky-top" style="width: 250px; overflow-y: auto;">
+        <a href="/" class="d-flex align-items-center mb-3 mb-md-0 me-md-auto text-decoration-none text-body">
+            <span class="fs-4 fw-bold">DealHunter</span>
+        </a>
+        <hr>
+        {% include 'partials/nav_links.html' %}
+        
+        <hr class="mt-auto">
+        <div class="d-flex align-items-center text-secondary small">
+            <span class="badge text-bg-success rounded-pill d-flex align-items-center gap-1 me-2">
+                <span class="status-dot bg-white rounded-circle d-inline-block" style="width: 8px; height: 8px;"></span>
+                OK
+            </span>
+            <span>Local DB Active</span>
+        </div>
+    </aside>
+
+    <!-- Mobile Offcanvas Menu (for items not in bottom nav) -->
+    <div class="offcanvas offcanvas-start" tabindex="-1" id="mobileMenu" aria-labelledby="mobileMenuLabel">
+        <div class="offcanvas-header">
+            <h5 class="offcanvas-title fw-bold" id="mobileMenuLabel">DealHunter</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+        </div>
+        <div class="offcanvas-body">
+            {% include 'partials/nav_links.html' %}
+        </div>
+    </div>
+
+    <!-- Main Content -->
+    <main class="flex-grow-1 p-3 p-md-4 mb-5 mb-md-0">
+        <!-- Desktop Top Bar -->
+        <div class="d-none d-md-flex justify-content-between align-items-center mb-4 bg-body p-3 rounded shadow-sm">
+            <div class="w-50 position-relative">
+                <input class="form-control" type="search" placeholder="Buscar productos, tiendas..." 
+                       name="q" hx-get="/search" hx-target="#searchResultsDropdown" hx-trigger="keyup changed delay:500ms">
+                <div id="searchResultsDropdown" class="position-absolute w-100 bg-body shadow rounded mt-1 z-3"></div>
+            </div>
+            <div class="dropdown">
+                <button class="btn btn-light dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                    ⚙ Preferencias
+                </button>
+                <ul class="dropdown-menu dropdown-menu-end">
+                    <li><h6 class="dropdown-header">Tema</h6></li>
+                    <li><a class="dropdown-item" href="#" onclick="setTheme('light')">☀️ Claro</a></li>
+                    <li><a class="dropdown-item" href="#" onclick="setTheme('dark')">🌙 Oscuro</a></li>
+                    <li><a class="dropdown-item" href="#" onclick="setTheme('system')">💻 Sistema</a></li>
+                    <li><hr class="dropdown-divider"></li>
+                    <li><h6 class="dropdown-header">Densidad</h6></li>
+                    <li><a class="dropdown-item" href="#" onclick="setDensity('comfortable')">Confortable</a></li>
+                    <li><a class="dropdown-item" href="#" onclick="setDensity('compact')">Compacto</a></li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- Mobile search full width -->
+        <div class="d-md-none mb-3 position-relative">
+            <input class="form-control" type="search" placeholder="🔎 Buscar..." 
+                   name="q" hx-get="/search" hx-target="#searchResultsDropdownMobile" hx-trigger="keyup changed delay:500ms">
+            <div id="searchResultsDropdownMobile" class="position-absolute w-100 bg-body shadow rounded mt-1 z-3"></div>
+        </div>
+
+        {% block content %}{% endblock %}
+    </main>
+
+    <!-- Mobile Bottom Nav -->
+    <nav class="d-md-none fixed-bottom bg-body border-top d-flex justify-content-around p-2 pb-safe shadow">
+        <a href="/" class="text-decoration-none text-center text-body {{ 'fw-bold text-primary' if current_path == '/' else '' }}">
+            <div class="fs-5">🏠</div>
+            <div class="small">Inicio</div>
+        </a>
+        <a href="/deals" class="text-decoration-none text-center text-body {{ 'fw-bold text-primary' if current_path == '/deals' else '' }}">
+            <div class="fs-5">🔥</div>
+            <div class="small">Deals</div>
+        </a>
+        <a href="/search" class="text-decoration-none text-center text-body {{ 'fw-bold text-primary' if current_path == '/search' else '' }}">
+            <div class="fs-5">🔎</div>
+            <div class="small">Buscar</div>
+        </a>
+        <a href="/watchlist" class="text-decoration-none text-center text-body {{ 'fw-bold text-primary' if current_path == '/watchlist' else '' }}">
+            <div class="fs-5">👁</div>
+            <div class="small">Seguir</div>
+        </a>
+    </nav>
+
+    <script src="{{ url_for('static', filename='js/bootstrap.bundle.min.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+</body>
+</html>

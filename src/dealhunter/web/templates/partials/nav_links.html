@@ -1,0 +1,26 @@
+<ul class="nav nav-pills flex-column mb-auto">
+    <li class="nav-item">
+        <a href="/" class="nav-link {{ 'active' if current_path == '/' else 'text-body' }}">
+            🏠 Inicio
+        </a>
+    </li>
+
+    <li class="nav-item mt-3 mb-1 fw-bold text-uppercase small text-secondary px-3">Comprar</li>
+    <li><a href="/deals" class="nav-link {{ 'active' if current_path == '/deals' else 'text-body' }}">🔥 Oportunidades</a></li>
+    <li><a href="/market" class="nav-link {{ 'active' if current_path == '/market' else 'text-body' }}">🛒 Supermercados</a></li>
+    <li><a href="/turbo" class="nav-link {{ 'active' if current_path == '/turbo' else 'text-body' }}">⚡ Turbo</a></li>
+    <li><a href="/restaurants" class="nav-link {{ 'active' if current_path == '/restaurants' else 'text-body' }}">🍔 Restaurantes</a></li>
+    <li><a href="/categories" class="nav-link {{ 'active' if current_path == '/categories' else 'text-body' }}">📦 Categorías</a></li>
+
+    <li class="nav-item mt-3 mb-1 fw-bold text-uppercase small text-secondary px-3">Investigar</li>
+    <li><a href="/products" class="nav-link {{ 'active' if current_path == '/products' else 'text-body' }}">🔎 Productos</a></li>
+    <li><a href="/stores" class="nav-link {{ 'active' if current_path == '/stores' else 'text-body' }}">🏪 Tiendas</a></li>
+    <li><a href="/compare" class="nav-link {{ 'active' if current_path == '/compare' else 'text-body' }}">⚖ Comparar</a></li>
+
+    <li class="nav-item mt-3 mb-1 fw-bold text-uppercase small text-secondary px-3">Seguir</li>
+    <li><a href="/watchlist" class="nav-link {{ 'active' if current_path == '/watchlist' else 'text-body' }}">👁 Watchlist</a></li>
+    <li><a href="/alerts" class="nav-link {{ 'active' if current_path == '/alerts' else 'text-body' }}">🔔 Alertas</a></li>
+
+    <li class="nav-item mt-3 mb-1 fw-bold text-uppercase small text-secondary px-3">Administrar</li>
+    <li><a href="/admin" class="nav-link {{ 'active' if current_path.startswith('/admin') else 'text-body' }}">🛠 Sistema</a></li>
+</ul>

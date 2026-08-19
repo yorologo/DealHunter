@@ -10,6 +10,7 @@ from dealhunter.historico import analyze_history, compare_stores
 from dealhunter.db import get_default_db_path
 from dealhunter.output import print_results
 from dealhunter.alerts import AlertEngine
+from dealhunter.web.app import run_server
 
 def main():
     parser = argparse.ArgumentParser()
@@ -37,7 +38,12 @@ def main():
     alerts_p.add_argument('--new', action='store_true', help="Show only unseen alerts")
     alerts_p.add_argument('--format', choices=['table', 'json', 'csv', 'markdown'], default='table')
     
+    
+    web_p = subparsers.add_parser("web")
+    web_p.add_argument('--port', type=int, default=8765)
+    
     args, unknown = parser.parse_known_args()
+
 
     db_path = get_default_db_path()
     
@@ -56,6 +62,12 @@ def main():
             res = engine.get_alerts(new_only=args.new, top=args.top, store=args.store, alert_type=args.type)
             print_results(res, format=args.format)
             return
+
+    
+    if args.command == "web":
+        print(f"DealHunter Web\nhttp://127.0.0.1:{args.port}")
+        run_server(port=args.port)
+        return
 
     if args.command == "compare":
         res = compare_stores(db_path, args.query, exact_only=args.exact_only, no_fuzzy=args.no_fuzzy)
