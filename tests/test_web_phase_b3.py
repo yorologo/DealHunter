@@ -19,15 +19,15 @@ def app():
     c.execute("INSERT INTO stores (store_id, name, type) VALUES ('s1', 'Soriana', 'market')")
     
     # Dish available with base price and toppings
-    c.execute("INSERT INTO products (product_id, store_id, name, category) VALUES ('d1', 'r1', 'Combo McTrio Elige tu gusto', 'Combos')")
+    c.execute("INSERT INTO products (product_id, store_id, name, category, has_toppings) VALUES ('d1', 'r1', 'Combo McTrio Elige tu gusto', 'Combos', 1)")
     c.execute("INSERT INTO observations (run_id, store_id, product_id, price, timestamp, availability) VALUES ('1', 'r1', 'd1', 120.0, '2026-08-01T00:00:00', 'AVAILABLE')")
     
     # Dish unavailable with direct discount
-    c.execute("INSERT INTO products (product_id, store_id, name, category) VALUES ('d2', 'r1', 'Papas Grandes', 'Extras')")
+    c.execute("INSERT INTO products (product_id, store_id, name, category, has_toppings) VALUES ('d2', 'r1', 'Papas Grandes', 'Extras', 0)")
     c.execute("INSERT INTO observations (run_id, store_id, product_id, price, original_price, discount_effective, promotion_label, timestamp, availability) VALUES ('1', 'r1', 'd2', 30.0, 50.0, 20.0, 'Directo', '2026-08-01T00:00:00', 'UNAVAILABLE')")
     
     # Dish without category
-    c.execute("INSERT INTO products (product_id, store_id, name, category) VALUES ('d3', 'r1', 'Helado Sencillo', NULL)")
+    c.execute("INSERT INTO products (product_id, store_id, name, category, has_toppings) VALUES ('d3', 'r1', 'Helado Sencillo', NULL, NULL)")
     c.execute("INSERT INTO observations (run_id, store_id, product_id, price, timestamp, availability) VALUES ('1', 'r1', 'd3', 20.0, '2026-08-01T00:00:00', 'AVAILABLE')")
     
     conn.commit()

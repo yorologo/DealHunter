@@ -83,3 +83,5 @@
 ## [v2.6.0] - Unreleased
 - **Feat**: Restaurants Web Experience (Phase B3) con menu grouping, dish cards, y manejo correcto de availability y precio base (toppings).
 - **Fix**: Schema v6 introduces `category` column to products table for true semantic taxonomy, replacing query_term fallbacks.
+
+- **Fix**: Schema v7 introduces `has_toppings` to products to eliminate unsafe NLP heuristic.

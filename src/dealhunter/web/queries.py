@@ -568,7 +568,7 @@ def get_restaurant_detail(db_path, store_id):
     c.execute('''
         SELECT p.product_id, p.name, COALESCE(NULLIF(TRIM(p.category), ''), 'Otros') as category,
                o.price, o.original_price, o.discount_effective, o.promotion_label, o.promotion_type, o.availability,
-               MAX(o.timestamp) as ts
+               MAX(o.timestamp) as ts, p.has_toppings
         FROM products p
         JOIN observations o ON p.product_id = o.product_id AND p.store_id = o.store_id
         WHERE p.store_id = ?
@@ -601,18 +601,8 @@ def get_restaurant_detail(db_path, store_id):
             "promotion_type": r[7],
             "availability": r[8],
             "ts": r[9],
-            "has_toppings": "elige" in r[1].lower() or "tu gusto" in r[1].lower() # We'll determine has_toppings dynamically if not explicit
+            "has_toppings": True if r[10] == 1 else (False if r[10] == 0 else None)
         }
-        
-        # A simple heuristic for has_toppings based on real data: DealHunter can't scrape modifiable items completely,
-        # but if name contains combo, arma, crea, etc it usually has toppings.
-        # Since DH doesn't have a specific `has_toppings` field in DB, we use basic heuristic or default to false, but the prompt says: "si has_toppings = true mostrar claramente: 'Precio base'". We'll add a check.
-        # Let's say if the name contains 'combo', 'arma', 'elige', 'personaliza', 'opciones'.
-        name_lower = dish["name"].lower()
-        if any(x in name_lower for x in ['combo', 'arma', 'elige', 'personaliza', 'opciones', 'tu gusto', 'agreg']):
-            dish["has_toppings"] = True
-        else:
-            dish["has_toppings"] = False
             
         dishes.append(dish)
         

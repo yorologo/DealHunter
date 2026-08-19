@@ -5,7 +5,7 @@ La fase B3 implementó una experiencia de restaurante dedicada, diferenciándola
 ## Precio Base y Toppings / Modificadores
 DealHunter no puede scrapear ni indexar todas las combinaciones posibles de toppings, extras y modificadores de platillos (ej. "combo arma tu gusto").
 Por lo tanto, hemos establecido las siguientes reglas:
-- **Precio Base**: Siempre que detectamos palabras como "combo", "arma", "elige", "personaliza", "opciones", marcamos el platillo con `has_toppings = true`.
+- **Precio Base**: USAMOS ESTRICTAMENTE metadata estructurada del origen (has_toppings). NUNCA inferimos ni inventamos atributos por NLP/palabras clave.
 - En la interfaz, mostramos explícitamente "Precio base" y advertimos que el precio "Puede cambiar al seleccionar opciones".
 - **Histórico**: Solo se realiza y muestra análisis de inteligencia de precios para el "Precio base" capturado.
 

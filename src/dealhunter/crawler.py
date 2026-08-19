@@ -192,6 +192,10 @@ def run_discover(config, lat, lng, conn, run_id, dry_run=False):
                     uid = f"{s_id}_{p_id}"
                     
                     cat = p.get("category_name", "")
+                    raw_toppings = p.get("has_toppings")
+                    has_toppings = None
+                    if raw_toppings is not None:
+                        has_toppings = 1 if raw_toppings else 0
                     brand = p.get("trademark", "")
                     pname = p.get("name", "")
                     
@@ -227,8 +231,8 @@ def run_discover(config, lat, lng, conn, run_id, dry_run=False):
                             
                         c.execute('''INSERT INTO products (product_id, store_id, name, brand, image, 
                                      normalized_name, quantity, unit, normalized_quantity, normalized_unit,
-                                     fingerprint, pack_count, category)
-                                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                                     fingerprint, pack_count, category, has_toppings)
+                                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                                      ON CONFLICT(product_id, store_id) DO UPDATE SET
                                      brand = COALESCE(NULLIF(brand, ''), excluded.brand),
                                      normalized_name = COALESCE(NULLIF(normalized_name, ''), excluded.normalized_name),
@@ -238,6 +242,7 @@ def run_discover(config, lat, lng, conn, run_id, dry_run=False):
                                      normalized_unit = COALESCE(NULLIF(normalized_unit, ''), excluded.normalized_unit),
                                      pack_count = COALESCE(pack_count, excluded.pack_count),
                                      category = COALESCE(NULLIF(category, ''), excluded.category),
+                                         has_toppings = COALESCE(has_toppings, excluded.has_toppings),
                                      image = COALESCE(NULLIF(image, ''), excluded.image),
                                      name = COALESCE(NULLIF(name, ''), excluded.name),
                                      fingerprint = CASE 
@@ -250,7 +255,7 @@ def run_discover(config, lat, lng, conn, run_id, dry_run=False):
                                   (p_id, s_id, pname, brand, img,
                                    norm["normalized_name"], norm["quantity"], norm["unit"], 
                                    norm["normalized_quantity"], norm["normalized_unit"], fingerprint,
-                                   norm["pack_count"], cat))
+                                   norm["pack_count"], cat, has_toppings))
                         
                         c.execute('''INSERT OR IGNORE INTO observations (run_id, store_id, product_id, price, original_price, stock, timestamp, 
                                      discount_price, discount_promotion, discount_effective, discount_source, promotion_type, promotion_label, query_term, availability)

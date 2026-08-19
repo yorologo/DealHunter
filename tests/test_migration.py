@@ -203,3 +203,45 @@ if __name__ == "__main__":
         passed += 1
         print(f"  PASS  {test.__name__}")
     print(f"\nMigration tests: {passed} total, {passed} passed, 0 failed.")
+
+
+def test_v5_to_v7_migration():
+    db_fd, db_path = tempfile.mkstemp(suffix=".db")
+    os.close(db_fd)
+    
+    conn = sqlite3.connect(db_path)
+    c = conn.cursor()
+    c.execute('CREATE TABLE schema_version (version INTEGER PRIMARY KEY)')
+    c.execute('INSERT INTO schema_version VALUES (5)')
+    
+    c.execute('''CREATE TABLE products
+                 (product_id TEXT, store_id TEXT, name TEXT, brand TEXT, image TEXT,
+                  normalized_name TEXT, quantity REAL, unit TEXT, 
+                  normalized_quantity REAL, normalized_unit TEXT, fingerprint TEXT,
+                  pack_count INTEGER,
+                  PRIMARY KEY (store_id, product_id))''')
+    
+    c.execute("INSERT INTO products VALUES ('p1', 's1', 'Prod 1', 'Brand 1', 'img', 'prod 1', 1.0, 'L', 1.0, 'L', 'fp', 1)")
+    conn.commit()
+    conn.close()
+    
+    # Run migration
+    setup_db(db_path)
+    
+    conn = sqlite3.connect(db_path)
+    c = conn.cursor()
+    
+    # Check if category and has_toppings were added
+    c.execute("PRAGMA table_info(products)")
+    columns = [row[1] for row in c.fetchall()]
+    assert "category" in columns
+    assert "has_toppings" in columns
+    
+    # Check if data preserved
+    c.execute("SELECT category, has_toppings FROM products WHERE product_id='p1'")
+    row = c.fetchone()
+    assert row[0] is None
+    assert row[1] is None
+    
+    conn.close()
+    os.remove(db_path)

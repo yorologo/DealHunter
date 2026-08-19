@@ -19,7 +19,7 @@
         </h6>
         
         <div class="mt-auto">
-            {% if d.has_toppings %}
+            {% if d.has_toppings == True %}
                 <div class="small text-secondary fw-bold mb-1">Precio base</div>
             {% endif %}
             
@@ -32,7 +32,7 @@
                 </div>
             </div>
             
-            {% if d.has_toppings %}
+            {% if d.has_toppings == True %}
                 <div class="small text-secondary mt-2 fst-italic lh-sm" style="font-size: 0.75rem;">
                     * Puede cambiar al seleccionar opciones.
                 </div>
