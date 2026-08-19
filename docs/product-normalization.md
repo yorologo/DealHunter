@@ -1,57 +1,82 @@
 # Product Normalization
 
-DealHunter v2.3 introduces a robust product normalization layer designed to extract and standardize brands, units, and quantities from raw product titles, allowing for fair cross-store comparisons.
+DealHunter v2.3 normaliza marcas, cantidades, unidades y composición de packs antes de comparar productos entre tiendas. La representación conserva tanto la cantidad total como el número de unidades del pack: dos presentaciones con el mismo volumen por unidad no son necesariamente el mismo producto.
 
-## Reglas de Parsing
+## Reglas de parsing
 
-El motor analiza el `name` del producto y el campo estructurado `brand` del endpoint de Unified Search para extraer información estructurada:
+El motor analiza `name` y el campo estructurado `brand` del proveedor para obtener:
 
-1. **Brand**: Se respeta el metadata estructurado si está presente, de lo contrario se deduce del string (futuro). Todo se lleva a lowercase.
-2. **Quantity & Unit**: Usando Regex para identificar patrones comunes como `2 L`, `500 ml`, `6 pack 355 ml`, `12 piezas`.
-3. **Normalized Name**: Se remueve la cantidad/unidad explícita del nombre del producto y caracteres especiales extraños.
+1. **Brand**: conserva el metadata estructurado, en minúsculas. No infiere una marca ausente desde el título.
+2. **Quantity & Unit**: extrae la cantidad total y la unidad declarada.
+3. **Normalized Quantity & Unit**: convierte `g` y `mg` a `kg`, y `ml` a `L`.
+4. **Pack Count**: registra cuántas unidades individuales contiene una presentación explícita. Una cantidad sin multiplicador tiene `pack_count = 1`; si no hay información suficiente, queda `NULL`.
+5. **Normalized Name**: elimina la expresión completa de cantidad/pack y canonicaliza el resto del título.
 
-## Unidades Soportadas
+El schema SQLite v4 añade `products.pack_count INTEGER`. La migración es idempotente y conserva todos los productos y observaciones existentes. Los registros v3 quedan con `pack_count = NULL` hasta volver a normalizarlos; `scripts/backfill_normalization.py <db>` migra con backup previo y procesa únicamente filas que aún necesitan esos datos.
 
-Actualmente DealHunter soporta la extracción y normalización de:
-* Peso: `g`, `mg` → `kg`
-* Volumen: `ml` → `L`
-* Unidades: `pz`, `pza`, `piezas` → `pieza`
-* Médico: `tableta`, `tabletas`, `cápsulas`, `capsula`
-* Agrupación: `pack` (ej. `6 pack 355 ml` se expande a `2.13 L` si se especifica submúltiplo).
+## Formatos soportados
 
-### Ejemplos Normalizados
+Las expresiones de volumen incluyen `1 L`, `1 l`, `1 lt`, `2 lt` y sus equivalentes en `ml`. Los packs reconocidos incluyen:
 
-| Raw Name | Brand | Normalized Name | Qty | Unit | Norm Qty | Norm Unit |
-|----------|-------|-----------------|-----|------|----------|-----------|
-| Coca Cola 2L | Coca-Cola | coca cola | 2 | L | 2 | L |
-| Coca-Cola 2000 ml | Coca-Cola | coca-cola | 2000 | ml | 2 | L |
-| Arroz 900 g | - | arroz | 900 | g | 0.9 | kg |
-| Croquetas 3 kg | - | croquetas | 3 | kg | 3 | kg |
-| Refresco 6 pack 355 ml | - | refresco | 2130 | ml | 2.13 | L |
-| Huevos 12 piezas | - | huevos | 12 | pieza | 12 | pieza |
+- `2 x 1 L`
+- `2x1 L`
+- `2 x botella 1 L`
+- `2 x 355 ml`
+- `6 x 355 ml`
+- `6 pack 355 ml`
+- `Pack 2 botellas 1L`
+- `Pack 6 latas de 355 ml`
 
-## Unit Price (Precio Unitario)
+Un multiplicador explícito sin tamaño, como `2 x Leche Deslactosada`, conserva `pack_count = 2`, pero mantiene cantidad y unidad desconocidas. No se inventa un volumen.
 
-La CLI ahora es capaz de calcular el precio unitario (`UNIT_PRICE`) de manera determinista al usar `rappi-historico`.
+Las unidades normalizadas son:
 
-Ejemplo:
-* `$180 / 2 L` → `$90.0 / L`
-* `$60 / 12 piezas` → `$5.0 / pieza`
+- Peso: `g`, `mg` → `kg`; `kg` se conserva.
+- Volumen: `ml` → `L`; `l`, `lt`, `litro` y `litros` → `L`.
+- Unidades: `pz`, `pza`, `pzas`, `pieza`, `piezas` → `pieza`.
+- Médico: `tableta(s)` y `cápsula(s)`.
+- Pack sin subcantidad: unidad `pack`.
 
-Puedes usar el parámetro de CLI `--sort unit-price` para priorizar los productos con el precio unitario más bajo. Los productos con cantidades ambiguas (donde no se puede calcular) se ubican al final del sorting de forma segura.
+## Ejemplos
 
-## Product Fingerprint
+| Raw Name | Normalized Name | Total Qty | Norm Unit | Pack Count |
+|---|---|---:|---|---:|
+| Coca Cola 2L | coca cola | 2 | L | 1 |
+| Coca-Cola 2000 ml | coca cola | 2 | L | 1 |
+| Arroz 900 g | arroz | 0.9 | kg | 1 |
+| Refresco 6 x 355 ml | refresco | 2.13 | L | 6 |
+| Refresco Pack 6 latas de 355 ml | refresco | 2.13 | L | 6 |
+| Leche 2 x botella 1 L | leche | 2 | L | 2 |
+| Leche 1 lt | leche | 1 | L | 1 |
 
-Se crea un fingerprint conservador concatenando `brand|normalized_name|normalized_quantity|normalized_unit`.
+La cantidad normalizada de un multipack es total. Por ejemplo, `6 x 355 ml` produce `2.13 L` y `pack_count = 6`. Esto permite calcular el precio por litro sin perder la composición comercial.
 
-Ejemplo conceptual:
-* `coca-cola|original|2|l`
+## Precio unitario
 
-> [!NOTE]
-> DealHunter actualmente utiliza coincidencias exactas para los fingerprints. Dos productos compartirán fingerprint solamente si su cadena generada coincide. Todavía no se usa Fuzzy Matching.
+`UNIT_PRICE` se calcula con la cantidad total normalizada:
 
-## Limitaciones
+- `$180 / 2 L` → `$90/L`
+- `$60 / 12 piezas` → `$5/pieza`
 
-* **Fuzzy Matching**: Aún no está implementado. `coca cola` y `coca-cola` podrían generar diferentes fingerprints.
-* **Toppings (Restaurantes)**: No se normalizan ni soportan variantes dentro de un mismo producto; se asume siempre el precio/cantidad base del platillo.
-* **Ambigüedad**: Si un producto no especifica claramente su unidad (ej: `Leche Entera`), la normalización fallará de forma segura (`quantity = NULL`), deshabilitando el cálculo de `UNIT_PRICE`.
+Una cantidad ausente o no positiva produce `UNIT_PRICE = NULL`; esos productos quedan al final al ordenar por precio unitario.
+
+## Fingerprint
+
+El fingerprint contiene `brand|normalized_name|normalized_quantity|normalized_unit` y, para multipacks, añade `pack-N`.
+
+Ejemplos:
+
+- `coca-cola|original|2|l`
+- `marca|refresco|2.13|l|pack-6`
+
+El número de pack evita que un multipack actualizado comparta fingerprint con una unidad de igual volumen total. Además, el matcher ejecuta sus reglas duras antes de aceptar un fingerprint, para proteger registros antiguos.
+
+## Comportamiento conservador
+
+- Una unidad de `1 L` no coincide con `2 x 1 L`.
+- `355 ml` no coincide con `6 x 355 ml`.
+- Dos expresiones equivalentes, como `6 x 355 ml` y `Pack 6 latas 355 ml`, sí pueden coincidir.
+- Cantidad o unidad desconocidas deshabilitan `HIGH_CONFIDENCE_MATCH` y `FUZZY_MATCH`. Sólo un fingerprint idéntico puede producir `EXACT_MATCH` en ese estado.
+- No se infiere una marca ausente ni una cantidad implícita.
+
+Los productos de restaurantes y toppings siguen requiriendo adaptadores específicos cuando su estructura no representa un SKU minorista normal.

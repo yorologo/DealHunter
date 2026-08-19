@@ -1,14 +1,16 @@
-import sqlite3
 import statistics
 from datetime import datetime, timedelta
 
+from .db import setup_db
+
 def analyze_history(db_path, config, store=None, product=None, explain=False):
-    conn = sqlite3.connect(db_path)
+    conn = setup_db(db_path)
     c = conn.cursor()
     
     query = '''
         SELECT o.store_id, o.product_id, p.name, s.name, o.price, o.timestamp, o.discount_effective,
-               p.brand, p.normalized_name, p.quantity, p.unit, p.normalized_quantity, p.normalized_unit, p.fingerprint
+               p.brand, p.normalized_name, p.quantity, p.unit, p.normalized_quantity, p.normalized_unit,
+               p.fingerprint, p.pack_count
         FROM observations o
         JOIN products p ON o.product_id = p.product_id AND o.store_id = p.store_id
         JOIN stores s ON o.store_id = s.store_id
@@ -32,13 +34,14 @@ def analyze_history(db_path, config, store=None, product=None, explain=False):
     
     grouped = {}
     for r in rows:
-        store_id, product_id, p_name, s_name, price, ts_str, d_eff, brand, norm_name, qty, unit, n_qty, n_unit, fp = r
+        store_id, product_id, p_name, s_name, price, ts_str, d_eff, brand, norm_name, qty, unit, n_qty, n_unit, fp, pack_count = r
         key = (store_id, product_id)
         if key not in grouped:
             grouped[key] = {
                 "product_name": p_name, "store_name": s_name, 
                 "brand": brand, "normalized_name": norm_name, "quantity": qty, "unit": unit,
                 "normalized_quantity": n_qty, "normalized_unit": n_unit, "fingerprint": fp,
+                "pack_count": pack_count,
                 "obs": []
             }
         try:
@@ -174,12 +177,12 @@ def analyze_history(db_path, config, store=None, product=None, explain=False):
         return sorted(results, key=lambda x: x["deal_score"], reverse=True)
 
 def compare_stores(db_path, query, exact_only=False, no_fuzzy=False):
-    conn = sqlite3.connect(db_path)
+    conn = setup_db(db_path)
     c = conn.cursor()
     c.execute('''
         SELECT p.product_id, p.store_id, p.name, s.name, o.price,
-               p.brand, p.normalized_name, p.quantity, p.unit, p.normalized_quantity, p.normalized_unit, p.fingerprint,
-               o.discount_effective
+               p.brand, p.normalized_name, p.quantity, p.unit, p.normalized_quantity, p.normalized_unit,
+               p.fingerprint, p.pack_count, o.discount_effective
         FROM observations o
         JOIN products p ON o.product_id = p.product_id AND o.store_id = p.store_id
         JOIN stores s ON o.store_id = s.store_id
@@ -197,7 +200,7 @@ def compare_stores(db_path, query, exact_only=False, no_fuzzy=False):
                 "product_id": r[0], "store_id": r[1], "product_name": r[2], "store_name": r[3], "price": r[4],
                 "brand": r[5], "normalized_name": r[6], "quantity": r[7], "unit": r[8],
                 "normalized_quantity": r[9], "normalized_unit": r[10], "fingerprint": r[11],
-                "discount_effective": r[12]
+                "pack_count": r[12], "discount_effective": r[13]
             }
             
     products = list(latest.values())

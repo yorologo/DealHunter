@@ -5,6 +5,7 @@ logs/
 # Databases
 rappi-deals.db
 rappi-deals.db.*.bak
+*.db.*.bak
 *.db
 *.sqlite3
 

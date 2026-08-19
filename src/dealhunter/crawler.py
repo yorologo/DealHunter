@@ -218,14 +218,20 @@ def run_discover(config, lat, lng, conn, run_id, dry_run=False):
                             
                         from .normalization import parse_product_name, generate_fingerprint
                         norm = parse_product_name(pname, brand)
-                        fingerprint = generate_fingerprint(norm["brand"], norm["normalized_name"], norm["normalized_quantity"], norm["normalized_unit"])
+                        fingerprint = generate_fingerprint(
+                            norm["brand"], norm["normalized_name"],
+                            norm["normalized_quantity"], norm["normalized_unit"],
+                            norm["pack_count"]
+                        )
                             
                         c.execute('''INSERT OR IGNORE INTO products (product_id, store_id, name, brand, image, 
-                                     normalized_name, quantity, unit, normalized_quantity, normalized_unit, fingerprint) 
-                                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''', 
+                                     normalized_name, quantity, unit, normalized_quantity, normalized_unit,
+                                     fingerprint, pack_count)
+                                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
                                   (p_id, s_id, pname, brand, img,
                                    norm["normalized_name"], norm["quantity"], norm["unit"], 
-                                   norm["normalized_quantity"], norm["normalized_unit"], fingerprint))
+                                   norm["normalized_quantity"], norm["normalized_unit"], fingerprint,
+                                   norm["pack_count"]))
                         
                         c.execute('''INSERT OR IGNORE INTO observations (run_id, store_id, product_id, price, original_price, stock, timestamp, 
                                      discount_price, discount_promotion, discount_effective, discount_source, promotion_type, promotion_label, query_term, availability)

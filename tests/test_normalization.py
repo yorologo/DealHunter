@@ -13,6 +13,21 @@ def test_normalization_basic():
     assert res["unit"] == "L"
     assert res["normalized_quantity"] == 2
     assert res["normalized_unit"] == "L"
+    assert res["pack_count"] == 1
+
+def test_normalization_liter_aliases():
+    for raw_name, expected_quantity in (
+        ("Leche 1 lt", 1),
+        ("Leche 2 lt", 2),
+        ("Leche 1 l", 1),
+    ):
+        res = parse_product_name(raw_name, "Lala")
+        assert res["normalized_name"] == "leche"
+        assert res["quantity"] == expected_quantity
+        assert res["unit"] == "L"
+        assert res["normalized_quantity"] == expected_quantity
+        assert res["normalized_unit"] == "L"
+        assert res["pack_count"] == 1
 
 def test_normalization_ml_to_L():
     res = parse_product_name("Coca-Cola 2000 ml", "Coca-Cola")
@@ -49,6 +64,33 @@ def test_normalization_packs():
     assert res["unit"] == "ml"
     assert res["normalized_quantity"] == 2.13
     assert res["normalized_unit"] == "L"
+    assert res["pack_count"] == 6
+
+def test_normalization_multiplier_packs():
+    cases = (
+        ("Leche 2 x 1 L", 2, "L", 2.0, "L", 2),
+        ("Leche 2x1 L", 2, "L", 2.0, "L", 2),
+        ("Refresco 2 x 355 ml", 710, "ml", 0.71, "L", 2),
+        ("Refresco 6 x 355 ml", 2130, "ml", 2.13, "L", 6),
+        ("Leche 2 x botella 1 L", 2, "L", 2.0, "L", 2),
+        ("Leche Pack 2 botellas 1L", 2, "L", 2.0, "L", 2),
+        ("Refresco Pack 6 latas de 355 ml", 2130, "ml", 2.13, "L", 6),
+    )
+    for raw_name, quantity, unit, normalized_quantity, normalized_unit, pack_count in cases:
+        res = parse_product_name(raw_name, "Marca")
+        assert res["normalized_name"] in ("leche", "refresco")
+        assert res["quantity"] == quantity
+        assert res["unit"] == unit
+        assert res["normalized_quantity"] == normalized_quantity
+        assert res["normalized_unit"] == normalized_unit
+        assert res["pack_count"] == pack_count
+
+def test_normalization_multiplier_without_size_preserves_pack():
+    res = parse_product_name("2 x Santa Clara Leche Deslactosada", "Santa Clara")
+    assert res["normalized_name"] == "santa clara leche deslactosada"
+    assert res["normalized_quantity"] is None
+    assert res["normalized_unit"] is None
+    assert res["pack_count"] == 2
 
 def test_normalization_missing():
     res = parse_product_name("Leche entera", "")
@@ -56,6 +98,7 @@ def test_normalization_missing():
     assert res["unit"] is None
     assert res["normalized_quantity"] is None
     assert res["normalized_unit"] is None
+    assert res["pack_count"] is None
 
 def test_unit_price():
     assert calculate_unit_price(180, 2) == 90.0
@@ -71,6 +114,9 @@ def test_fingerprint():
     
     fp2 = generate_fingerprint("", "leche entera", None, None)
     assert fp2 == "leche-entera"
+
+    pack_fp = generate_fingerprint("marca", "refresco", 2.13, "L", 6)
+    assert pack_fp == "marca|refresco|2.13|l|pack-6"
 
 if __name__ == "__main__":
     tests = [v for k, v in sorted(globals().items()) if k.startswith("test_")]
