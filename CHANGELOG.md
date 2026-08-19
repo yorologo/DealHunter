@@ -1,6 +1,6 @@
 # Changelog
 
-## [2.2.0-dev] - Unreleased
+## [2.2.0] - 2026-08-19
 - feat: structured error handling with error catalog and classification
 - feat: partial run support (preserves committed observations on failure)
 - feat: minimal checkpoint model for crawl progress tracking
