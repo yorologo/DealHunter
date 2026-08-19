@@ -2,42 +2,34 @@
 
 ```mermaid
 flowchart TD
-    subgraph Data Input
-        CLI([CLI: rappi-ofertas])
-    end
+    CLI([CLI]) --> CFG[Configuration]
+    CFG --> PRF[Profiles]
+    PRF --> FLT[Filters]
+    FLT --> CR[Crawler]
 
-    subgraph Crawler Layer
-        CR[Crawler Engine]
-        QS[Query Scheduler]
-        CR <--> QS
+    subgraph Crawler Modes
+        CR --> D[Discover]
+        CR --> U[Update]
     end
-
-    subgraph API
-        US[Unified Search Endpoint]
-    end
-
-    subgraph Data Processing
-        NM[Normalizer]
-        DE[Discount Engine]
-    end
-
+    
+    D --> NM[Normalizer]
+    U --> NM
+    
+    NM --> DE[Discount Engine]
+    
+    DE --> DB[(SQLite)]
+    
     subgraph Storage
-        DB[(SQLite)]
+        DB -->|Runs| TB1[(Runs)]
+        DB -->|Products| TB2[(Products)]
+        DB -->|Observations| TB3[(Observations)]
+        DB -->|Watchlist| TB4[(Watchlist)]
     end
-
-    subgraph Analytical Output
-        CLI2([CLI: rappi-historico])
-        HA[Historical Analyzer]
-        OUT[/Console / JSON Reporter/]
-    end
-
-    CLI --> CR
-    CR -->|HTTP POST| US
-    US -->|Raw JSON| NM
-    NM --> DE
-    DE -->|Inserts Runs & Obs| DB
-
-    CLI2 --> HA
-    HA -->|Reads| DB
-    HA --> OUT
+    
+    TB1 --> HA[Historical Analyzer]
+    TB2 --> HA
+    TB3 --> HA
+    TB4 --> HA
+    
+    HA --> REP[Reporter]
 ```
