@@ -31,6 +31,7 @@ Las plataformas de delivery suelen alterar el "Precio Original" antes de aplicar
 * **Rappi Turbo:** Integración nativa como vertical con análisis histórico de precios.
 * **Restaurantes:** Soporte inicial para menús, platillos y sus promociones (`rappi-ofertas restaurants`).
 * **Privacidad y Diagnósticos:** Verificación read-only y sanitizada del estatus de la cuenta de usuario.
+  > Authentication tokens are ephemeral and are never persisted by DealHunter.
 
 ## Cómo funciona
 ```text

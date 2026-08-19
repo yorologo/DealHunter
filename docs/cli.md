@@ -44,3 +44,14 @@ rappi-ofertas restaurants --query "pizza" --min-discount 20
 
 **Argumentos Adicionales:**
 * `--restaurant <nombre>`: Filtra por nombre de restaurante (funciona como alias de `--store`).
+
+---
+
+## `account status`
+Consulta read-only del estado de la sesión si se provee un token vía la variable de entorno `RAPPI_BEARER_TOKEN`.
+
+> Authentication tokens are ephemeral and are never persisted by DealHunter.
+
+```bash
+RAPPI_BEARER_TOKEN="ey..." rappi-ofertas account status
+```

@@ -25,3 +25,4 @@ jobs:
         python tests/test_turbo.py
         python tests/test_restaurants.py
         python tests/test_account.py
+        python tests/test_migration.py

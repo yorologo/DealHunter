@@ -26,6 +26,8 @@ Para extraer el token de sesión dinámicamente de la app móvil en tu dispositi
 * No se provee ningún bypass de autenticación.
 * El sistema **requiere** que el usuario provea manualmente su `RAPPI_BEARER_TOKEN` si desea habilitar funcionalidades que requieran autenticación.
 
+> Authentication tokens are ephemeral and are never persisted by DealHunter.
+
 ## Sanitización y Seguridad
 Si el sistema utiliza tu token para consultar el estatus de la cuenta, respeta la siguiente regla dura:
 

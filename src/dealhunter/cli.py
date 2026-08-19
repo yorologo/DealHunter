@@ -117,6 +117,10 @@ def handle_config_command(args):
     elif args.action == "get":
         print(cfg.get(args.key, ""))
     elif args.action == "set":
+        if args.key in ["rappi_token", "token", "bearer_token"]:
+            import sys
+            print("ERROR: Tokens cannot be saved to configuration for security reasons. Use RAPPI_BEARER_TOKEN env var.", file=sys.stderr)
+            sys.exit(1)
         try:
             val = float(args.value) if '.' in args.value else int(args.value)
         except:

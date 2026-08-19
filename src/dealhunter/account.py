@@ -3,8 +3,7 @@ from .api import fetch_account_profile
 from .errors import DealHunterError
 
 def get_account_token(config=None):
-    if config and config.get("rappi_token"):
-        return config["rappi_token"]
+    # Ensure tokens are never read from config files to avoid persistence
     return os.environ.get("RAPPI_BEARER_TOKEN")
 
 def sanitize_account_data(data):
