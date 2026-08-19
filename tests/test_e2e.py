@@ -39,46 +39,46 @@ def main():
         print("Testing CLI e2e offline...")
         
         # Test help
-        res = run_cmd("bin/rappi-ofertas --help")
+        res = run_cmd("python3 bin/rappi-ofertas --help")
         assert "DealHunter CLI v2.1" in res.stdout
         
-        res = run_cmd("bin/rappi-historico --help")
+        res = run_cmd("python3 bin/rappi-historico --help")
         assert "min-history-days" in res.stdout
         
         # Test config
-        res = run_cmd("bin/rappi-ofertas config set min_discount 40")
+        res = run_cmd("python3 bin/rappi-ofertas config set min_discount 40")
         assert res.returncode == 0
-        res = run_cmd("bin/rappi-ofertas config get min_discount")
+        res = run_cmd("python3 bin/rappi-ofertas config get min_discount")
         assert "40" in res.stdout
         
         # Test runs
-        res = run_cmd("bin/rappi-ofertas runs")
+        res = run_cmd("python3 bin/rappi-ofertas runs")
         assert res.returncode == 0
         
         # Test db stats
-        res = run_cmd("bin/rappi-ofertas db status")
+        res = run_cmd("python3 bin/rappi-ofertas db status")
         assert res.returncode == 0
         assert "stores" in res.stdout
         
         # Test dry-run discover
-        res = run_cmd("bin/rappi-ofertas discover --dry-run")
+        res = run_cmd("python3 bin/rappi-ofertas discover --dry-run")
         if "Dry run completed successfully." not in res.stderr: print("ERR WAS:", res.stderr); assert False
         
         # Test dry-run update
-        res = run_cmd("bin/rappi-ofertas update --dry-run")
+        res = run_cmd("python3 bin/rappi-ofertas update --dry-run")
         if "Dry run completed successfully." not in res.stderr: print("ERR WAS:", res.stderr); assert False
         
         # Test watchlist
-        res = run_cmd("bin/rappi-ofertas watch add 'Test' --below 100")
+        res = run_cmd("python3 bin/rappi-ofertas watch add 'Test' --below 100")
         assert res.returncode == 0
-        res = run_cmd("bin/rappi-ofertas watch list")
+        res = run_cmd("python3 bin/rappi-ofertas watch list")
         assert "Test" in res.stdout
         
         # Test historico output
-        res = run_cmd("bin/rappi-historico")
+        res = run_cmd("python3 bin/rappi-historico")
         assert res.returncode == 0
         
-        res = run_cmd("bin/rappi-historico --json")
+        res = run_cmd("python3 bin/rappi-historico --json")
         assert os.path.exists("history-analysis.json")
         
         print("E2E tests passed!")
