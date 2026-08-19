@@ -3,7 +3,7 @@ from datetime import datetime, timedelta
 
 from .db import setup_db
 from .price_intelligence import compute_price_metrics
-from .normalization import calculate_unit_price, compute_match
+from .normalization import calculate_unit_price, compute_match, format_unit_price
 
 def analyze_history(db_path, config, store=None, product=None):
     conn = setup_db(db_path)
@@ -70,7 +70,7 @@ def analyze_history(db_path, config, store=None, product=None):
         if req_status and estado not in req_status:
             continue
             
-        unit_price = calculate_unit_price(metrics["current_price"], data["normalized_quantity"])
+        unit_price = format_unit_price(metrics["current_price"], data["normalized_quantity"], data.get("normalized_unit"))
         
         res = {
             "store_id": key[0],
@@ -80,7 +80,7 @@ def analyze_history(db_path, config, store=None, product=None):
             "BRAND": data["brand"] or "",
             "QUANTITY": data["quantity"] or "",
             "UNIT": data["unit"] or "",
-            "UNIT_PRICE": unit_price if unit_price is not None else "",
+            "UNIT_PRICE": unit_price,
             "current_price": metrics["current_price"],
             "historical_min": metrics["historical_min"],
             "median_30d": metrics["median_30d"],
@@ -91,7 +91,8 @@ def analyze_history(db_path, config, store=None, product=None):
             "discount_vs_median_30d": metrics["discount_vs_median_30d"],
             "distance_from_historical_min": metrics["distance_from_historical_min"],
             "deal_status": estado,
-            "reason": metrics["reason"]
+            "reason": metrics["reason"],
+            "is_suspicious_reference": metrics.get("is_suspicious_reference", False)
         }
         
         results.append(res)
@@ -353,8 +354,7 @@ def compare_with_anchor(db_path, store_id, product_id):
     
     res = []
     for item in final_matches:
-        u_price = calculate_unit_price(item["price"], item["normalized_quantity"])
-        up_str = f"${u_price}/{item['normalized_unit']}" if u_price else ""
+        up_str = format_unit_price(item["price"], item["normalized_quantity"], item["normalized_unit"])
         metrics = item["metrics"]
         
         # Calculate VS_MEDIAN correctly using the discount_vs_median_30d

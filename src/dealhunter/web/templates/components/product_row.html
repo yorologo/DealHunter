@@ -1,0 +1,30 @@
+{% from 'components/status_badge.html' import render_status %}
+<div class="list-group-item list-group-item-action d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3">
+    <div class="flex-grow-1">
+        <div class="d-flex align-items-center gap-2 mb-1">
+            <span class="badge text-bg-light border">{{ p.store_name }}</span>
+            {% if p.metrics %}
+                {{ render_status(p.metrics.deal_status) }}
+            {% elif p.alert_type %}
+                {{ render_status(p.alert_type) }}
+            {% endif %}
+        </div>
+        <h6 class="fw-bold mb-0">
+            <a href="/products/{{ p.store_id }}/{{ p.product_id }}" class="text-decoration-none text-body">
+                {{ p.product_name }}
+            </a>
+        </h6>
+        <div class="small text-secondary">{{ p.brand or '' }}</div>
+    </div>
+    
+    <div class="text-md-end">
+        <div class="fs-5 fw-bold text-success lh-1">${{ "%.2f"|format(p.current_price) }}</div>
+        {% if p.unit_price %}
+            <div class="small text-secondary mt-1">{{ p.unit_price }}</div>
+        {% endif %}
+    </div>
+    
+    <div>
+        <a href="/compare?store_id={{ p.store_id }}&product_id={{ p.product_id }}" class="btn btn-sm btn-outline-secondary">⚖ Comparar</a>
+    </div>
+</div>

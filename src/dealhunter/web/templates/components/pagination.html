@@ -1,0 +1,23 @@
+{% macro render_pagination(data, current_url) %}
+{% if data.pages > 1 %}
+<nav aria-label="Page navigation" class="mt-4">
+    <ul class="pagination justify-content-center">
+        <li class="page-item {{ 'disabled' if data.page == 1 else '' }}">
+            <a class="page-link" href="#" 
+               hx-get="{{ current_url }}&page={{ data.page - 1 }}" hx-target="#catalog-grid"
+               {% if data.page == 1 %}tabindex="-1" aria-disabled="true"{% endif %}>Anterior</a>
+        </li>
+        
+        <li class="page-item active" aria-current="page">
+            <span class="page-link">{{ data.page }} de {{ data.pages }}</span>
+        </li>
+        
+        <li class="page-item {{ 'disabled' if data.page == data.pages else '' }}">
+            <a class="page-link" href="#" 
+               hx-get="{{ current_url }}&page={{ data.page + 1 }}" hx-target="#catalog-grid"
+               {% if data.page == data.pages %}tabindex="-1" aria-disabled="true"{% endif %}>Siguiente</a>
+        </li>
+    </ul>
+</nav>
+{% endif %}
+{% endmacro %}

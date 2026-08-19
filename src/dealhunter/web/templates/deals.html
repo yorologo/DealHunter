@@ -1,0 +1,54 @@
+{% extends 'base.html' %}
+{% block content %}
+
+<!-- BREADCRUMBS -->
+<nav aria-label="breadcrumb" class="mb-3">
+  <ol class="breadcrumb small">
+    <li class="breadcrumb-item"><a href="/" class="text-decoration-none">Home</a></li>
+    <li class="breadcrumb-item active" aria-current="page">Oportunidades</li>
+  </ol>
+</nav>
+
+<div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center mb-4 gap-3">
+    <h3 class="fw-bold m-0">🔥 Oportunidades</h3>
+</div>
+
+<ul class="nav nav-tabs mb-4 flex-nowrap overflow-x-auto overflow-y-hidden" style="white-space: nowrap; -webkit-overflow-scrolling: touch;" id="dealsTabs" role="tablist">
+    {% set tabs = ['Todo', 'NEW_LOW', 'REAL_DEAL', 'GOOD_PRICE', 'PRICE_DROP', 'TARGET_PRICE', 'BACK_IN_STOCK'] %}
+    {% for t in tabs %}
+    <li class="nav-item" role="presentation">
+        <a class="nav-link {{ 'active fw-bold' if tab == t else 'text-secondary' }}" 
+           href="/deals?tab={{ t }}&sort={{ sort }}">{{ t }}</a>
+    </li>
+    {% endfor %}
+</ul>
+
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card shadow-sm border-0">
+            <div class="card-body py-2">
+                <form id="filter-form" hx-get="/deals" hx-target="#catalog-grid" hx-push-url="true" class="row g-3 align-items-center">
+                    <input type="hidden" name="tab" value="{{ tab }}">
+                    <div class="col-auto">
+                        <label class="form-label small text-secondary fw-bold mb-0 me-2">Ordenar por</label>
+                    </div>
+                    <div class="col-auto">
+                        <select name="sort" class="form-select form-select-sm" onchange="document.getElementById('filter-form').dispatchEvent(new Event('submit'))">
+                            <option value="opportunity" {% if sort == 'opportunity' %}selected{% endif %}>Prioridad</option>
+                            <option value="drop" {% if sort == 'drop' %}selected{% endif %}>Mayor caída (%)</option>
+                            <option value="discount" {% if sort == 'discount' %}selected{% endif %}>Descuento vs Mediana</option>
+                            <option value="price" {% if sort == 'price' %}selected{% endif %}>Menor Precio</option>
+                            <option value="recent" {% if sort == 'recent' %}selected{% endif %}>Más reciente</option>
+                        </select>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="catalog-grid">
+    {% include 'partials/catalog_grid.html' %}
+</div>
+
+{% endblock %}

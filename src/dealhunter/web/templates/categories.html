@@ -1,0 +1,38 @@
+{% extends 'base.html' %}
+{% block content %}
+<nav aria-label="breadcrumb" class="mb-3">
+  <ol class="breadcrumb small">
+    <li class="breadcrumb-item"><a href="/" class="text-decoration-none">Home</a></li>
+    <li class="breadcrumb-item active" aria-current="page">Categorías</li>
+  </ol>
+</nav>
+
+<h3 class="fw-bold mb-4">📦 Categorías</h3>
+
+<div class="row row-cols-1 row-cols-sm-2 row-cols-md-3 row-cols-lg-4 g-4">
+    {% for cat in cats %}
+    <div class="col">
+        <a href="/categories/{{ cat.name | urlencode }}" class="text-decoration-none">
+            <div class="card h-100 shadow-sm hover-shadow transition-all border-0 bg-body-tertiary">
+                <div class="card-body text-center py-4">
+                    <h5 class="fw-bold text-body text-uppercase mb-3">{{ cat.name }}</h5>
+                    <div class="d-flex justify-content-center gap-3 text-secondary small">
+                        <div>
+                            <span class="fw-bold fs-5 d-block text-body">{{ cat.products }}</span>
+                            Productos
+                        </div>
+                        <div>
+                            <span class="fw-bold fs-5 d-block text-body">{{ cat.stores }}</span>
+                            Tiendas
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </a>
+    </div>
+    {% endfor %}
+</div>
+{% if not cats %}
+    <div class="alert alert-secondary text-center">No hay categorías disponibles.</div>
+{% endif %}
+{% endblock %}

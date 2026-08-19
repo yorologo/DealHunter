@@ -1,0 +1,76 @@
+{% extends 'base.html' %}
+{% block content %}
+<nav aria-label="breadcrumb" class="mb-3">
+  <ol class="breadcrumb small">
+    <li class="breadcrumb-item"><a href="/" class="text-decoration-none">Home</a></li>
+    <li class="breadcrumb-item"><a href="/stores" class="text-decoration-none">Tiendas</a></li>
+    <li class="breadcrumb-item active" aria-current="page">{{ detail.name }}</li>
+  </ol>
+</nav>
+
+<div class="card shadow-sm border-0 mb-4 bg-body-tertiary">
+    <div class="card-body p-4">
+        <div class="d-flex justify-content-between align-items-start mb-2">
+            <span class="badge text-bg-light border text-uppercase">{{ detail.type }}</span>
+            <div class="small text-secondary">ID: {{ detail.store_id }}</div>
+        </div>
+        <h2 class="fw-bold mb-3">{{ detail.name }}</h2>
+        <div class="row g-3">
+            <div class="col-6 col-md-3">
+                <div class="small text-secondary">Productos</div>
+                <div class="fs-4 fw-bold">{{ detail.products }}</div>
+            </div>
+            <div class="col-6 col-md-3">
+                <div class="small text-secondary">Última actualización</div>
+                <div class="fs-5 fw-medium mt-1">{{ detail.last_obs[:10] if detail.last_obs else 'Nunca' }}</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% if detail.categories %}
+<div class="mb-5">
+    <h5 class="fw-bold mb-3">Categorías disponibles</h5>
+    <div class="d-flex flex-wrap gap-2">
+        {% for cat in detail.categories %}
+        <a href="/stores/{{ detail.store_id }}?category={{ cat.name | urlencode }}" 
+           class="btn btn-sm btn-outline-secondary">
+            {{ cat.name }} <span class="badge text-bg-light ms-1">{{ cat.count }}</span>
+        </a>
+        {% endfor %}
+    </div>
+</div>
+{% endif %}
+
+<div class="d-flex justify-content-between align-items-end mb-3 mt-5">
+    <h4 class="fw-bold m-0">Catálogo de {{ detail.name }}</h4>
+    <div class="text-secondary small">{{ data.total }} productos</div>
+</div>
+
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card shadow-sm border-0">
+            <div class="card-body py-2">
+                <form id="filter-form" hx-get="/stores/{{ detail.store_id }}" hx-target="#catalog-grid" hx-push-url="true" class="row g-3 align-items-center">
+                    <div class="col-auto">
+                        <label class="form-label small text-secondary fw-bold mb-0 me-2">Ordenar por</label>
+                    </div>
+                    <div class="col-auto">
+                        <select name="sort" class="form-select form-select-sm" onchange="document.getElementById('filter-form').dispatchEvent(new Event('submit'))">
+                            <option value="opportunity" {% if sort == 'opportunity' %}selected{% endif %}>Prioridad</option>
+                            <option value="price_asc" {% if sort == 'price_asc' %}selected{% endif %}>Menor Precio</option>
+                            <option value="name_asc" {% if sort == 'name_asc' %}selected{% endif %}>Nombre A-Z</option>
+                            <option value="recent" {% if sort == 'recent' %}selected{% endif %}>Más reciente</option>
+                        </select>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="catalog-grid">
+    {% include 'partials/catalog_grid.html' %}
+</div>
+
+{% endblock %}

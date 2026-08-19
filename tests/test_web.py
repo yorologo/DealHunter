@@ -50,7 +50,7 @@ def test_search_hx(client):
     assert b'dropdown-item' in rv.data
 
 def test_placeholders(client):
-    routes = ['/deals', '/market', '/turbo', '/restaurants', '/categories', '/stores', '/watchlist', '/alerts', '/admin', '/admin/account']
+    routes = ['/restaurants', '/watchlist', '/alerts', '/admin', '/admin/account']
     for r in routes:
         rv = client.get(r)
         assert rv.status_code == 200

@@ -1,0 +1,46 @@
+{% if data['items'] %}
+    {% if view_mode == 'rows' %}
+        <div class="list-group shadow-sm">
+            {% for p in data['items'] %}
+                {% if p.type == 'alert' or p.type == 'pi' %}
+                    {% set item = p.data %}
+                {% else %}
+                    {% set item = p %}
+                {% endif %}
+                {% include 'components/product_row.html' with context %}
+            {% endfor %}
+        </div>
+    {% else %}
+        <div class="row row-cols-1 row-cols-sm-2 row-cols-md-3 row-cols-lg-4 g-4">
+            {% for p in data['items'] %}
+                {% if p.type == 'alert' or p.type == 'pi' %}
+                    {% set item = p.data %}
+                {% else %}
+                    {% set item = p %}
+                {% endif %}
+                <div class="col">
+                    {% with p=item %}
+                        {% include 'components/product_card.html' %}
+                    {% endwith %}
+                </div>
+            {% endfor %}
+        </div>
+    {% endif %}
+    
+    {% from 'components/pagination.html' import render_pagination %}
+    
+    <!-- We need a way to pass the current URL parameters to pagination. We can reconstruct it or use JS. -->
+    <!-- htmx hx-include can be used, but since the pagination is just GET params, we can build it. -->
+    {% set query_params = request.query_string.decode('utf-8') %}
+    {% set clean_query = query_params|replace('page=' ~ data.page, '')|replace('&&', '&') %}
+    {% set base_url = request.path ~ '?' ~ clean_query %}
+    
+    {{ render_pagination(data, base_url) }}
+    
+{% else %}
+    <div class="alert alert-secondary text-center py-5">
+        <div class="fs-1 mb-3">🤷</div>
+        <h4>No se encontraron resultados</h4>
+        <p class="text-secondary mb-0">Intenta ajustar los filtros para encontrar lo que buscas.</p>
+    </div>
+{% endif %}

@@ -155,3 +155,13 @@ def test_compare_anchor_strict_rules(client):
     res_sham = compare_with_anchor(db, 's1', 'p_sham_anc')
     assert 'p_sham_nm' not in [m['product_id'] for m in res_sham['matches']]
 
+
+def test_format_unit_price():
+    from dealhunter.normalization import format_unit_price
+    assert format_unit_price(42, 2, 'L') == '$21/L'
+    assert format_unit_price(42, 2000, 'ml') == '$21/L'
+    assert format_unit_price(20, 500, 'ml') == '$40/L'
+    assert format_unit_price(80, 1, 'kg') == '$80/kg'
+    assert format_unit_price(40, 500, 'g') == '$80/kg'
+    # 6 x 355 ml = 2130 ml
+    assert format_unit_price(42.6, 2130, 'ml') == '$20/L'

@@ -77,7 +77,7 @@
                 {% if p.metrics %}
                     <div class="fs-1 fw-bold text-success lh-1">${{ "%.2f"|format(p.metrics.current_price) }}</div>
                     {% if p.unit_price %}
-                        <div class="text-secondary mt-1 fw-medium">${{ "%.2f"|format(p.unit_price) }} / {{ p.normalized_unit }}</div>
+                        <div class="text-secondary mt-1 fw-medium">{{ p.unit_price }}</div>
                     {% endif %}
                     {% if p.metrics.previous_price and p.metrics.previous_price != p.metrics.current_price %}
                         <div class="text-secondary small mt-1">Anterior: ${{ "%.2f"|format(p.metrics.previous_price) }}</div>
