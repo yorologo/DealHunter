@@ -27,3 +27,11 @@ Ejecución: --vertical general
 ```
 
 Gracias a los verticales, las farmacias y tiendas de tecnología pueden florecer independientemente sin ser devoradas por la marea de abarrotes.
+* `turbo`
+* `restaurants`
+
+## Rappi Turbo (`--vertical turbo`)
+Turbo cuenta con su propio ecosistema de tiendas ocultas identificadas estructuralmente (por ejemplo, `chiper_home`, `chiper_extended`, `chiper_express`). Al indicar `turbo`, DealHunter restringe el universo de extracción excluyendo supermercados y filtrando estrictamente los `store_type` confirmados de Turbo.
+
+## Restaurantes (`--vertical restaurants`)
+El módulo de restaurantes trata los menús y platillos bajo un modelo de datos compatible. Al invocar explícitamente `--vertical restaurants` (o usando el comando directo `rappi-ofertas restaurants`), DealHunter se enfoca en tiendas cuyo `parent_store_type` es `"restaurants"`.

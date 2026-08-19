@@ -58,3 +58,13 @@ rappi-ofertas update --dry-run
 ```bash
 rappi-historico compare "Leche Lala"
 ```
+
+## Caso G — Encontrar promociones en Restaurantes
+**Objetivo:** El usuario quiere ver ofertas de hamburguesas en restaurantes cercanos con al menos 20% de descuento.
+**Flujo:**
+```bash
+rappi-ofertas restaurants --query "hamburguesa" --min-discount 20
+```
+1. El motor rastrea el catálogo de restaurantes y normaliza los precios.
+2. Identifica combos, descuentos y promociones de `discounts_bundle`.
+3. Filtra y muestra únicamente los platillos que cumplen el criterio.

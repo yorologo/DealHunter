@@ -5,7 +5,10 @@ from .db import setup_db, db_status, db_integrity, db_vacuum, backup_db
 from .crawler import run_discover, run_update
 from .historico import analyze_history, compare_stores
 from .output import print_results
+from .doctor import run_doctor, format_doctor_output
 from datetime import datetime
+
+VERSION = "2.2.0-dev"
 
 def build_parser():
     # Base parser for shared arguments
@@ -70,7 +73,7 @@ def build_parser():
     group_out.add_argument('--output', type=str, help="Output file")
     group_out.add_argument('--compact', action='store_true', help="Compact output format")
     
-    parser = argparse.ArgumentParser(description="DealHunter CLI v2.1", parents=[base_parser])
+    parser = argparse.ArgumentParser(description=f"DealHunter CLI v{VERSION}", parents=[base_parser])
     subparsers = parser.add_subparsers(dest="command", title="Subcommands", description="Available commands")
     
     # Subcommands
@@ -82,6 +85,12 @@ def build_parser():
     discover_p = subparsers.add_parser("discover", help="Discover new deals via crawler", parents=[base_parser])
     update_p = subparsers.add_parser("update", help="Update known deals quickly", parents=[base_parser])
     
+    rest_p = subparsers.add_parser("restaurants", help="Discover deals in restaurants", parents=[base_parser])
+    rest_p.add_argument("--restaurant", action="append", help="Filter by restaurant name (alias for --store)")
+
+    acc_p = subparsers.add_parser("account", help="Read-only account diagnostics")
+    acc_p.add_argument("action", choices=["status"])
+
     db_p = subparsers.add_parser("db", help="Database management")
     db_p.add_argument("action", choices=["status", "integrity", "backup", "vacuum"])
 
@@ -95,6 +104,9 @@ def build_parser():
     watch_p.add_argument("query_or_id", nargs="?")
     watch_p.add_argument("--below", type=float)
 
+    doctor_p = subparsers.add_parser("doctor", help="Run system diagnostics")
+    doctor_p.add_argument("--network", action='store_true', help="Include network checks (not yet implemented)")
+
     return parser
 
 def handle_config_command(args):
@@ -105,6 +117,10 @@ def handle_config_command(args):
     elif args.action == "get":
         print(cfg.get(args.key, ""))
     elif args.action == "set":
+        if args.key in ["rappi_token", "token", "bearer_token"]:
+            import sys
+            print("ERROR: Tokens cannot be saved to configuration for security reasons. Use RAPPI_BEARER_TOKEN env var.", file=sys.stderr)
+            sys.exit(1)
         try:
             val = float(args.value) if '.' in args.value else int(args.value)
         except:
@@ -134,6 +150,26 @@ def main(args_list=None):
         
     if args.command == "config":
         handle_config_command(args)
+        return
+
+    if args.command == "doctor":
+        import os
+        db_path = os.environ.get("RAPPI_DB_PATH", os.path.expanduser("~/rappi-deal-hunter/rappi-deals.db"))
+        checks = run_doctor(db_path=db_path, check_network=getattr(args, "network", False))
+        print(format_doctor_output(checks))
+        return
+
+    if args.command == "account":
+        from .account import get_account_status
+        import json
+        if args.action == "status":
+            try:
+                status = get_account_status(config)
+                print(json.dumps(status, indent=2))
+            except Exception as e:
+                from .errors import classify_error
+                err = classify_error(e)
+                print(f"Error checking account: {err}", file=sys.stderr)
         return
         
     conn = setup_db()
@@ -190,7 +226,12 @@ def main(args_list=None):
         return
         
     # Crawler commands
-    if args.command in ("discover", "update", None):
+    if args.command in ("discover", "update", "restaurants", None):
+        if args.command == "restaurants":
+            config["vertical"] = ["restaurants"]
+            if getattr(args, "restaurant", None):
+                config["store"] = args.restaurant
+
         run_id = f"run_{datetime.now().strftime('%Y%m%d_%H%M%S_%f')}"
         c = conn.cursor()
         lat, lng = config.get("lat", 19.4326), config.get("lng", -99.1332)
@@ -202,10 +243,17 @@ def main(args_list=None):
         mode = args.command if args.command else "discover"
         print(f"Running mode: {mode}", file=sys.stderr)
         
-        if mode == "discover":
-            state, reqs = run_discover(config, lat, lng, conn, run_id, dry_run=config.get("dry_run"))
-        else:
-            state, reqs = run_update(config, lat, lng, conn, run_id, dry_run=config.get("dry_run"))
+        try:
+            if mode == "discover":
+                state, reqs = run_discover(config, lat, lng, conn, run_id, dry_run=config.get("dry_run"))
+            else:
+                state, reqs = run_update(config, lat, lng, conn, run_id, dry_run=config.get("dry_run"))
+        except Exception as exc:
+            # Preserve already-committed observations; mark run as PARTIAL
+            from .errors import classify_error
+            err = classify_error(exc)
+            state = "PARTIAL"
+            print(f"Run interrupted: {err}", file=sys.stderr)
             
         c.execute('''UPDATE runs SET status = ?, finished_at = CURRENT_TIMESTAMP WHERE run_id = ?''', (state, run_id))
         conn.commit()

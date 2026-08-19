@@ -3,6 +3,8 @@ import sys
 from datetime import datetime
 from .api import fetch_unified_search
 from .discounts import calculate_discount
+from .errors import DealHunterError, classify_error
+from .checkpoint import RunCheckpoint, save_checkpoint
 
 VERTICALS = {
     "supermercado": ["super", "mercado", "oferta", "descuento", "2x1", "carne", "leche", "fruta"],
@@ -12,8 +14,20 @@ VERTICALS = {
     "higiene": ["higiene", "jabon", "shampoo", "desodorante", "pasta dental", "crema", "bed bath"],
     "hogar": ["hogar", "limpieza", "detergente", "limpiador", "escoba", "suavizante"],
     "tecnologia": ["tecnologia", "cables", "audifonos", "usb", "electronica", "macstore", "lumen"],
+    "turbo": ["turbo", "turbo fresh", "express", "despensa turbo"],
+    "restaurants": ["hamburguesa", "pizza", "sushi", "tacos", "ensalada", "pollo"],
     "test_run": ["frutarindo"]
 }
+
+def is_turbo_store(store_data):
+    parent = store_data.get("parent_store_type", "").lower()
+    stype = store_data.get("store_type", "").lower()
+    turbo_types = ("chiper_home", "chiper_extended", "chiper_express")
+    return parent in turbo_types or stype in turbo_types
+
+def is_restaurant(store_data):
+    parent = store_data.get("parent_store_type", "").lower()
+    return parent == "restaurants"
 
 def matches_filters(p_name, brand, s_name, category, config, d_eff, p_type, eff_price):
     if config.get("min_discount", 0) > d_eff:
@@ -77,6 +91,14 @@ def run_discover(config, lat, lng, conn, run_id, dry_run=False):
     
     results = []
     global_state = "COMPLETED"
+    error_code = None
+    
+    # Initialize checkpoint
+    checkpoint = RunCheckpoint(
+        run_id=run_id,
+        mode="discover",
+        status="RUNNING",
+    )
     
     for v_name in verticals_to_run:
         base_queries = queries_to_run if queries_to_run else VERTICALS.get(v_name, [v_name])
@@ -87,12 +109,16 @@ def run_discover(config, lat, lng, conn, run_id, dry_run=False):
         vertical_total_valid = 0
         state = "LOW_COVERAGE"
         
+        checkpoint.current_vertical = v_name
+        
         while queries:
             if requests_count >= max_reqs:
                 global_state = "REQUEST_BUDGET_REACHED"
+                error_code = "REQUEST_BUDGET_REACHED"
                 break
             if time.time() - start_time >= max_time:
                 global_state = "TIMEOUT"
+                error_code = "TIMEOUT"
                 break
                 
             q = queries.pop(0).lower().strip()
@@ -102,16 +128,43 @@ def run_discover(config, lat, lng, conn, run_id, dry_run=False):
             visited.add(q)
             if dry_run:
                 print(f"[DRY-RUN] Would search: {q}")
+                checkpoint.queries_completed += 1
+                checkpoint.last_completed_query = q
                 continue
                 
             print(f"    [{v_name}] Query: '{q}'", file=sys.stderr)
-            data = fetch_unified_search(q, lat, lng)
+            
+            try:
+                data = fetch_unified_search(q, lat, lng)
+            except Exception as exc:
+                err = classify_error(exc)
+                print(f"    [{v_name}] Error: {err}", file=sys.stderr)
+                if not err.recoverable or err.code in ("HTTP_429", "CLOUDFLARE_LIMIT"):
+                    # For rate limits: stop conservatively, preserve what we have
+                    global_state = "PARTIAL"
+                    error_code = err.code
+                    # Save checkpoint before stopping
+                    checkpoint.status = "PARTIAL"
+                    checkpoint.error_code = err.code
+                    checkpoint.requests_made = requests_count
+                    save_checkpoint(conn, checkpoint)
+                    return global_state, requests_count
+                # For recoverable errors, skip this query and continue
+                continue
+            
             requests_count += 1
             
             if data == "RATE_LIMIT":
-                global_state = "RATE_LIMITED"
-                break
+                global_state = "PARTIAL"
+                error_code = "HTTP_429"
+                checkpoint.status = "PARTIAL"
+                checkpoint.error_code = "HTTP_429"
+                checkpoint.requests_made = requests_count
+                save_checkpoint(conn, checkpoint)
+                return global_state, requests_count
             elif not data:
+                checkpoint.queries_completed += 1
+                checkpoint.last_completed_query = q
                 continue
                 
             stores = data.get("stores", []) or []
@@ -119,6 +172,11 @@ def run_discover(config, lat, lng, conn, run_id, dry_run=False):
             total_in_query = 0
             
             for s in stores:
+                if v_name == "turbo" and not is_turbo_store(s):
+                    continue
+                if v_name == "restaurants" and not is_restaurant(s):
+                    continue
+                    
                 s_id = str(s.get("store_id"))
                 s_name = s.get("store_name", s_id)
                 
@@ -141,8 +199,13 @@ def run_discover(config, lat, lng, conn, run_id, dry_run=False):
                         seen_in_run.add(uid)
                         new_in_query += 1
                         
-                        if not p.get("in_stock", False) or p.get("stock", 0) <= 0:
-                            continue
+                        is_in_stock = p.get("in_stock", False) or p.get("is_available", False)
+                        stock_val = p.get("stock")
+                        
+                        if stock_val is not None and stock_val <= 0:
+                            is_in_stock = False
+                            
+                        availability = "AVAILABLE" if is_in_stock else "UNAVAILABLE"
                             
                         d_price, d_promo, d_eff, d_src, p_type, p_label, eff_price, eff_real = calculate_discount(p)
                         
@@ -157,12 +220,17 @@ def run_discover(config, lat, lng, conn, run_id, dry_run=False):
                                   (p_id, s_id, pname, brand, img))
                         
                         c.execute('''INSERT OR IGNORE INTO observations (run_id, store_id, product_id, price, original_price, stock, timestamp, 
-                                     discount_price, discount_promotion, discount_effective, discount_source, promotion_type, promotion_label, query_term)
-                                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''', 
-                                     (run_id, s_id, p_id, eff_price, eff_real, p.get("stock", 0), datetime.now().isoformat(), 
-                                      d_price, d_promo, d_eff, d_src, p_type, p_label, q))
+                                     discount_price, discount_promotion, discount_effective, discount_source, promotion_type, promotion_label, query_term, availability)
+                                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''', 
+                                     (run_id, s_id, p_id, eff_price, eff_real, stock_val, datetime.now().isoformat(), 
+                                      d_price, d_promo, d_eff, d_src, p_type, p_label, q, availability))
                                       
+            # Commit after each query to preserve partial data
             conn.commit()
+            
+            checkpoint.queries_completed += 1
+            checkpoint.last_completed_query = q
+            checkpoint.requests_made = requests_count
             
             # Simple keyword expansion based on query results (simplified for length)
             if len(visited) < 10 and not queries_to_run: # only expand if no explicit queries
@@ -173,8 +241,14 @@ def run_discover(config, lat, lng, conn, run_id, dry_run=False):
             if not dry_run:
                 time.sleep(3)
                 
-        if global_state != "COMPLETED":
+        if global_state not in ("COMPLETED",):
             break
+    
+    # Final checkpoint update
+    checkpoint.status = global_state
+    checkpoint.error_code = error_code
+    checkpoint.requests_made = requests_count
+    save_checkpoint(conn, checkpoint)
             
     return global_state, requests_count
 

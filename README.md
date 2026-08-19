@@ -1,4 +1,3 @@
-# DealHunter v2.1
 # DealHunter
 
 Herramienta de recolección, normalización y análisis histórico de precios y promociones.
@@ -26,6 +25,13 @@ Las plataformas de delivery suelen alterar el "Precio Original" antes de aplicar
 * **Motor Matemático (Discount Engine):** Descifra promociones NxM (2x1, 3x2) vs Descuento Directo.
 * **Histórico Offline:** SQLite append-only local.
 * **Analizador Analítico:** Computa medianas a 7 y 30 días, declarando ofertas irrebatibles (`NEW_LOW`, `REAL_DEAL`).
+* **Errores Estructurados:** Códigos de error claros con acciones recomendadas.
+* **Runs Parciales:** Los datos ya recolectados sobreviven interrupciones.
+* **Doctor:** Diagnóstico del sistema con `rappi-ofertas doctor`.
+* **Rappi Turbo:** Integración nativa como vertical con análisis histórico de precios.
+* **Restaurantes:** Soporte inicial para menús, platillos y sus promociones (`rappi-ofertas restaurants`).
+* **Privacidad y Diagnósticos:** Verificación read-only y sanitizada del estatus de la cuenta de usuario.
+  > Authentication tokens are ephemeral and are never persisted by DealHunter.
 
 ## Cómo funciona
 ```text
