@@ -1,5 +1,16 @@
 # Changelog
 
+## [2.3.0-dev] - Unreleased
+- feat: product normalization engine for brand, quantity, and unit extraction
+- feat: support metric standardizations (g to kg, ml to L) and pack expansions
+- feat: dynamic `unit_price` calculation in historical analyzer
+- feat: product fingerprints for robust cross-store and temporal matching
+- feat: added `--sort unit-price` support in CLI
+- feat: exact, high-confidence, and fuzzy fallback product matching logic
+- feat: `compare` command in `rappi-historico` to find best multi-store prices
+- test: unit and integration tests for parsing, exact/high/no matches, and cross-store
+- docs: `product-normalization.md` and `product-matching.md` specification
+
 ## [2.2.0] - 2026-08-19
 - feat: structured error handling with error catalog and classification
 - feat: partial run support (preserves committed observations on failure)

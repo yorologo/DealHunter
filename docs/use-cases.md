@@ -21,12 +21,13 @@ Muchos usuarios perciben un 3x2 como un remate. DealHunter lo transparenta numé
 * Descuento = `(1 - 2/3) * 100` = **33.33%**.
 La oferta se cataloga como inferior a un `2x1` y a un `-50%` directo, protegiéndote de comprar por volumen innecesario.
 
-## Caso D — Comparar cadenas
+## Caso D — Comparación Cross-Store y Precio Unitario
 **Ejemplo conceptual:**
-* Producto X en Tienda A cuesta $50
-* Producto X en Tienda B cuesta $42
-* Producto X en Tienda C está en 2x1 (precio base $100).
-DealHunter unifica la métrica en la tabla SQLite, permitiéndote consultar a nivel de base de datos (`product_id`) la observación más eficiente, que en este caso sería C ($50 efectivo por unidad).
+* "Coca Cola 2 L" en Tienda A cuesta $50 ($25/L)
+* "Coca Cola 2000 ml" en Tienda B cuesta $42 ($21/L)
+* "Coca Cola 2 L" en Tienda C está en 2x1 (precio base $100 -> Efectivo $50).
+
+DealHunter normaliza el nombre a `coca cola`, la cantidad a `2`, y la unidad a `L`. Usando el comando de comparación, unifica estos productos bajo el mismo grupo semántico utilizando un motor de matching conservador (EXACT / HIGH_CONFIDENCE), e indica que la Tienda B tiene el `BEST PRICE` con una diferencia porcentual para el resto.
 
 ## Caso E — Detectar oferta histórica (REAL_DEAL)
 **Situación:**
@@ -43,6 +44,7 @@ DealHunter unifica la métrica en la tabla SQLite, permitiéndote consultar a ni
 * Sin embargo, la **mediana histórica** de ese producto los últimos 30 días ha sido de **$65**.
 * Caída histórica real = **7.7%**.
 * Clasificación: `RAPPI_PROMO`. El sistema ignora la insignia y te advierte que el precio habitual suele ser casi idéntico al actual. (Diferencia crítica entre `promo_status` provisto por el API vs `history_status` derivado empíricamente).
+
 ### Caso 12: Watchlist
 ```bash
 rappi-ofertas watch add "Café" --below 100
@@ -55,8 +57,10 @@ rappi-ofertas update --dry-run
 ```
 
 ### Caso 14: Comparar tiendas
+Descubre la tienda con el mejor precio para un producto equivalente:
 ```bash
-rappi-historico compare "Leche Lala"
+bin/rappi-historico compare "Coca Cola"
+bin/rappi-historico compare "leche" --exact-only
 ```
 
 ## Caso G — Encontrar promociones en Restaurantes

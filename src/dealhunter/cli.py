@@ -8,7 +8,7 @@ from .output import print_results
 from .doctor import run_doctor, format_doctor_output
 from datetime import datetime
 
-VERSION = "2.2.0"
+VERSION = "2.3.0-dev"
 
 def build_parser():
     # Base parser for shared arguments

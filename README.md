@@ -87,11 +87,10 @@ Por favor revisa [CONTRIBUTING.md](CONTRIBUTING.md) antes de enviar un Pull Requ
 ## Disclaimer
 Proyecto de uso personal, analítico y offline. No afiliado con Rappi. La herramienta es estrictamente *read-only* y no evade controles de autenticación. Úsela bajo su propio riesgo y respetando los términos de servicio aplicables.
 
-## Novedades v2.1
-- Configuración persistente (`~/.config/dealhunter/config.toml`)
-- Perfiles combinables con argumentos CLI.
-- Filtros avanzados (`--min-discount`, `--max-price`, `--only-nxm`, `--store`).
-- Modos de Crawler: `discover` para descubrir ofertas nuevas, `update` para refrescar catálogo.
-- Watchlist local para seguimiento de precios.
-- Salida en formatos múltiples (`table`, `json`, `csv`, `markdown`).
-- Comandos útiles: `stats`, `runs`, `db backup`.
+## Novedades v2.3 (En Desarrollo)
+- **Normalización de Productos:** Extracción estructurada de marcas, cantidades y unidades (`g`, `kg`, `ml`, `L`, `piezas`, `packs`).
+- **Precio Unitario:** Cálculo dinámico de `UNIT_PRICE` (ej. $90/L) para comparativas justas.
+- **Product Matching:** Identificación conservadora de productos equivalentes a través de tiendas (`EXACT_MATCH`, `HIGH_CONFIDENCE_MATCH` y `FUZZY_MATCH` como fallback).
+- **Comparación Cross-Store:** Nuevo comando `bin/rappi-historico compare` para hallar el mejor precio (y diferencia porcentual) del mismo producto.
+- **Sorting CLI:** Soporte para ordenar resultados por precio unitario (`--sort unit-price`).
+- **Error Recovery:** Tolerancia a fallos por cantidad ambigua/desconocida (preserva raw data).

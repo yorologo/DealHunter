@@ -26,16 +26,19 @@ def main():
     parser.add_argument('--price-drop', type=float)
     parser.add_argument('--new-deals', action='store_true')
     parser.add_argument('--price-changes', action='store_true')
+    parser.add_argument('--sort', choices=['discount', 'price', 'deal-score', 'historical-discount', 'unit-price'], default='deal-score')
     
     subparsers = parser.add_subparsers(dest="command")
     compare_p = subparsers.add_parser("compare")
     compare_p.add_argument("query")
+    compare_p.add_argument("--exact-only", action="store_true")
+    compare_p.add_argument("--no-fuzzy", action="store_true")
     
     args, unknown = parser.parse_known_args()
     db_path = get_default_db_path()
     
     if args.command == "compare":
-        res = compare_stores(db_path, args.query)
+        res = compare_stores(db_path, args.query, exact_only=args.exact_only, no_fuzzy=args.no_fuzzy)
         print_results(res, format="json" if args.json else "table")
         return
         
@@ -48,6 +51,7 @@ def main():
         "price_drop": args.price_drop,
         "new_deals": args.new_deals,
         "price_changes": args.price_changes,
+        "sort": args.sort,
     }
     
     res = analyze_history(db_path, config, store=args.store, product=args.product, explain=args.explain)

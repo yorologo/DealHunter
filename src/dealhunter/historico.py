@@ -1,13 +1,16 @@
-import sqlite3
 import statistics
 from datetime import datetime, timedelta
 
+from .db import setup_db
+
 def analyze_history(db_path, config, store=None, product=None, explain=False):
-    conn = sqlite3.connect(db_path)
+    conn = setup_db(db_path)
     c = conn.cursor()
     
     query = '''
-        SELECT o.store_id, o.product_id, p.name, s.name, o.price, o.timestamp, o.discount_effective
+        SELECT o.store_id, o.product_id, p.name, s.name, o.price, o.timestamp, o.discount_effective,
+               p.brand, p.normalized_name, p.quantity, p.unit, p.normalized_quantity, p.normalized_unit,
+               p.fingerprint, p.pack_count
         FROM observations o
         JOIN products p ON o.product_id = p.product_id AND o.store_id = p.store_id
         JOIN stores s ON o.store_id = s.store_id
@@ -31,10 +34,16 @@ def analyze_history(db_path, config, store=None, product=None, explain=False):
     
     grouped = {}
     for r in rows:
-        store_id, product_id, p_name, s_name, price, ts_str, d_eff = r
+        store_id, product_id, p_name, s_name, price, ts_str, d_eff, brand, norm_name, qty, unit, n_qty, n_unit, fp, pack_count = r
         key = (store_id, product_id)
         if key not in grouped:
-            grouped[key] = {"product_name": p_name, "store_name": s_name, "obs": []}
+            grouped[key] = {
+                "product_name": p_name, "store_name": s_name, 
+                "brand": brand, "normalized_name": norm_name, "quantity": qty, "unit": unit,
+                "normalized_quantity": n_qty, "normalized_unit": n_unit, "fingerprint": fp,
+                "pack_count": pack_count,
+                "obs": []
+            }
         try:
             ts = datetime.fromisoformat(ts_str.replace("Z", ""))
         except:
@@ -125,11 +134,18 @@ def analyze_history(db_path, config, store=None, product=None, explain=False):
             score += min(len(obs_list) * 0.5, 10)
         score = min(max(int(score), 0), 100)
         
+        from .normalization import calculate_unit_price
+        unit_price = calculate_unit_price(current_price, data["normalized_quantity"])
+        
         res = {
             "store_id": key[0],
             "product_id": key[1],
             "product_name": data["product_name"],
             "store_name": data["store_name"],
+            "BRAND": data["brand"] or "",
+            "QUANTITY": data["quantity"] or "",
+            "UNIT": data["unit"] or "",
+            "UNIT_PRICE": unit_price if unit_price is not None else "",
             "current_price": current_price,
             "previous_price": previous_price,
             "median_30d": median_30d,
@@ -146,29 +162,98 @@ def analyze_history(db_path, config, store=None, product=None, explain=False):
             
         results.append(res)
         
-    return sorted(results, key=lambda x: x["deal_score"], reverse=True)
+    sort_key = config.get("sort", "deal-score")
+    
+    if sort_key == "unit-price":
+        # Missing unit prices go to the bottom
+        return sorted(results, key=lambda x: x["UNIT_PRICE"] if x["UNIT_PRICE"] != "" else float('inf'))
+    elif sort_key == "price":
+        return sorted(results, key=lambda x: x["current_price"])
+    elif sort_key == "discount":
+        return sorted(results, key=lambda x: x["current_discount_effective"], reverse=True)
+    elif sort_key == "historical-discount":
+        return sorted(results, key=lambda x: x["historical_discount"], reverse=True)
+    else:
+        return sorted(results, key=lambda x: x["deal_score"], reverse=True)
 
-def compare_stores(db_path, query):
-    conn = sqlite3.connect(db_path)
+def compare_stores(db_path, query, exact_only=False, no_fuzzy=False):
+    conn = setup_db(db_path)
     c = conn.cursor()
     c.execute('''
-        SELECT p.name, s.name, o.price
+        SELECT p.product_id, p.store_id, p.name, s.name, o.price,
+               p.brand, p.normalized_name, p.quantity, p.unit, p.normalized_quantity, p.normalized_unit,
+               p.fingerprint, p.pack_count, o.discount_effective
         FROM observations o
         JOIN products p ON o.product_id = p.product_id AND o.store_id = p.store_id
         JOIN stores s ON o.store_id = s.store_id
-        WHERE p.name LIKE ?
+        WHERE p.name LIKE ? OR p.brand LIKE ? OR o.query_term LIKE ?
         ORDER BY o.timestamp DESC
-    ''', (f"%{query}%",))
+    ''', (f"%{query}%", f"%{query}%", f"%{query}%"))
     
-    # We want latest per store-product. 
-    # simplified group:
+    rows = c.fetchall()
+    
     latest = {}
-    for r in c.fetchall():
+    for r in rows:
         key = (r[0], r[1])
         if key not in latest:
-            latest[key] = r[2]
+            latest[key] = {
+                "product_id": r[0], "store_id": r[1], "product_name": r[2], "store_name": r[3], "price": r[4],
+                "brand": r[5], "normalized_name": r[6], "quantity": r[7], "unit": r[8],
+                "normalized_quantity": r[9], "normalized_unit": r[10], "fingerprint": r[11],
+                "pack_count": r[12], "discount_effective": r[13]
+            }
+            
+    products = list(latest.values())
+    if not products:
+        return []
+        
+    from .normalization import compute_match, calculate_unit_price
+    
+    groups = []
+    
+    for p in products:
+        placed = False
+        for g in groups:
+            anchor = g[0]
+            m_type, m_conf = compute_match(anchor, p)
+            
+            is_match = False
+            if m_type == "EXACT_MATCH":
+                is_match = True
+            elif not exact_only and m_type == "HIGH_CONFIDENCE_MATCH":
+                is_match = True
+            elif not exact_only and not no_fuzzy and m_type == "FUZZY_MATCH":
+                is_match = True
+                
+            if is_match:
+                p["match_type"] = m_type
+                p["match_confidence"] = m_conf
+                g.append(p)
+                placed = True
+                break
+        if not placed:
+            p["match_type"] = "EXACT_MATCH"
+            p["match_confidence"] = 1.00
+            groups.append([p])
             
     res = []
-    for (p_name, s_name), price in latest.items():
-        res.append({"product": p_name, "store": s_name, "price": price})
+    for g in groups:
+        g_sorted = sorted(g, key=lambda x: x["price"])
+        best_p = g_sorted[0]
+        best_price = best_p["price"]
+        
+        for item in g_sorted:
+            diff = ((item["price"] / best_price) - 1) * 100 if best_price > 0 else 0
+            u_price = calculate_unit_price(item["price"], item["normalized_quantity"])
+            up_str = f"${u_price}/{item['normalized_unit']}" if u_price else ""
+            res.append({
+                "GRUPO": best_p["product_name"][:20],
+                "TIENDA": item["store_name"][:15],
+                "PRECIO": f"${item['price']:.2f}",
+                "DIFF": f"+{diff:.1f}%" if diff > 0 else "BEST",
+                "UNIT_PRICE": up_str,
+                "MATCH": item["match_type"].replace("_MATCH", ""),
+                "PRODUCTO": item["product_name"][:30]
+            })
+            
     return res

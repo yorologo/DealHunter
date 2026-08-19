@@ -209,6 +209,7 @@ def run_discover(config, lat, lng, conn, run_id, dry_run=False):
                             
                         d_price, d_promo, d_eff, d_src, p_type, p_label, eff_price, eff_real = calculate_discount(p)
                         
+                        print(f"Checking {pname}");
                         if not matches_filters(pname, brand, s_name, cat, config, d_eff, p_type, eff_price):
                             continue
                             
@@ -216,8 +217,39 @@ def run_discover(config, lat, lng, conn, run_id, dry_run=False):
                         if img and not img.startswith("http") and not img.startswith("data:"):
                             img = "https://images.rappi.com.mx/products/" + img
                             
-                        c.execute('INSERT OR IGNORE INTO products (product_id, store_id, name, brand, image) VALUES (?, ?, ?, ?, ?)', 
-                                  (p_id, s_id, pname, brand, img))
+                        from .normalization import parse_product_name, generate_fingerprint
+                        norm = parse_product_name(pname, brand)
+                        fingerprint = generate_fingerprint(
+                            norm["brand"], norm["normalized_name"],
+                            norm["normalized_quantity"], norm["normalized_unit"],
+                            norm["pack_count"]
+                        )
+                            
+                        c.execute('''INSERT INTO products (product_id, store_id, name, brand, image, 
+                                     normalized_name, quantity, unit, normalized_quantity, normalized_unit,
+                                     fingerprint, pack_count)
+                                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                                     ON CONFLICT(product_id, store_id) DO UPDATE SET
+                                     brand = COALESCE(NULLIF(brand, ''), excluded.brand),
+                                     normalized_name = COALESCE(NULLIF(normalized_name, ''), excluded.normalized_name),
+                                     quantity = COALESCE(quantity, excluded.quantity),
+                                     unit = COALESCE(NULLIF(unit, ''), excluded.unit),
+                                     normalized_quantity = COALESCE(normalized_quantity, excluded.normalized_quantity),
+                                     normalized_unit = COALESCE(NULLIF(normalized_unit, ''), excluded.normalized_unit),
+                                     pack_count = COALESCE(pack_count, excluded.pack_count),
+                                     image = COALESCE(NULLIF(image, ''), excluded.image),
+                                     name = COALESCE(NULLIF(name, ''), excluded.name),
+                                     fingerprint = CASE 
+                                        WHEN NULLIF(brand, '') IS NULL AND NULLIF(excluded.brand, '') IS NOT NULL THEN excluded.fingerprint
+                                        WHEN quantity IS NULL AND excluded.quantity IS NOT NULL THEN excluded.fingerprint
+                                        WHEN NULLIF(fingerprint, '') IS NULL THEN excluded.fingerprint
+                                        ELSE fingerprint
+                                     END
+                                     ''',
+                                  (p_id, s_id, pname, brand, img,
+                                   norm["normalized_name"], norm["quantity"], norm["unit"], 
+                                   norm["normalized_quantity"], norm["normalized_unit"], fingerprint,
+                                   norm["pack_count"]))
                         
                         c.execute('''INSERT OR IGNORE INTO observations (run_id, store_id, product_id, price, original_price, stock, timestamp, 
                                      discount_price, discount_promotion, discount_effective, discount_source, promotion_type, promotion_label, query_term, availability)
