@@ -1,10 +1,14 @@
 # Changelog
 
-## [2.4.0-dev] - Unreleased
-- feat: Price Intelligence engine for historical metrics
-- feat: Deal classifications (NEW_LOW, REAL_DEAL, GOOD_PRICE)
-- feat: Suspicious reference price detection
-- feat: `deals` subcommand in CLI and historical extensions
+## [2.4.0] - 2026-08-19
+- feat: historical price intelligence
+- feat: median_30d, historical min/max/average, previous price, price change metrics
+- feat: Deal classifications (NEW_LOW, REAL_DEAL, GOOD_PRICE, INSUFFICIENT_HISTORY)
+- feat: suspicious reference price detection
+- feat: cross-store historical comparison
+- feat: best current store and best unit price identification
+- feat: explainable reasons for deal status
+- feat: `deals` subcommand in CLI
 
 ## [2.3.0] - 2026-08-19
 - feat: product normalization engine (brand, quantity, unit, and pack count)
