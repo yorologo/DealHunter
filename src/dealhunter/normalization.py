@@ -6,9 +6,17 @@ import unicodedata
 
 UNIT_MAP = {
     "g": "g",
+    "gramo": "g",
+    "gramos": "g",
     "kg": "kg",
+    "kilogramo": "kg",
+    "kilogramos": "kg",
     "mg": "mg",
+    "miligramo": "mg",
+    "miligramos": "mg",
     "ml": "ml",
+    "mililitro": "ml",
+    "mililitros": "ml",
     "l": "L",
     "lt": "L",
     "lts": "L",
@@ -29,7 +37,7 @@ UNIT_MAP = {
 }
 
 _UNIT_PATTERN = (
-    r"kg|mg|ml|g|lts?|litros?|l|pz|pza|pzas|piezas?|"
+    r"kilogramos?|kg|miligramos?|mg|mililitros?|ml|gramos?|g|litros?|lts?|l|piezas?|pzas?|pz|"
     r"tabletas?|c[aá]psulas?"
 )
 _CONTAINER_PATTERN = r"botellas?|latas?|envases?|unidades?"

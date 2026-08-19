@@ -80,3 +80,12 @@ El número de pack evita que un multipack actualizado comparta fingerprint con u
 - No se infiere una marca ausente ni una cantidad implícita.
 
 Los productos de restaurantes y toppings siguen requiriendo adaptadores específicos cuando su estructura no representa un SKU minorista normal.
+
+## Limitaciones Actuales (v2.3)
+Actualmente, el proveedor (Rappi Unified Search) **no entrega** el campo `trademark` ni `brand` en sus respuestas estructuradas globales.
+Por lo tanto:
+* DealHunter **nunca inventa** la marca (`brand`) extrayéndola del nombre. El campo permanece vacío (NULL).
+* El motor de UPSERT está listo. Si un futuro provider o endpoint entrega la marca, la base histórica se enriquecerá automáticamente.
+* **EXACT_MATCH** sigue operando a la perfección basándose en el nombre canónico, tamaño y unidad exactas.
+* **HIGH_CONFIDENCE_MATCH** y **FUZZY_MATCH** están diseñados para operar *solo* si existe una marca confirmada. Actualmente permanecen inactivos en producción hasta que un provider proporcione los datos, evitando por completo los falsos positivos.
+

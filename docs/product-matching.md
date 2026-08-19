@@ -93,3 +93,9 @@ El agrupamiento sólo utiliza los tipos habilitados. Un `NO_MATCH` permanece en 
 ## Nota sobre la Marca (`brand`)
 Para asegurar un matching confiable (HIGH_CONFIDENCE o FUZZY), DealHunter requiere que la marca coincida. **La marca nunca se inventa a partir del nombre del producto**, sino que proviene estrictamente de metadatos estructurados (API `trademark`). Si la base de datos contiene productos históricos sin marca, estos permanecerán así hasta que una futura observación enriquezca el campo (mediante UPSERT) sin destruir el histórico existente.
 
+
+## Limitaciones de Búsqueda (Unified Search)
+El endpoint `unified-search` actualmente no entrega metadata de marca.
+- **EXACT_MATCH**: Puede operar sin brand bajo reglas estrictas, garantizando emparejamientos seguros.
+- **HIGH/FUZZY**: Requieren brand explícito. DealHunter nunca inventa brand desde el nombre. Futuros providers podrán habilitar HIGH/FUZZY automáticamente al entregar esta metadata.
+

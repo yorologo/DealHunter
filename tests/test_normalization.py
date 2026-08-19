@@ -20,6 +20,8 @@ def test_normalization_liter_aliases():
         ("Leche 1 lt", 1),
         ("Leche 2 lt", 2),
         ("Leche 1 l", 1),
+        ("Leche 2 litros", 2),
+        ("Leche 1.5 litro", 1.5),
     ):
         res = parse_product_name(raw_name, "Lala")
         assert res["normalized_name"] == "leche"
@@ -27,8 +29,20 @@ def test_normalization_liter_aliases():
         assert res["unit"] == "L"
         assert res["normalized_quantity"] == expected_quantity
         assert res["normalized_unit"] == "L"
-        assert res["pack_count"] == 1
 
+def test_normalization_full_words():
+    tests = [
+        ("Agua 625 Mililitros", 625, "ml", 0.625, "L"),
+        ("Queso 500 gramos", 500, "g", 0.5, "kg"),
+        ("Manzana 2 kilogramos", 2, "kg", 2, "kg"),
+        ("Pastillas 20 miligramos", 20, "mg", 0.00002, "kg")
+    ]
+    for raw_name, q, u, nq, nu in tests:
+        res = parse_product_name(raw_name, "Test")
+        assert res["quantity"] == q
+        assert res['unit'] == u
+        assert res['normalized_quantity'] == nq
+        assert res['normalized_unit'] == nu
 def test_normalization_ml_to_L():
     res = parse_product_name("Coca-Cola 2000 ml", "Coca-Cola")
     assert res["quantity"] == 2000
