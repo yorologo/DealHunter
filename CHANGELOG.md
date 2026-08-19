@@ -1,5 +1,14 @@
 # Changelog
 
+## [2.2.0-dev] - Unreleased
+- feat: structured error handling with error catalog and classification
+- feat: partial run support (preserves committed observations on failure)
+- feat: minimal checkpoint model for crawl progress tracking
+- feat: `rappi-ofertas doctor` diagnostic command
+- feat: provider placeholders (Turbo, Restaurants, Account context)
+- test: 27 new robustness tests (errors, checkpoints, partial runs, doctor)
+- docs: error-handling.md documentation
+
 ## [2.1.0] - 2026-08-18
 - feat: persistent configuration (`config.toml`)
 - feat: profiles

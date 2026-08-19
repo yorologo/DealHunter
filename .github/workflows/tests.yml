@@ -21,3 +21,4 @@ jobs:
         python tests/test_config.py
         python tests/test_filters.py
         python tests/test_e2e.py
+        python tests/test_robustness.py

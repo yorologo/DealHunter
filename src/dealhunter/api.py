@@ -1,6 +1,7 @@
 import urllib.request
 import urllib.error
 import json
+from .errors import DealHunterError, classify_error
 
 def fetch_unified_search(query, lat, lng):
     url = "https://services.mxgrability.rappi.com/api/pns-global-search-api/v1/unified-search"
@@ -17,6 +18,11 @@ def fetch_unified_search(query, lat, lng):
     except urllib.error.HTTPError as e:
         if e.code in [429, 1015]:
             return "RATE_LIMIT"
+        raise classify_error(e)
+    except (urllib.error.URLError, TimeoutError) as e:
+        raise classify_error(e)
+    except json.JSONDecodeError as e:
+        raise classify_error(e)
     except Exception as e:
-        pass
+        raise classify_error(e)
     return None

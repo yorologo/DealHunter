@@ -5,7 +5,10 @@ from .db import setup_db, db_status, db_integrity, db_vacuum, backup_db
 from .crawler import run_discover, run_update
 from .historico import analyze_history, compare_stores
 from .output import print_results
+from .doctor import run_doctor, format_doctor_output
 from datetime import datetime
+
+VERSION = "2.2.0-dev"
 
 def build_parser():
     # Base parser for shared arguments
@@ -70,7 +73,7 @@ def build_parser():
     group_out.add_argument('--output', type=str, help="Output file")
     group_out.add_argument('--compact', action='store_true', help="Compact output format")
     
-    parser = argparse.ArgumentParser(description="DealHunter CLI v2.1", parents=[base_parser])
+    parser = argparse.ArgumentParser(description=f"DealHunter CLI v{VERSION}", parents=[base_parser])
     subparsers = parser.add_subparsers(dest="command", title="Subcommands", description="Available commands")
     
     # Subcommands
@@ -94,6 +97,9 @@ def build_parser():
     watch_p.add_argument("action", choices=["add", "list", "remove", "enable", "disable"])
     watch_p.add_argument("query_or_id", nargs="?")
     watch_p.add_argument("--below", type=float)
+
+    doctor_p = subparsers.add_parser("doctor", help="Run system diagnostics")
+    doctor_p.add_argument("--network", action='store_true', help="Include network checks (not yet implemented)")
 
     return parser
 
@@ -134,6 +140,13 @@ def main(args_list=None):
         
     if args.command == "config":
         handle_config_command(args)
+        return
+
+    if args.command == "doctor":
+        import os
+        db_path = os.environ.get("RAPPI_DB_PATH", os.path.expanduser("~/rappi-deal-hunter/rappi-deals.db"))
+        checks = run_doctor(db_path=db_path)
+        print(format_doctor_output(checks))
         return
         
     conn = setup_db()
@@ -202,10 +215,17 @@ def main(args_list=None):
         mode = args.command if args.command else "discover"
         print(f"Running mode: {mode}", file=sys.stderr)
         
-        if mode == "discover":
-            state, reqs = run_discover(config, lat, lng, conn, run_id, dry_run=config.get("dry_run"))
-        else:
-            state, reqs = run_update(config, lat, lng, conn, run_id, dry_run=config.get("dry_run"))
+        try:
+            if mode == "discover":
+                state, reqs = run_discover(config, lat, lng, conn, run_id, dry_run=config.get("dry_run"))
+            else:
+                state, reqs = run_update(config, lat, lng, conn, run_id, dry_run=config.get("dry_run"))
+        except Exception as exc:
+            # Preserve already-committed observations; mark run as PARTIAL
+            from .errors import classify_error
+            err = classify_error(exc)
+            state = "PARTIAL"
+            print(f"Run interrupted: {err}", file=sys.stderr)
             
         c.execute('''UPDATE runs SET status = ?, finished_at = CURRENT_TIMESTAMP WHERE run_id = ?''', (state, run_id))
         conn.commit()
