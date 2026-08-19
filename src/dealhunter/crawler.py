@@ -201,11 +201,11 @@ def run_discover(config, lat, lng, conn, run_id, dry_run=False):
                         
                         is_in_stock = p.get("in_stock", False) or p.get("is_available", False)
                         stock_val = p.get("stock")
-                        if stock_val is None:
-                            stock_val = 1 if is_in_stock else 0
+                        
+                        if stock_val is not None and stock_val <= 0:
+                            is_in_stock = False
                             
-                        if not is_in_stock or stock_val <= 0:
-                            continue
+                        availability = "AVAILABLE" if is_in_stock else "UNAVAILABLE"
                             
                         d_price, d_promo, d_eff, d_src, p_type, p_label, eff_price, eff_real = calculate_discount(p)
                         
@@ -220,10 +220,10 @@ def run_discover(config, lat, lng, conn, run_id, dry_run=False):
                                   (p_id, s_id, pname, brand, img))
                         
                         c.execute('''INSERT OR IGNORE INTO observations (run_id, store_id, product_id, price, original_price, stock, timestamp, 
-                                     discount_price, discount_promotion, discount_effective, discount_source, promotion_type, promotion_label, query_term)
-                                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''', 
+                                     discount_price, discount_promotion, discount_effective, discount_source, promotion_type, promotion_label, query_term, availability)
+                                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''', 
                                      (run_id, s_id, p_id, eff_price, eff_real, stock_val, datetime.now().isoformat(), 
-                                      d_price, d_promo, d_eff, d_src, p_type, p_label, q))
+                                      d_price, d_promo, d_eff, d_src, p_type, p_label, q, availability))
                                       
             # Commit after each query to preserve partial data
             conn.commit()

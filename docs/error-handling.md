@@ -14,6 +14,7 @@ DealHunter uses structured error codes to make failures predictable and actionab
 | `PARSER_ERROR` | No | Failed to parse response data | Report this issue |
 | `DB_LOCKED` | Yes | Database locked by another process | Close other processes using the database |
 | `DB_CORRUPT` | No | Database file is corrupted | Restore from backup: `rappi-ofertas db backup` |
+| `ACCOUNT_SESSION_UNAVAILABLE` | No | Provided token is invalid or expired | Provide a valid token or check account |
 | `CONFIG_ERROR` | Yes | Configuration error | Check config: `rappi-ofertas config show` |
 | `PARTIAL_RUN` | Yes | Run completed with partial data | Re-run to collect remaining data |
 | `REQUEST_BUDGET_REACHED` | No | Max request budget reached | Increase `--max-requests` or accept partial results |
@@ -60,9 +61,9 @@ DealHunter Doctor
   Last run               OK
   Partial runs           0
   Rappi catalog          NOT_CHECKED
-  Turbo                  NOT_IMPLEMENTED
-  Restaurants            NOT_IMPLEMENTED
-  Account context        NOT_IMPLEMENTED
+  Turbo                  AVAILABLE
+  Restaurants            AVAILABLE
+  Account context        NOT_CONFIGURED
 
   Overall              HEALTHY
 ```

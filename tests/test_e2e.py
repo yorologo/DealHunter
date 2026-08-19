@@ -15,7 +15,7 @@ def setup_db(db_path):
     c.execute('''CREATE TABLE IF NOT EXISTS stores (store_id TEXT PRIMARY KEY, name TEXT, brand TEXT, type TEXT)''')
     c.execute('''CREATE TABLE IF NOT EXISTS products (product_id TEXT, store_id TEXT, name TEXT, brand TEXT, image TEXT, PRIMARY KEY (store_id, product_id))''')
     c.execute('''CREATE TABLE IF NOT EXISTS runs (run_id TEXT PRIMARY KEY, started_at DATETIME, finished_at DATETIME, lat REAL, lng REAL, radius REAL, vertical TEXT, status TEXT)''')
-    c.execute('''CREATE TABLE IF NOT EXISTS observations (id INTEGER PRIMARY KEY AUTOINCREMENT, run_id TEXT, store_id TEXT, product_id TEXT, price REAL, original_price REAL, stock INTEGER, timestamp DATETIME, discount_price REAL, discount_promotion REAL, discount_effective REAL, discount_source TEXT, promotion_type TEXT, promotion_label TEXT, query_term TEXT, UNIQUE(run_id, store_id, product_id))''')
+    c.execute('''CREATE TABLE IF NOT EXISTS observations (id INTEGER PRIMARY KEY AUTOINCREMENT, run_id TEXT, store_id TEXT, product_id TEXT, price REAL, original_price REAL, stock INTEGER, timestamp DATETIME, discount_price REAL, discount_promotion REAL, discount_effective REAL, discount_source TEXT, promotion_type TEXT, promotion_label TEXT, query_term TEXT, availability TEXT, UNIQUE(run_id, store_id, product_id))''')
     c.execute('''CREATE TABLE IF NOT EXISTS schema_version (version INTEGER PRIMARY KEY)''')
     c.execute('''CREATE TABLE IF NOT EXISTS watchlist (id INTEGER PRIMARY KEY AUTOINCREMENT, query TEXT, store_filter TEXT, target_price REAL, min_discount REAL, created_at DATETIME, enabled INTEGER DEFAULT 1)''')
     

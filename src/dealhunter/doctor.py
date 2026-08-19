@@ -8,7 +8,7 @@ from .db import get_default_db_path, db_integrity
 from .config import load_config, get_config_path
 
 
-def run_doctor(conn=None, db_path=None):
+def run_doctor(conn=None, db_path=None, check_network=False):
     """Run all diagnostic checks. Returns list of (name, status, detail) tuples."""
     if db_path is None:
         db_path = get_default_db_path()
@@ -39,8 +39,8 @@ def run_doctor(conn=None, db_path=None):
     # 8. Partial runs
     checks.append(_check_partial_runs(db_path))
 
-    # 9. Providers (placeholder for future)
-    checks.extend(_check_providers())
+    # 9. Providers
+    checks.extend(_check_providers(check_network))
 
     return checks
 
@@ -224,11 +224,29 @@ def _check_partial_runs(db_path):
         return ("Partial runs", "OK", {"info": "0"})
 
 
-def _check_providers():
-    """Placeholder provider checks for future implementation."""
+def _check_providers(check_network=False):
+    """Check providers status including account."""
+    from .account import get_account_token, get_account_status
+    
+    acc_status = "NOT_CONFIGURED"
+    try:
+        cfg = load_config()
+        token = get_account_token(cfg)
+        if token:
+            if check_network:
+                try:
+                    res = get_account_status(cfg)
+                    acc_status = res.get("status", "UNAVAILABLE")
+                except:
+                    acc_status = "UNAVAILABLE"
+            else:
+                acc_status = "UNVERIFIED (use --network)"
+    except:
+        pass
+        
     return [
         ("Rappi catalog", "NOT_CHECKED", None),
         ("Turbo", "AVAILABLE", None),
         ("Restaurants", "AVAILABLE", None),
-        ("Account context", "NOT_IMPLEMENTED", None),
+        ("Account context", acc_status, None),
     ]

@@ -72,7 +72,7 @@ def _make_test_db():
     c.execute('''CREATE TABLE stores (store_id TEXT PRIMARY KEY, name TEXT, brand TEXT, type TEXT)''')
     c.execute('''CREATE TABLE products (product_id TEXT, store_id TEXT, name TEXT, brand TEXT, image TEXT, PRIMARY KEY (store_id, product_id))''')
     c.execute('''CREATE TABLE runs (run_id TEXT PRIMARY KEY, started_at DATETIME, finished_at DATETIME, lat REAL, lng REAL, radius REAL, vertical TEXT, status TEXT)''')
-    c.execute('''CREATE TABLE observations (id INTEGER PRIMARY KEY AUTOINCREMENT, run_id TEXT, store_id TEXT, product_id TEXT, price REAL, original_price REAL, stock INTEGER, timestamp DATETIME, discount_price REAL, discount_promotion REAL, discount_effective REAL, discount_source TEXT, promotion_type TEXT, promotion_label TEXT, query_term TEXT, UNIQUE(run_id, store_id, product_id))''')
+    c.execute('''CREATE TABLE observations (id INTEGER PRIMARY KEY AUTOINCREMENT, run_id TEXT, store_id TEXT, product_id TEXT, price REAL, original_price REAL, stock INTEGER, timestamp DATETIME, discount_price REAL, discount_promotion REAL, discount_effective REAL, discount_source TEXT, promotion_type TEXT, promotion_label TEXT, query_term TEXT, availability TEXT, UNIQUE(run_id, store_id, product_id))''')
     conn.commit()
     return conn, db_path
 
@@ -110,24 +110,32 @@ def test_restaurant_products(mock_fetch):
     config = {"vertical": ["restaurants"], "query": ["hamburguesa"], "max_requests": 1, "max_runtime": 3600}
     run_discover(config, 19.4, -99.1, conn, "rest_run2")
     
-    c.execute("SELECT product_id, price, original_price, discount_effective, stock FROM observations ORDER BY product_id")
+    c.execute("SELECT product_id, price, original_price, discount_effective, stock, availability FROM observations ORDER BY product_id")
     obs = c.fetchall()
     
-    # We should have p1 and p2. p3 is out of stock.
-    assert len(obs) == 2
+    # We should have p1, p2, and p3 (p3 is UNAVAILABLE).
+    assert len(obs) == 3
     
-    # p1: Clasica (no discount, stock=1 assumed for restaurants)
+    # p1: Clasica (no discount, stock=NULL)
     assert obs[0][0] == "p1"
     assert obs[0][1] == 100.0
     assert obs[0][2] == 100.0
     assert obs[0][3] == 0.0
-    assert obs[0][4] == 1 # stock handling
+    assert obs[0][4] is None # stock
+    assert obs[0][5] == "AVAILABLE"
     
     # p2: Combo (discounted)
     assert obs[1][0] == "p2"
     assert obs[1][1] == 120.0
     assert obs[1][2] == 150.0
     assert round(obs[1][3], 1) == 20.0 # (1 - 120/150) * 100
+    assert obs[1][4] is None
+    assert obs[1][5] == "AVAILABLE"
+
+    # p3: Malteada (out of stock)
+    assert obs[2][0] == "p3"
+    assert obs[2][4] is None
+    assert obs[2][5] == "UNAVAILABLE"
 
 @patch('dealhunter.crawler.fetch_unified_search')
 def test_restaurant_filters(mock_fetch):

@@ -174,7 +174,7 @@ def _make_full_test_db():
     c.execute('''CREATE TABLE stores (store_id TEXT PRIMARY KEY, name TEXT, brand TEXT, type TEXT)''')
     c.execute('''CREATE TABLE products (product_id TEXT, store_id TEXT, name TEXT, brand TEXT, image TEXT, PRIMARY KEY (store_id, product_id))''')
     c.execute('''CREATE TABLE runs (run_id TEXT PRIMARY KEY, started_at DATETIME, finished_at DATETIME, lat REAL, lng REAL, radius REAL, vertical TEXT, status TEXT)''')
-    c.execute('''CREATE TABLE observations (id INTEGER PRIMARY KEY AUTOINCREMENT, run_id TEXT, store_id TEXT, product_id TEXT, price REAL, original_price REAL, stock INTEGER, timestamp DATETIME, discount_price REAL, discount_promotion REAL, discount_effective REAL, discount_source TEXT, promotion_type TEXT, promotion_label TEXT, query_term TEXT, UNIQUE(run_id, store_id, product_id))''')
+    c.execute('''CREATE TABLE observations (id INTEGER PRIMARY KEY AUTOINCREMENT, run_id TEXT, store_id TEXT, product_id TEXT, price REAL, original_price REAL, stock INTEGER, timestamp DATETIME, discount_price REAL, discount_promotion REAL, discount_effective REAL, discount_source TEXT, promotion_type TEXT, promotion_label TEXT, query_term TEXT, availability TEXT, UNIQUE(run_id, store_id, product_id))''')
     c.execute('''CREATE TABLE schema_version (version INTEGER PRIMARY KEY)''')
     c.execute('''CREATE TABLE watchlist (id INTEGER PRIMARY KEY AUTOINCREMENT, query TEXT, store_filter TEXT, target_price REAL, min_discount REAL, created_at DATETIME, enabled INTEGER DEFAULT 1)''')
     conn.commit()
@@ -303,7 +303,7 @@ def test_doctor_providers_placeholder():
     names = {c[0]: c[1] for c in checks}
     assert names.get("Turbo") == "AVAILABLE"
     assert names.get("Restaurants") == "AVAILABLE"
-    assert names.get("Account context") == "NOT_IMPLEMENTED"
+    assert names.get("Account context") == "NOT_CONFIGURED"
     assert names.get("Rappi catalog") == "NOT_CHECKED"
 
 def test_doctor_output_format():

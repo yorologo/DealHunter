@@ -88,6 +88,9 @@ def build_parser():
     rest_p = subparsers.add_parser("restaurants", help="Discover deals in restaurants", parents=[base_parser])
     rest_p.add_argument("--restaurant", action="append", help="Filter by restaurant name (alias for --store)")
 
+    acc_p = subparsers.add_parser("account", help="Read-only account diagnostics")
+    acc_p.add_argument("action", choices=["status"])
+
     db_p = subparsers.add_parser("db", help="Database management")
     db_p.add_argument("action", choices=["status", "integrity", "backup", "vacuum"])
 
@@ -148,8 +151,21 @@ def main(args_list=None):
     if args.command == "doctor":
         import os
         db_path = os.environ.get("RAPPI_DB_PATH", os.path.expanduser("~/rappi-deal-hunter/rappi-deals.db"))
-        checks = run_doctor(db_path=db_path)
+        checks = run_doctor(db_path=db_path, check_network=getattr(args, "network", False))
         print(format_doctor_output(checks))
+        return
+
+    if args.command == "account":
+        from .account import get_account_status
+        import json
+        if args.action == "status":
+            try:
+                status = get_account_status(config)
+                print(json.dumps(status, indent=2))
+            except Exception as e:
+                from .errors import classify_error
+                err = classify_error(e)
+                print(f"Error checking account: {err}", file=sys.stderr)
         return
         
     conn = setup_db()

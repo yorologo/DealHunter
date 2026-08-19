@@ -8,8 +8,9 @@
 - feat: provider placeholders (Turbo, Restaurants, Account context)
 - feat: full integration of **Rappi Turbo** as a first-class vertical
 - feat: initial support for **Restaurants** menus and promotions
-- test: 27 new robustness tests, 2 new Turbo offline tests, 3 restaurant tests
-- docs: error-handling.md, turbo.md, restaurants.md documentation
+- feat: strictly read-only, sanitised account diagnostics via `rappi-ofertas account status`
+- test: robustness tests, turbo offline tests, restaurant tests, account privacy tests
+- docs: error-handling.md, turbo.md, restaurants.md, account-diagnostics.md
 
 ## [2.1.0] - 2026-08-18
 - feat: persistent configuration (`config.toml`)
