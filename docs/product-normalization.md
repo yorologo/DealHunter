@@ -6,7 +6,7 @@ DealHunter v2.3 normaliza marcas, cantidades, unidades y composición de packs a
 
 El motor analiza `name` y el campo estructurado `brand` del proveedor para obtener:
 
-1. **Brand**: conserva el metadata estructurado, en minúsculas. No infiere una marca ausente desde el título.
+1. **Brand**: **NUNCA se inventa ni se deduce a partir del nombre del producto**. Proviene estrictamente de metadatos estructurados proporcionados por la API (el campo `trademark`). Si la API devuelve una marca válida, se normaliza. Si se actualiza el producto (UPSERT), se enriquece sin borrar valores previos.
 2. **Quantity & Unit**: extrae la cantidad total y la unidad declarada.
 3. **Normalized Quantity & Unit**: convierte `g` y `mg` a `kg`, y `ml` a `L`.
 4. **Pack Count**: registra cuántas unidades individuales contiene una presentación explícita. Una cantidad sin multiplicador tiene `pack_count = 1`; si no hay información suficiente, queda `NULL`.

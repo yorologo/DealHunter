@@ -89,3 +89,7 @@ bin/rappi-historico compare "coca cola"
 `--exact-only` conserva sólo `EXACT_MATCH`; `--no-fuzzy` admite EXACT/HIGH pero deshabilita FUZZY. Los formatos `table`, `json` y `csv` mantienen los datos operativos separados de stdout estructurado.
 
 El agrupamiento sólo utiliza los tipos habilitados. Un `NO_MATCH` permanece en un grupo distinto, aunque el resultado sea conservador o ambiguo.
+
+## Nota sobre la Marca (`brand`)
+Para asegurar un matching confiable (HIGH_CONFIDENCE o FUZZY), DealHunter requiere que la marca coincida. **La marca nunca se inventa a partir del nombre del producto**, sino que proviene estrictamente de metadatos estructurados (API `trademark`). Si la base de datos contiene productos históricos sin marca, estos permanecerán así hasta que una futura observación enriquezca el campo (mediante UPSERT) sin destruir el histórico existente.
+
