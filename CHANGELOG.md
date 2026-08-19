@@ -1,19 +1,20 @@
 # Changelog
 
-## [2.7.0-dev] - Unreleased
-- feat: DealHunter Web Phase B (Product Detail & Compare)
-- feat: `/products/<store_id>/<product_id>` layout with Tabs, History Chart, metrics, and Deal explanation
-- feat: `/compare` Cross-Store matching and visual layout with Best Store logic
-- feat: Client-side historical chart using local Chart.js with ranges
-- feat: Basic Products catalog and Breadcrumbs
-
-## [2.6.0-dev] - Unreleased
+## [2.6.0] - 2026-08-19
 - feat: DealHunter Web Foundation (Flask + HTMX + Bootstrap)
-- feat: Web Application Shell with Desktop Sidebar & Mobile Bottom Nav
+- feat: Web Application Shell with responsive Desktop Sidebar & Mobile Bottom Nav
 - feat: Theme (Light/Dark/System) & Density preferences
-- feat: Local UI Search with `LIMIT`
-- feat: Home Dashboard integrating deals and system status
-- feat: `--port` argument in `bin/rappi-historico web`
+- feat: Offline local frontend assets (Chart.js, Bootstrap, HTMX)
+- feat: Product Detail view with multi-tab layout and Historical Price Chart
+- feat: Cross-store product comparison anchor matching (`/compare`)
+- feat: Local UI Search with grouped results and server-side LIMIT
+- feat: Home Dashboard integrating Deals, System Status and Opportunities
+- feat: Market, Turbo, and Stores views with robust HTMX pagination
+- feat: Restaurants Web Experience with menu grouping and custom dish cards
+- feat: structured category metadata from provider (`schema v6`)
+- feat: structured has_toppings attribute (`schema v7`) to eliminate NLP heuristics
+- feat: local-first, air-gapped security without CDNs or tracking
+- fix: unified unit price formatter (`format_unit_price`)
 
 ## [2.5.0] - 2026-08-19
 - feat: DealHunter v2.5 Alerts Engine
@@ -80,8 +81,3 @@
 * Pruebas de concepto vía logcat y Shizuku.
 * Inspección de SDUI en Flutter/Dart.
 
-## [v2.6.0] - Unreleased
-- **Feat**: Restaurants Web Experience (Phase B3) con menu grouping, dish cards, y manejo correcto de availability y precio base (toppings).
-- **Fix**: Schema v6 introduces `category` column to products table for true semantic taxonomy, replacing query_term fallbacks.
-
-- **Fix**: Schema v7 introduces `has_toppings` to products to eliminate unsafe NLP heuristic.
