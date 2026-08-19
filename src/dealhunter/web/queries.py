@@ -87,7 +87,7 @@ def search_local(db_path, query, limit=10):
 
 import sqlite3
 from dealhunter.db import get_default_db_path
-from dealhunter.historico import compute_price_metrics, calculate_unit_price
+from dealhunter.historico import compute_price_metrics, calculate_unit_price, compare_stores, compare_with_anchor
 from datetime import datetime
 
 def get_product_detail(db_path, store_id, product_id):
@@ -166,3 +166,7 @@ def get_product_compare(db_path, product_name):
     from dealhunter.historico import compare_stores
     res = compare_stores(db_path, product_name)
     return res
+
+
+def get_anchor_compare(db_path, store_id, product_id):
+    return compare_with_anchor(db_path, store_id, product_id)

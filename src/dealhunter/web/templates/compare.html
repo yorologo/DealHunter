@@ -9,6 +9,10 @@
 </div>
 
 <div id="compareResults">
-    {% include 'partials/compare_results.html' %}
+    {% if anchor_mode %}
+        {% include 'partials/compare_results_anchor.html' %}
+    {% else %}
+        {% include 'partials/compare_results.html' %}
+    {% endif %}
 </div>
 {% endblock %}

@@ -100,7 +100,7 @@
     </li>
     <li class="nav-item" role="presentation">
         <button class="nav-link fw-bold" data-bs-toggle="tab" data-bs-target="#tab-compare" type="button" 
-                hx-get="/compare?q={{ p.product_name | urlencode }}" hx-target="#compare-content" hx-trigger="click once">Comparar</button>
+                hx-get="/compare?store_id={{ p.store_id }}&product_id={{ p.product_id }}" hx-target="#compare-content" hx-trigger="click once">Comparar</button>
     </li>
     <li class="nav-item" role="presentation">
         <button class="nav-link fw-bold" data-bs-toggle="tab" data-bs-target="#tab-obs" type="button">Observaciones</button>

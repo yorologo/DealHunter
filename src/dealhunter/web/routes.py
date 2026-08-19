@@ -1,5 +1,5 @@
 from flask import render_template, request, current_app
-from dealhunter.web.queries import get_home_metrics, get_home_deals, get_watchlist, search_local, get_product_detail, get_product_compare
+from dealhunter.web.queries import get_home_metrics, get_home_deals, get_watchlist, search_local, get_product_detail, get_product_compare, get_anchor_compare
 
 def register_routes(app):
     
@@ -42,16 +42,27 @@ def register_routes(app):
             return render_template('404_product.html', current_path='/products'), 404
         return render_template('product_detail.html', p=p, current_path='/products')
         
+
     @app.route('/compare')
     def compare():
+        store_id = request.args.get('store_id')
+        product_id = request.args.get('product_id')
         q = request.args.get('q', '')
+        
         db_path = current_app.config['DATABASE']
-        res = get_product_compare(db_path, q) if q and len(q) >= 3 else []
-        if request.headers.get('HX-Request'):
-            return render_template('partials/compare_results.html', results=res, q=q)
-        return render_template('compare.html', results=res, q=q, current_path='/compare')
-
-    # Placeholders
+        
+        if store_id and product_id:
+            # Anchor mode
+            res = get_anchor_compare(db_path, store_id, product_id)
+            if request.headers.get('HX-Request'):
+                return render_template('partials/compare_results_anchor.html', res=res)
+            return render_template('compare.html', res=res, anchor_mode=True, current_path='/compare')
+        else:
+            # Manual mode
+            res = get_product_compare(db_path, q) if q and len(q) >= 3 else []
+            if request.headers.get('HX-Request'):
+                return render_template('partials/compare_results.html', results=res, q=q)
+            return render_template('compare.html', results=res, q=q, anchor_mode=False, current_path='/compare')
     @app.route('/deals')
     def deals(): return render_template('placeholder.html', title="Deals", current_path='/deals')
     

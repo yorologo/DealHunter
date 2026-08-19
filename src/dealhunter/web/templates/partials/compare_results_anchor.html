@@ -1,0 +1,57 @@
+{% if res and res.matches %}
+    <div class="alert alert-secondary mb-3 text-start">
+        <strong>Comparando equivalentes a:</strong><br>
+        {{ res.anchor_name }}
+    </div>
+    
+    <div class="table-responsive text-start">
+        <table class="table table-hover align-middle shadow-sm rounded overflow-hidden">
+            <thead class="table-light">
+                <tr>
+                    <th>Tienda</th>
+                    <th>Producto</th>
+                    <th>Precio</th>
+                    <th>Dif vs Mejor</th>
+                    <th>Unitario</th>
+                    <th>vs 30d</th>
+                    <th>Match</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody class="table-group-divider">
+                {% for item in res.matches %}
+                    <tr class="{{ 'table-success' if item.DIFF == 'BEST' else '' }}">
+                        <td class="fw-medium">
+                            {% if item.DIFF == 'BEST' %}🏆 {% endif %}{{ item.TIENDA }}
+                        </td>
+                        <td class="text-truncate" style="max-width: 200px;" title="{{ item.PRODUCTO }}">{{ item.PRODUCTO }}</td>
+                        <td class="fw-bold">{{ item.PRECIO }}</td>
+                        <td>
+                            {% if item.DIFF == 'BEST' %}
+                                <span class="badge text-bg-success">MEJOR</span>
+                            {% else %}
+                                <span class="text-danger small">{{ item.DIFF }}</span>
+                            {% endif %}
+                        </td>
+                        <td class="small text-secondary">{{ item.UNIT_PRICE }}</td>
+                        <td>
+                            {% if item.STATUS == 'REAL_DEAL' or item.STATUS == 'NEW_LOW' %}
+                                <span class="badge text-bg-success">{{ item.VS_MEDIAN }}</span>
+                            {% else %}
+                                <span class="small">{{ item.VS_MEDIAN }}</span>
+                            {% endif %}
+                        </td>
+                        <td><span class="badge text-bg-light border small">{{ item.MATCH }}</span></td>
+                        <td>
+                            <a href="/products/{{ item.store_id }}/{{ item.product_id }}" class="btn btn-sm btn-outline-secondary py-0">Detalle</a>
+                        </td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+{% else %}
+    <div class="alert alert-secondary text-center py-4">
+        No encontramos el mismo producto en otras tiendas con suficiente confianza.
+    </div>
+{% endif %}
