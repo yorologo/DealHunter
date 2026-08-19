@@ -1,4 +1,5 @@
 import re
+import difflib
 
 UNIT_MAP = {
     'g': 'g',
@@ -200,8 +201,17 @@ def compute_match(p1, p2):
     # overlap ratio
     intersection = words1.intersection(words2)
     if intersection:
-        if len(intersection) / max(len(words1), len(words2)) >= 0.5:
+        if len(intersection) / max(len(words1), len(words2)) >= 0.6:
              return "HIGH_CONFIDENCE_MATCH", 0.70
+
+    # FUZZY MATCH FALLBACK
+    name1_no_brand = " ".join(sorted(list(words1)))
+    name2_no_brand = " ".join(sorted(list(words2)))
+    
+    if name1_no_brand and name2_no_brand:
+        ratio = difflib.SequenceMatcher(None, name1_no_brand, name2_no_brand).ratio()
+        if ratio >= 0.85:
+            return "FUZZY_MATCH", 0.60
 
     return "NO_MATCH", 0.0
 

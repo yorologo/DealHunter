@@ -173,7 +173,7 @@ def analyze_history(db_path, config, store=None, product=None, explain=False):
     else:
         return sorted(results, key=lambda x: x["deal_score"], reverse=True)
 
-def compare_stores(db_path, query, exact_only=False):
+def compare_stores(db_path, query, exact_only=False, no_fuzzy=False):
     conn = sqlite3.connect(db_path)
     c = conn.cursor()
     c.execute('''
@@ -213,7 +213,16 @@ def compare_stores(db_path, query, exact_only=False):
         for g in groups:
             anchor = g[0]
             m_type, m_conf = compute_match(anchor, p)
-            if m_type == "EXACT_MATCH" or (not exact_only and m_type == "HIGH_CONFIDENCE_MATCH"):
+            
+            is_match = False
+            if m_type == "EXACT_MATCH":
+                is_match = True
+            elif not exact_only and m_type == "HIGH_CONFIDENCE_MATCH":
+                is_match = True
+            elif not exact_only and not no_fuzzy and m_type == "FUZZY_MATCH":
+                is_match = True
+                
+            if is_match:
                 p["match_type"] = m_type
                 p["match_confidence"] = m_conf
                 g.append(p)

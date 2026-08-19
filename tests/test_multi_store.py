@@ -28,9 +28,27 @@ def test_compare_stores_grouping():
     c.execute("INSERT INTO observations (run_id, store_id, product_id, price, original_price, stock, timestamp) VALUES ('r1', 's3', 'p3', 49.0, 49.0, 10, '2026-08-19T00:00:00')")
     
     conn.commit()
-    conn.close()
+    c.execute("INSERT INTO products (product_id, store_id, name, brand, normalized_name, quantity, unit, normalized_quantity, normalized_unit, fingerprint) VALUES ('p4', 's1', 'Cacahuete', 'Marcax', 'cacahuete', 500, 'g', 0.5, 'kg', 'marcax|cacahuete|0.5|kg')")
+    c.execute("INSERT INTO products (product_id, store_id, name, brand, normalized_name, quantity, unit, normalized_quantity, normalized_unit, fingerprint) VALUES ('p5', 's2', 'Cacahuate', 'Marcax', 'cacahuate', 500, 'g', 0.5, 'kg', 'marcax|cacahuate|0.5|kg')")
+    
+    c.execute("INSERT INTO observations (run_id, store_id, product_id, price, original_price, stock, timestamp) VALUES ('r1', 's1', 'p4', 20.0, 20.0, 10, '2026-08-19T00:00:00')")
+    c.execute("INSERT INTO observations (run_id, store_id, product_id, price, original_price, stock, timestamp) VALUES ('r1', 's2', 'p5', 22.0, 22.0, 10, '2026-08-19T00:00:00')")
+    
+    conn.commit()
+    
+    # Test fuzzy default
+    res2 = compare_stores(db_path, "cacahu")
+    assert len({r["GRUPO"] for r in res2}) == 1
+    
+    # Test no_fuzzy
+    res3 = compare_stores(db_path, "cacahu", no_fuzzy=True)
+    assert len({r["GRUPO"] for r in res3}) == 2
     
     res = compare_stores(db_path, "coca")
+    
+    conn.close()
+    if os.path.exists(db_path):
+        os.remove(db_path)
     
     # p1 and p2 should be in the same group because p1 is EXACT and p2 is HIGH_CONFIDENCE. p3 is a different group
     groups = {}

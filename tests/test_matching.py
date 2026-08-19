@@ -57,6 +57,42 @@ def test_no_match():
     p8 = _mock_prod("marca y", "acondicionador", 0.4, "L")
     assert compute_match(p7, p8)[0] == "NO_MATCH"
 
+def test_fuzzy_match():
+    # typo simple
+    p1 = _mock_prod("cacahuates", "cacahuate tostado", 500, "g")
+    p2 = _mock_prod("cacahuates", "cacahuete tostado", 500, "g")
+    m_type, conf = compute_match(p1, p2)
+    assert m_type == "FUZZY_MATCH"
+    assert conf < 0.70
+    
+    # words transposed should work with sorted canonicalization
+    p3 = _mock_prod("sabritas", "papas fritas originales", 100, "g")
+    p4 = _mock_prod("sabritas", "originales papas fritas", 100, "g")
+    m_type, _ = compute_match(p3, p4)
+    # This might actually hit HIGH_CONFIDENCE because it's a perfect word match
+    assert m_type in ("HIGH_CONFIDENCE_MATCH", "FUZZY_MATCH")
+
+    # missing accent vs non missing is solved by canonicalize
+    p5 = _mock_prod("nestle", "café", 200, "g")
+    p6 = _mock_prod("nestle", "cafe", 200, "g")
+    assert compute_match(p5, p6)[0] == "EXACT_MATCH"
+
+def test_fuzzy_no_match_on_hard_rules():
+    # hard conflicts cannot be saved by fuzzy
+    p1 = _mock_prod("coca cola", "original", 2, "L")
+    p2 = _mock_prod("coca cola", "zero", 2, "L")
+    # words: "original" vs "zero". ratio is low anyway, but hard constraint should block it.
+    assert compute_match(p1, p2)[0] == "NO_MATCH"
+    
+    p3 = _mock_prod("lala", "leche entera", 1, "L")
+    p4 = _mock_prod("lala", "leche enterra", 1, "L")
+    assert compute_match(p3, p4)[0] == "FUZZY_MATCH"
+    
+    # different quantities block fuzzy
+    p5 = _mock_prod("cacahuates", "cacahuete tostado", 500, "g")
+    p6 = _mock_prod("cacahuates", "cacahuate tostado", 400, "g")
+    assert compute_match(p5, p6)[0] == "NO_MATCH"
+
 if __name__ == "__main__":
     tests = [v for k, v in sorted(globals().items()) if k.startswith("test_")]
     passed = 0

@@ -32,12 +32,13 @@ def main():
     compare_p = subparsers.add_parser("compare")
     compare_p.add_argument("query")
     compare_p.add_argument("--exact-only", action="store_true")
+    compare_p.add_argument("--no-fuzzy", action="store_true")
     
     args, unknown = parser.parse_known_args()
     db_path = get_default_db_path()
     
     if args.command == "compare":
-        res = compare_stores(db_path, args.query, exact_only=args.exact_only)
+        res = compare_stores(db_path, args.query, exact_only=args.exact_only, no_fuzzy=args.no_fuzzy)
         print_results(res, format="json" if args.json else "table")
         return
         

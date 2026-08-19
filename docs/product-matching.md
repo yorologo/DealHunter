@@ -32,7 +32,13 @@ Se permite cuando hay una leve variación en el nombre comercial reportado por d
 * `Coca Cola Original 2 L`
 * `Coca Cola Refresco Original 2000 ml`
 
-### 3. NO_MATCH (Confidence: 0.0)
+### 3. FUZZY_MATCH (Confidence: 0.6)
+Actúa estrictamente como un **fallback** cuando `EXACT` e `HIGH_CONFIDENCE` fallan. No pretende ser una IA generativa ni usar embeddings costosos; implementa la biblioteca estándar de Python (`difflib.SequenceMatcher`).
+* Requiere que coincidan estrictamente **Marca, Cantidad y Unidad**.
+* Requiere que **NO** existan conflictos de variantes semánticas ("Zero", "Original", "Entera", "Deslactosada").
+* Útil para solventar typos simples o diferencias ortográficas (ej. `cacahuate` vs `cacahuete`, `coca colla` vs `coca cola`).
+
+### 4. NO_MATCH (Confidence: 0.0)
 El matching es conservador y se rechaza activamente si:
 * Difieren en cantidad (ej. `600 ml` vs `2 L`).
 * Las palabras clave semánticas entran en conflicto (ej. `Zero` vs `Original`, `Entera` vs `Deslactosada`, `Shampoo` vs `Acondicionador`).
@@ -57,9 +63,10 @@ Coca Cola Original    Chedraui        $45.00     +7.1%    $22.50/L    HIGH_CONFI
 
 ### Opciones de CLI
 
-* `--exact-only`: Limita la agrupación estrictamente a `EXACT_MATCH`, excluyendo variaciones de nombre.
+* `--exact-only`: Limita la agrupación estrictamente a `EXACT_MATCH`, excluyendo variaciones de nombre y fuzzy.
+* `--no-fuzzy`: Deshabilita el algoritmo de fallback fuzzy (mantiene `HIGH_CONFIDENCE`).
 * `--format`: Soporta salidas en `json`, `csv`, o `table`.
 
 ## Limitaciones
-1. **Fuzzy Matching**: Aún no se utilizan algoritmos de distancia de Levenshtein o NLP (Embeddings) para evitar falsos positivos costosos.
+1. **Fuzzy Matching Restringido**: El threshold es alto (>=0.85) para evitar falsos positivos costosos. No se usan LLMs ni Embeddings de NLP para asegurar que el motor opere de forma ligera y 100% offline.
 2. **Presentaciones Agrupadas**: Un paquete de `6 x 355 ml` no se emparejará con un producto individual de `355 ml`. El cálculo unitario existe, pero el matching los aísla correctamente por diseño.
