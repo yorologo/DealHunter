@@ -1,5 +1,14 @@
 # Changelog
 
+## [2.3.0-dev] - Unreleased
+- feat: product normalization engine for brand, quantity, and unit extraction
+- feat: support metric standardizations (g to kg, ml to L) and pack expansions
+- feat: dynamic `unit_price` calculation in historical analyzer
+- feat: product fingerprints for robust cross-store and temporal matching
+- feat: added `--sort unit-price` support in CLI
+- test: unit and integration tests for parsing and edge cases
+- docs: `product-normalization.md` specification
+
 ## [2.2.0] - 2026-08-19
 - feat: structured error handling with error catalog and classification
 - feat: partial run support (preserves committed observations on failure)

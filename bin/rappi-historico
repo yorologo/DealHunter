@@ -26,6 +26,7 @@ def main():
     parser.add_argument('--price-drop', type=float)
     parser.add_argument('--new-deals', action='store_true')
     parser.add_argument('--price-changes', action='store_true')
+    parser.add_argument('--sort', choices=['discount', 'price', 'deal-score', 'historical-discount', 'unit-price'], default='deal-score')
     
     subparsers = parser.add_subparsers(dest="command")
     compare_p = subparsers.add_parser("compare")
@@ -48,6 +49,7 @@ def main():
         "price_drop": args.price_drop,
         "new_deals": args.new_deals,
         "price_changes": args.price_changes,
+        "sort": args.sort,
     }
     
     res = analyze_history(db_path, config, store=args.store, product=args.product, explain=args.explain)

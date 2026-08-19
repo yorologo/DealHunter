@@ -7,7 +7,8 @@ def analyze_history(db_path, config, store=None, product=None, explain=False):
     c = conn.cursor()
     
     query = '''
-        SELECT o.store_id, o.product_id, p.name, s.name, o.price, o.timestamp, o.discount_effective
+        SELECT o.store_id, o.product_id, p.name, s.name, o.price, o.timestamp, o.discount_effective,
+               p.brand, p.normalized_name, p.quantity, p.unit, p.normalized_quantity, p.normalized_unit, p.fingerprint
         FROM observations o
         JOIN products p ON o.product_id = p.product_id AND o.store_id = p.store_id
         JOIN stores s ON o.store_id = s.store_id
@@ -31,10 +32,15 @@ def analyze_history(db_path, config, store=None, product=None, explain=False):
     
     grouped = {}
     for r in rows:
-        store_id, product_id, p_name, s_name, price, ts_str, d_eff = r
+        store_id, product_id, p_name, s_name, price, ts_str, d_eff, brand, norm_name, qty, unit, n_qty, n_unit, fp = r
         key = (store_id, product_id)
         if key not in grouped:
-            grouped[key] = {"product_name": p_name, "store_name": s_name, "obs": []}
+            grouped[key] = {
+                "product_name": p_name, "store_name": s_name, 
+                "brand": brand, "normalized_name": norm_name, "quantity": qty, "unit": unit,
+                "normalized_quantity": n_qty, "normalized_unit": n_unit, "fingerprint": fp,
+                "obs": []
+            }
         try:
             ts = datetime.fromisoformat(ts_str.replace("Z", ""))
         except:
@@ -125,11 +131,18 @@ def analyze_history(db_path, config, store=None, product=None, explain=False):
             score += min(len(obs_list) * 0.5, 10)
         score = min(max(int(score), 0), 100)
         
+        from .normalization import calculate_unit_price
+        unit_price = calculate_unit_price(current_price, data["normalized_quantity"])
+        
         res = {
             "store_id": key[0],
             "product_id": key[1],
             "product_name": data["product_name"],
             "store_name": data["store_name"],
+            "BRAND": data["brand"] or "",
+            "QUANTITY": data["quantity"] or "",
+            "UNIT": data["unit"] or "",
+            "UNIT_PRICE": unit_price if unit_price is not None else "",
             "current_price": current_price,
             "previous_price": previous_price,
             "median_30d": median_30d,
@@ -146,7 +159,19 @@ def analyze_history(db_path, config, store=None, product=None, explain=False):
             
         results.append(res)
         
-    return sorted(results, key=lambda x: x["deal_score"], reverse=True)
+    sort_key = config.get("sort", "deal-score")
+    
+    if sort_key == "unit-price":
+        # Missing unit prices go to the bottom
+        return sorted(results, key=lambda x: x["UNIT_PRICE"] if x["UNIT_PRICE"] != "" else float('inf'))
+    elif sort_key == "price":
+        return sorted(results, key=lambda x: x["current_price"])
+    elif sort_key == "discount":
+        return sorted(results, key=lambda x: x["current_discount_effective"], reverse=True)
+    elif sort_key == "historical-discount":
+        return sorted(results, key=lambda x: x["historical_discount"], reverse=True)
+    else:
+        return sorted(results, key=lambda x: x["deal_score"], reverse=True)
 
 def compare_stores(db_path, query):
     conn = sqlite3.connect(db_path)
