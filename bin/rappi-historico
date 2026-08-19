@@ -12,62 +12,54 @@ from dealhunter.output import print_results
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--min-history-days', type=float, default=1.0)
-    parser.add_argument('--store', type=str, default=None)
-    parser.add_argument('--product', type=str, default=None)
-    parser.add_argument('--json', action='store_true')
-    parser.add_argument('--top', type=int, default=50)
-    parser.add_argument('--explain', action='store_true')
-    parser.add_argument('--status', action='append')
-    parser.add_argument('--historical-discount', type=float)
-    parser.add_argument('--min-observations', type=int, default=1)
-    parser.add_argument('--history-days', type=float, default=1.0)
-    parser.add_argument('--new-low', action='store_true')
-    parser.add_argument('--price-drop', type=float)
-    parser.add_argument('--new-deals', action='store_true')
-    parser.add_argument('--price-changes', action='store_true')
-    parser.add_argument('--sort', choices=['discount', 'price', 'deal-score', 'historical-discount', 'unit-price'], default='deal-score')
-    
     subparsers = parser.add_subparsers(dest="command")
+    
     compare_p = subparsers.add_parser("compare")
     compare_p.add_argument("query")
     compare_p.add_argument("--exact-only", action="store_true")
     compare_p.add_argument("--no-fuzzy", action="store_true")
+    
+    deals_p = subparsers.add_parser("deals")
+    deals_p.add_argument('--top', type=int, default=50)
+    deals_p.add_argument('--store', type=str, default=None)
+    deals_p.add_argument('--status', action='append', default=None)
+    deals_p.add_argument('--format', choices=['table', 'json', 'csv', 'markdown'], default='table')
+    deals_p.add_argument('--explain', action='store_true')
+    deals_p.add_argument('--sort', choices=['discount', 'price'], default='discount')
     
     args, unknown = parser.parse_known_args()
     db_path = get_default_db_path()
     
     if args.command == "compare":
         res = compare_stores(db_path, args.query, exact_only=args.exact_only, no_fuzzy=args.no_fuzzy)
-        print_results(res, format="json" if args.json else "table")
+        print_results(res, format="table")
         return
         
-    config = {
-        "min_observations": args.min_observations,
-        "history_days": args.history_days if args.history_days != 1.0 else args.min_history_days,
-        "status": args.status,
-        "new_low": args.new_low,
-        "historical_discount": args.historical_discount,
-        "price_drop": args.price_drop,
-        "new_deals": args.new_deals,
-        "price_changes": args.price_changes,
-        "sort": args.sort,
-    }
-    
-    res = analyze_history(db_path, config, store=args.store, product=args.product, explain=args.explain)
-    
-    if args.explain:
-        for r in res[:args.top]:
-            print(f"Producto: {r['product_name']}\nTienda: {r['store_name']}")
-            print(r.get("explanation", ""))
-            print("-" * 40)
-        return
+    if args.command == "deals" or args.command is None:
+        # Fallback to defaults if no command is specified (backward compat)
+        if args.command is None:
+            args.top = 50
+            args.store = None
+            args.status = None
+            args.format = 'table'
+            args.explain = False
+            args.sort = 'discount'
+            
+        config = {
+            "status": args.status,
+            "sort": args.sort,
+        }
         
-    if args.json:
-        with open("history-analysis.json", "w") as f:
-            json.dump({"results": res}, f, indent=2)
-    else:
-        print_results(res[:args.top], format="table")
+        res = analyze_history(db_path, config, store=args.store)
         
+        if args.explain:
+            for r in res[:args.top]:
+                print(f"Producto: {r['product_name']}\nTienda: {r['store_name']}")
+                print(r.get("reason", ""))
+                print("-" * 40)
+            return
+            
+        print_results(res[:args.top], format=args.format)
+
 if __name__ == '__main__':
     main()
