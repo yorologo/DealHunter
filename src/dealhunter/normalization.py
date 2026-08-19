@@ -246,6 +246,30 @@ def calculate_unit_price(price, normalized_quantity):
         return None
     return round(price / normalized_quantity, 2)
 
+def format_unit_price(price, normalized_quantity, normalized_unit):
+    if price is None or normalized_quantity is None or normalized_quantity <= 0 or not normalized_unit:
+        return ""
+    
+    nu = normalized_unit.lower()
+    if nu == 'ml':
+        val = price * (1000 / normalized_quantity)
+        unit_str = 'L'
+    elif nu == 'l':
+        val = price / normalized_quantity
+        unit_str = 'L'
+    elif nu == 'g':
+        val = price * (1000 / normalized_quantity)
+        unit_str = 'kg'
+    elif nu == 'kg':
+        val = price / normalized_quantity
+        unit_str = 'kg'
+    else:
+        val = price / normalized_quantity
+        unit_str = normalized_unit
+        
+    return f"${val:g}/{unit_str}"
+
+
 
 def generate_fingerprint(
     brand, normalized_name, normalized_quantity, normalized_unit, pack_count=None

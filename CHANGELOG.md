@@ -1,5 +1,21 @@
 # Changelog
 
+## [2.6.0] - 2026-08-19
+- feat: DealHunter Web Foundation (Flask + HTMX + Bootstrap)
+- feat: Web Application Shell with responsive Desktop Sidebar & Mobile Bottom Nav
+- feat: Theme (Light/Dark/System) & Density preferences
+- feat: Offline local frontend assets (Chart.js, Bootstrap, HTMX)
+- feat: Product Detail view with multi-tab layout and Historical Price Chart
+- feat: Cross-store product comparison anchor matching (`/compare`)
+- feat: Local UI Search with grouped results and server-side LIMIT
+- feat: Home Dashboard integrating Deals, System Status and Opportunities
+- feat: Market, Turbo, and Stores views with robust HTMX pagination
+- feat: Restaurants Web Experience with menu grouping and custom dish cards
+- feat: structured category metadata from provider (`schema v6`)
+- feat: structured has_toppings attribute (`schema v7`) to eliminate NLP heuristics
+- feat: local-first, air-gapped security without CDNs or tracking
+- fix: unified unit price formatter (`format_unit_price`)
+
 ## [2.5.0] - 2026-08-19
 - feat: DealHunter v2.5 Alerts Engine
 - feat: local notification evaluation (TARGET_PRICE, NEW_LOW, REAL_DEAL, PRICE_DROP, BACK_IN_STOCK)
@@ -64,3 +80,4 @@
 ## v0.1.0 — Research / PoC
 * Pruebas de concepto vía logcat y Shizuku.
 * Inspección de SDUI en Flutter/Dart.
+

@@ -1,0 +1,49 @@
+<div class="card h-100 shadow-sm border-0">
+    <div class="card-body d-flex flex-column">
+        <!-- DECISIÓN -->
+        <div class="d-flex justify-content-between align-items-start mb-2">
+            <h5 class="card-title fw-bold mb-0 text-truncate" title="{{ deal.product_name }}">{{ deal.product_name }}</h5>
+            {% if deal.deal_status == 'NEW_LOW' %}
+                <span class="badge bg-primary text-white">🔥 NEW_LOW</span>
+            {% elif deal.deal_status == 'REAL_DEAL' %}
+                <span class="badge bg-success text-white">💰 REAL_DEAL</span>
+            {% elif deal.deal_status == 'GOOD_PRICE' %}
+                <span class="badge bg-info text-dark">🟢 GOOD_PRICE</span>
+            {% else %}
+                <span class="badge bg-secondary">○ NORMAL</span>
+            {% endif %}
+        </div>
+        
+        <div class="mb-3">
+            <span class="fs-4 fw-bold text-success">${{ "%.2f"|format(deal.current_price) }}</span>
+            <span class="text-secondary small d-block">Tienda: {{ deal.store_name }}</span>
+        </div>
+        
+        <!-- EXPLICACIÓN -->
+        <div class="alert alert-secondary py-2 px-3 small mb-3">
+            {{ deal.reason }}
+        </div>
+        
+        <!-- COMPARACIÓN -->
+        <div class="mb-3 flex-grow-1">
+            <div class="d-flex justify-content-between small border-bottom pb-1 mb-1">
+                <span class="text-secondary">Mediana 30d:</span>
+                <span class="fw-medium">${{ "%.2f"|format(deal.median_30d) }}</span>
+            </div>
+            <div class="d-flex justify-content-between small border-bottom pb-1 mb-1">
+                <span class="text-secondary">Min histórico:</span>
+                <span class="fw-medium">${{ "%.2f"|format(deal.historical_min) }}</span>
+            </div>
+            <div class="d-flex justify-content-between small">
+                <span class="text-secondary">Precio anterior:</span>
+                <span class="fw-medium">${{ "%.2f"|format(deal.previous_price) }}</span>
+            </div>
+        </div>
+        
+        <!-- DATOS TÉCNICOS / ACTIONS -->
+        <div class="d-flex gap-2 mt-auto">
+            <a href="/products/{{ deal.store_id }}/{{ deal.product_id }}" class="btn btn-sm btn-outline-primary flex-grow-1">Ver producto</a>
+            <a href="/compare?q={{ deal.product_name | urlencode }}" class="btn btn-sm btn-outline-secondary">Comparar</a>
+        </div>
+    </div>
+</div>

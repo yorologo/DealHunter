@@ -1,0 +1,56 @@
+{% extends 'base.html' %}
+{% block content %}
+
+<!-- BREADCRUMBS -->
+<nav aria-label="breadcrumb" class="mb-3">
+  <ol class="breadcrumb small">
+    <li class="breadcrumb-item"><a href="/" class="text-decoration-none">Home</a></li>
+    <li class="breadcrumb-item active" aria-current="page">{{ title }}</li>
+  </ol>
+</nav>
+
+<div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center mb-4 gap-3">
+    <h3 class="fw-bold m-0">{{ emoji }} {{ title }}</h3>
+    <div class="text-secondary small">{{ data.total }} productos</div>
+</div>
+
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card shadow-sm border-0">
+            <div class="card-body">
+                <form id="filter-form" hx-get="{{ current_path }}" hx-target="#catalog-grid" hx-push-url="true" class="row g-3 align-items-end">
+                    <div class="col-md-3">
+                        <label class="form-label small text-secondary fw-bold">Ordenar por</label>
+                        <select name="sort" class="form-select form-select-sm" onchange="document.getElementById('filter-form').dispatchEvent(new Event('submit'))">
+                            <option value="opportunity" {% if sort == 'opportunity' %}selected{% endif %}>Mejor Oportunidad</option>
+                            <option value="price_asc" {% if sort == 'price_asc' %}selected{% endif %}>Menor Precio</option>
+                            <option value="name_asc" {% if sort == 'name_asc' %}selected{% endif %}>Nombre A-Z</option>
+                            <option value="recent" {% if sort == 'recent' %}selected{% endif %}>Más reciente</option>
+                        </select>
+                    </div>
+                    {% if current_path != '/stores' and current_path != '/stores/' ~ filters.store %}
+                    <div class="col-md-3">
+                        <label class="form-label small text-secondary fw-bold">Tienda</label>
+                        <input type="text" name="store" class="form-control form-control-sm" placeholder="ID Tienda..." value="{{ filters.store or '' }}" onchange="document.getElementById('filter-form').dispatchEvent(new Event('submit'))">
+                    </div>
+                    {% endif %}
+                    {% if current_path != '/categories' and '/categories/' not in current_path %}
+                    <div class="col-md-3">
+                        <label class="form-label small text-secondary fw-bold">Categoría</label>
+                        <input type="text" name="category" class="form-control form-control-sm" placeholder="Categoría..." value="{{ filters.category or '' }}" onchange="document.getElementById('filter-form').dispatchEvent(new Event('submit'))">
+                    </div>
+                    {% endif %}
+                    <div class="col-md-auto ms-auto">
+                        <button type="submit" class="btn btn-sm btn-primary">Filtrar</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="catalog-grid">
+    {% include 'partials/catalog_grid.html' %}
+</div>
+
+{% endblock %}

@@ -3,7 +3,7 @@ from datetime import datetime, timedelta
 
 from .db import setup_db
 from .price_intelligence import compute_price_metrics
-from .normalization import calculate_unit_price, compute_match
+from .normalization import calculate_unit_price, compute_match, format_unit_price
 
 def analyze_history(db_path, config, store=None, product=None):
     conn = setup_db(db_path)
@@ -70,7 +70,7 @@ def analyze_history(db_path, config, store=None, product=None):
         if req_status and estado not in req_status:
             continue
             
-        unit_price = calculate_unit_price(metrics["current_price"], data["normalized_quantity"])
+        unit_price = format_unit_price(metrics["current_price"], data["normalized_quantity"], data.get("normalized_unit"))
         
         res = {
             "store_id": key[0],
@@ -80,7 +80,7 @@ def analyze_history(db_path, config, store=None, product=None):
             "BRAND": data["brand"] or "",
             "QUANTITY": data["quantity"] or "",
             "UNIT": data["unit"] or "",
-            "UNIT_PRICE": unit_price if unit_price is not None else "",
+            "UNIT_PRICE": unit_price,
             "current_price": metrics["current_price"],
             "historical_min": metrics["historical_min"],
             "median_30d": metrics["median_30d"],
@@ -91,7 +91,8 @@ def analyze_history(db_path, config, store=None, product=None):
             "discount_vs_median_30d": metrics["discount_vs_median_30d"],
             "distance_from_historical_min": metrics["distance_from_historical_min"],
             "deal_status": estado,
-            "reason": metrics["reason"]
+            "reason": metrics["reason"],
+            "is_suspicious_reference": metrics.get("is_suspicious_reference", False)
         }
         
         results.append(res)
@@ -214,3 +215,175 @@ def compare_stores(db_path, query, exact_only=False, no_fuzzy=False):
             })
             
     return res
+
+
+def compare_with_anchor(db_path, store_id, product_id):
+    from dealhunter.normalization import compute_match
+    conn = setup_db(db_path)
+    c = conn.cursor()
+    
+    # 1. Fetch anchor product
+    c.execute('''
+        SELECT p.product_id, p.store_id, p.name, s.name,
+               p.brand, p.normalized_name, p.quantity, p.unit, p.normalized_quantity, p.normalized_unit,
+               p.fingerprint, p.pack_count
+        FROM products p
+        JOIN stores s ON p.store_id = s.store_id
+        WHERE p.product_id = ? AND p.store_id = ?
+    ''', (product_id, store_id))
+    
+    row = c.fetchone()
+    if not row:
+        return []
+        
+    anchor = {
+        "product_id": row[0], "store_id": row[1], "product_name": row[2], "store_name": row[3],
+        "brand": row[4], "normalized_name": row[5], "quantity": row[6], "unit": row[7],
+        "normalized_quantity": row[8], "normalized_unit": row[9], "fingerprint": row[10],
+        "pack_count": row[11], "obs": []
+    }
+    
+    # 2. Find candidates (use brand if available, otherwise name parts, limited to avoid full DB scan)
+    # A simple approach: use normalized_name if available, else name
+    search_term = anchor["normalized_name"] or anchor["product_name"]
+    # We can just take the first word or two to cast a wide but limited net
+    words = [w for w in search_term.split() if len(w) > 2][:2]
+    
+    if not words:
+        words = [search_term.split()[0]] if search_term.split() else [search_term]
+        
+    conditions = []
+    params = []
+    for w in words:
+        conditions.append("(p.name LIKE ? OR p.normalized_name LIKE ? OR p.brand LIKE ?)")
+        params.extend([f"%{w}%", f"%{w}%", f"%{w}%"])
+        
+    query = f'''
+        SELECT p.product_id, p.store_id, p.name, s.name,
+               p.brand, p.normalized_name, p.quantity, p.unit, p.normalized_quantity, p.normalized_unit,
+               p.fingerprint, p.pack_count
+        FROM products p
+        JOIN stores s ON p.store_id = s.store_id
+        WHERE {' AND '.join(conditions)}
+        LIMIT 200
+    '''
+    c.execute(query, params)
+    candidate_rows = c.fetchall()
+    
+    products_map = {}
+    for r in candidate_rows:
+        key = (r[0], r[1])
+        products_map[key] = {
+            "product_id": r[0], "store_id": r[1], "product_name": r[2], "store_name": r[3],
+            "brand": r[4], "normalized_name": r[5], "quantity": r[6], "unit": r[7],
+            "normalized_quantity": r[8], "normalized_unit": r[9], "fingerprint": r[10],
+            "pack_count": r[11], "obs": []
+        }
+        
+    # Ensure anchor is in map even if search missed it
+    products_map[(anchor["product_id"], anchor["store_id"])] = anchor
+        
+    # Fetch observations for these candidates
+    c.execute('''
+        SELECT product_id, store_id, price, timestamp, original_price
+        FROM observations
+        ORDER BY timestamp ASC
+    ''')
+    obs_rows = c.fetchall()
+    for r in obs_rows:
+        pid, sid, price, ts_str, orig_price = r
+        key = (pid, sid)
+        if key in products_map:
+            try:
+                from datetime import datetime
+                ts = datetime.fromisoformat(ts_str.replace("Z", ""))
+            except:
+                from datetime import datetime
+                ts = datetime.now()
+            products_map[key]["obs"].append({"price": price, "timestamp": ts, "original_price": orig_price})
+            
+    # Filter valid matches using compute_match
+    valid_matches = []
+    
+    # We will deduplicate by store_id: we want the best representative from each store
+    # if there are multiple matches in the same store. But wait, if multiple items match in the same store, 
+    # we pick the one with the lowest price. But if the anchor is from that store, it MUST be the representative.
+    
+    for key, p in products_map.items():
+        if not p["obs"]:
+            continue
+        if p["product_id"] == anchor["product_id"] and p["store_id"] == anchor["store_id"]:
+            m_type = "EXACT_MATCH"
+        else:
+            m_type, m_conf = compute_match(anchor, p)
+            
+        if m_type != "NO_MATCH":
+            metrics = compute_price_metrics(p["obs"])
+            if metrics:
+                p["price"] = metrics["current_price"]
+                p["metrics"] = metrics
+                p["match_type"] = m_type
+                valid_matches.append(p)
+                
+    if not valid_matches:
+        return []
+        
+    # Deduplicate by store_id
+    store_best = {}
+    for p in valid_matches:
+        sid = p["store_id"]
+        if sid not in store_best:
+            store_best[sid] = p
+        else:
+            # If we already have the anchor for this store, keep it
+            if store_best[sid]["product_id"] == anchor["product_id"]:
+                continue
+            # If the new one is the anchor, use it
+            if p["product_id"] == anchor["product_id"]:
+                store_best[sid] = p
+            else:
+                # Pick the cheaper one
+                if p["price"] < store_best[sid]["price"]:
+                    store_best[sid] = p
+                    
+    final_matches = list(store_best.values())
+    
+    # Sort by price
+    final_matches.sort(key=lambda x: x["price"])
+    best_current = final_matches[0]
+    
+    res = []
+    for item in final_matches:
+        up_str = format_unit_price(item["price"], item["normalized_quantity"], item["normalized_unit"])
+        metrics = item["metrics"]
+        
+        # Calculate VS_MEDIAN correctly using the discount_vs_median_30d
+        discount_vs_median = metrics["discount_vs_median_30d"]
+        if discount_vs_median > 0:
+            vs_median_str = f"↓ {discount_vs_median:.1f}%"
+        elif discount_vs_median < 0:
+            vs_median_str = f"↑ {-discount_vs_median:.1f}%"
+        else:
+            vs_median_str = "0%"
+            
+        res.append({
+            "product_id": item["product_id"],
+            "store_id": item["store_id"],
+            "TIENDA": item["store_name"][:15],
+            "PRECIO": f"${item['price']:.2f}",
+            "DIFF": f"+{((item['price'] / best_current['price']) - 1) * 100:.1f}%" if item['price'] > best_current['price'] else "BEST",
+            "UNIT_PRICE": up_str,
+            "MEDIAN_30D": f"${metrics['median_30d']:.2f}",
+            "HIST_MIN": f"${metrics['historical_min']:.2f}",
+            "VS_MEDIAN": vs_median_str,
+            "STATUS": metrics["status"],
+            "MATCH": item["match_type"].replace("_MATCH", ""),
+            "PRODUCTO": item["product_name"][:30],
+            "price_val": item["price"] # raw value for diff
+        })
+        
+    return {
+        "anchor_name": anchor["product_name"],
+        "matches": res
+    }
+

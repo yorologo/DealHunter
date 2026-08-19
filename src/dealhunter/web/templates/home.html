@@ -1,0 +1,120 @@
+{% extends 'base.html' %}
+{% block content %}
+
+<div class="container-fluid p-0">
+    <!-- Header Summary -->
+    <div class="row mb-4 g-3">
+        <div class="col-6 col-md-3">
+            <div class="card bg-primary text-white border-0 h-100 shadow-sm">
+                <div class="card-body text-center">
+                    <div class="fs-1 fw-bold">{{ deals.new_lows | length }}</div>
+                    <div class="small">Nuevos Mínimos (Top)</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-6 col-md-3">
+            <div class="card bg-success text-white border-0 h-100 shadow-sm">
+                <div class="card-body text-center">
+                    <div class="fs-1 fw-bold">{{ deals.real_deals | length }}</div>
+                    <div class="small">Ofertas Reales (Top)</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-6 col-md-3">
+            <div class="card bg-info text-dark border-0 h-100 shadow-sm">
+                <div class="card-body text-center">
+                    <div class="fs-1 fw-bold">{{ deals.good_prices | length }}</div>
+                    <div class="small">Buenos Precios (Top)</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-6 col-md-3">
+            <div class="card bg-warning text-dark border-0 h-100 shadow-sm">
+                <div class="card-body text-center">
+                    <div class="fs-1 fw-bold">{{ metrics.new_alerts }}</div>
+                    <div class="small">Alertas Nuevas</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Question -->
+    <h3 class="fw-bold mb-4">¿Qué vale la pena comprar hoy?</h3>
+
+    {% if not deals.new_lows and not deals.real_deals %}
+    <div class="alert alert-secondary d-flex flex-column align-items-center justify-content-center p-5 text-center shadow-sm">
+        <div class="fs-1 mb-3">🕵️</div>
+        <h5>Todavía no hay REAL DEAL.</h5>
+        <p class="text-secondary mb-0">DealHunter necesita más histórico para identificar oportunidades reales.</p>
+    </div>
+    {% endif %}
+
+    <!-- NUEVOS MINIMOS -->
+    {% if deals.new_lows %}
+    <h5 class="fw-bold mb-3 d-flex align-items-center gap-2">
+        <span>🔥</span> Nuevos mínimos históricos
+    </h5>
+    <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-4 mb-5">
+        {% for deal in deals.new_lows %}
+        <div class="col">
+            {% include 'partials/deal_card.html' %}
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <!-- OFERTAS REALES -->
+    {% if deals.real_deals %}
+    <h5 class="fw-bold mb-3 d-flex align-items-center gap-2">
+        <span>💰</span> Ofertas reales verificadas
+    </h5>
+    <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-4 mb-5">
+        {% for deal in deals.real_deals %}
+        <div class="col">
+            {% include 'partials/deal_card.html' %}
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+    
+    <!-- EXPLORAR -->
+    <h5 class="fw-bold mb-3">Explorar</h5>
+    <div class="row row-cols-2 row-cols-md-4 g-3 mb-5">
+        <div class="col">
+            <a href="/market" class="card h-100 text-decoration-none text-body border-0 shadow-sm text-center p-3">
+                <div class="fs-2 mb-2">🛒</div>
+                <div class="fw-bold small text-uppercase">Supermercados</div>
+            </a>
+        </div>
+        <div class="col">
+            <a href="/turbo" class="card h-100 text-decoration-none text-body border-0 shadow-sm text-center p-3">
+                <div class="fs-2 mb-2">⚡</div>
+                <div class="fw-bold small text-uppercase">Turbo</div>
+            </a>
+        </div>
+        <div class="col">
+            <a href="/restaurants" class="card h-100 text-decoration-none text-body border-0 shadow-sm text-center p-3">
+                <div class="fs-2 mb-2">🍔</div>
+                <div class="fw-bold small text-uppercase">Restaurantes</div>
+            </a>
+        </div>
+        <div class="col">
+            <a href="/categories" class="card h-100 text-decoration-none text-body border-0 shadow-sm text-center p-3">
+                <div class="fs-2 mb-2">📦</div>
+                <div class="fw-bold small text-uppercase">Categorías</div>
+            </a>
+        </div>
+    </div>
+
+    <!-- TECHNICAL STATE -->
+    <hr>
+    <div class="text-secondary small d-flex flex-wrap gap-4 mt-4 mb-2">
+        <div><span class="fw-bold">Productos:</span> {{ metrics.stats.products }}</div>
+        <div><span class="fw-bold">Tiendas:</span> {{ metrics.stats.stores }}</div>
+        <div><span class="fw-bold">Observaciones:</span> {{ metrics.stats.observations }}</div>
+        <div><span class="fw-bold">Último run:</span> {{ metrics.stats.last_run or 'N/A' }}</div>
+    </div>
+
+</div>
+
+{% endblock %}

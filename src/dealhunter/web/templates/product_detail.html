@@ -1,0 +1,374 @@
+{% extends 'base.html' %}
+{% block content %}
+
+<!-- BREADCRUMBS -->
+<nav aria-label="breadcrumb" class="mb-3">
+  <ol class="breadcrumb small">
+    {% if p.store_type == 'restaurants' %}
+    <li class="breadcrumb-item"><a href="/restaurants" class="text-decoration-none">Restaurantes</a></li>
+    {% else %}
+    <li class="breadcrumb-item"><a href="/market" class="text-decoration-none">Supermercados</a></li>
+    {% endif %}
+    <li class="breadcrumb-item"><a href="/stores/{{ p.store_id }}" class="text-decoration-none">{{ p.store_name }}</a></li>
+    <li class="breadcrumb-item active text-truncate d-inline-block" style="max-width: 200px;" aria-current="page">{{ p.product_name }}</li>
+  </ol>
+</nav>
+
+<!-- HERO -->
+<div class="card shadow-sm border-0 mb-4">
+    <div class="card-body p-4">
+        <div class="row">
+            <div class="col-md-8">
+                <div class="d-flex align-items-center gap-2 mb-2">
+                    <span class="badge text-bg-light border text-uppercase">{{ p.store_name }}</span>
+                    {% if p.brand %}<span class="badge text-bg-light border">{{ p.brand }}</span>{% endif %}
+                    {% if p.target_price %}
+                        <span class="badge text-bg-primary">👁 Objetivo: ${{ "%.2f"|format(p.target_price) }}</span>
+                    {% endif %}
+                </div>
+                
+                <h2 class="fw-bold mb-3">{{ p.product_name }}</h2>
+                
+                <div class="d-flex flex-wrap align-items-center gap-3 mb-3">
+                    {% if p.metrics %}
+                        {% if p.metrics.status == 'NEW_LOW' %}
+                            <span class="badge bg-primary text-white fs-6 py-2 px-3">🔥 NEW_LOW</span>
+                        {% elif p.metrics.status == 'REAL_DEAL' %}
+                            <span class="badge bg-success text-white fs-6 py-2 px-3">💰 REAL_DEAL</span>
+                        {% elif p.metrics.status == 'GOOD_PRICE' %}
+                            <span class="badge bg-info text-dark fs-6 py-2 px-3">🟢 GOOD_PRICE</span>
+                        {% elif p.metrics.status == 'INSUFFICIENT_HISTORY' %}
+                            <span class="badge bg-warning text-dark fs-6 py-2 px-3">🕒 INSUFFICIENT_HISTORY</span>
+                        {% else %}
+                            <span class="badge bg-secondary fs-6 py-2 px-3">○ NORMAL</span>
+                        {% endif %}
+                        
+                        {% if p.metrics.is_suspicious_reference %}
+                            <span class="badge bg-danger text-white fs-6 py-2 px-3">⚠ Precio de referencia atípico</span>
+                        {% endif %}
+                    {% else %}
+                        <span class="badge bg-warning text-dark fs-6 py-2 px-3">🕒 INSUFFICIENT_HISTORY</span>
+                    {% endif %}
+                </div>
+
+                <!-- ALERTS SUMMARY -->
+                {% if p.alerts %}
+                    <div class="small text-secondary mb-3">
+                        🔔 {{ p.alerts|length }} alertas. Última: <span class="fw-bold">{{ p.alerts[0].alert_type }}</span> ({{ p.alerts[0].triggered_at[:10] }})
+                    </div>
+                {% endif %}
+                
+                {% if p.metrics and p.metrics.reason %}
+                    <!-- EXPLICACIÓN -->
+                    <div class="alert alert-secondary py-2 px-3 d-inline-block">
+                        <strong>¿Por qué DealHunter dice esto?</strong><br>
+                        {{ p.metrics.reason }}
+                    </div>
+                {% endif %}
+                
+                {% if p.metrics and p.metrics.is_suspicious_reference %}
+                    <div class="alert alert-danger py-2 px-3 d-inline-block mt-2">
+                        <strong>El precio de referencia anunciado es superior al histórico almacenado por DealHunter.</strong>
+                    </div>
+                {% endif %}
+            </div>
+            
+            <div class="col-md-4 text-md-end mt-3 mt-md-0 d-flex flex-column justify-content-center">
+                {% if p.observations and p.observations[-1].availability != 'AVAILABLE' %}
+                    <div class="badge text-bg-danger fs-6 mb-2 align-self-md-end">AGOTADO</div>
+                {% endif %}
+                
+                {% if p.metrics %}
+                    <div class="fs-1 fw-bold text-success lh-1">${{ "%.2f"|format(p.metrics.current_price) }}</div>
+                    {% if p.unit_price %}
+                        <div class="text-secondary mt-1 fw-medium">{{ p.unit_price }}</div>
+                    {% endif %}
+                    {% if p.metrics.previous_price and p.metrics.previous_price != p.metrics.current_price %}
+                        <div class="text-secondary small mt-1">Anterior: ${{ "%.2f"|format(p.metrics.previous_price) }}</div>
+                    {% endif %}
+                {% else %}
+                    <div class="fs-1 fw-bold text-secondary lh-1">Sin Datos</div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- TABS -->
+<ul class="nav nav-tabs mb-4" id="productTabs" role="tablist">
+    <li class="nav-item" role="presentation">
+        <button class="nav-link active fw-bold" data-bs-toggle="tab" data-bs-target="#tab-summary" type="button">Resumen</button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link fw-bold" data-bs-toggle="tab" data-bs-target="#tab-history" type="button">Histórico</button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link fw-bold" data-bs-toggle="tab" data-bs-target="#tab-compare" type="button" 
+                hx-get="/compare?store_id={{ p.store_id }}&product_id={{ p.product_id }}" hx-target="#compare-content" hx-trigger="click once">Comparar</button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link fw-bold" data-bs-toggle="tab" data-bs-target="#tab-obs" type="button">Observaciones</button>
+    </li>
+</ul>
+
+<div class="tab-content" id="productTabsContent">
+    <!-- RESUMEN -->
+    <div class="tab-pane fade show active" id="tab-summary" role="tabpanel">
+        {% if p.metrics %}
+        <div class="row g-3 mb-4">
+            <div class="col-6 col-md-3">
+                <div class="card h-100 bg-body-tertiary border-0 shadow-sm">
+                    <div class="card-body">
+                        <div class="small text-secondary mb-1">Mediana 30d</div>
+                        <div class="fs-4 fw-bold">${{ "%.2f"|format(p.metrics.median_30d) }}</div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-6 col-md-3">
+                <div class="card h-100 bg-body-tertiary border-0 shadow-sm">
+                    <div class="card-body">
+                        <div class="small text-secondary mb-1">Promedio Histórico</div>
+                        <div class="fs-4 fw-bold">${{ "%.2f"|format(p.metrics.historical_average) }}</div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-6 col-md-3">
+                <div class="card h-100 bg-body-tertiary border-0 shadow-sm">
+                    <div class="card-body">
+                        <div class="small text-secondary mb-1">Mínimo Histórico</div>
+                        <div class="fs-4 fw-bold text-success">${{ "%.2f"|format(p.metrics.historical_min) }}</div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-6 col-md-3">
+                <div class="card h-100 bg-body-tertiary border-0 shadow-sm">
+                    <div class="card-body">
+                        <div class="small text-secondary mb-1">Máximo Histórico</div>
+                        <div class="fs-4 fw-bold">${{ "%.2f"|format(p.metrics.historical_max) }}</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="row g-3 mb-4">
+            <div class="col-12 col-md-4">
+                <div class="card h-100 bg-body-tertiary border-0 shadow-sm">
+                    <div class="card-body d-flex justify-content-between align-items-center">
+                        <span class="text-secondary">Observaciones:</span>
+                        <span class="fw-bold">{{ p.observations|length }}</span>
+                    </div>
+                </div>
+            </div>
+            <div class="col-12 col-md-4">
+                <div class="card h-100 bg-body-tertiary border-0 shadow-sm">
+                    <div class="card-body d-flex justify-content-between align-items-center">
+                        <span class="text-secondary">Primera vez:</span>
+                        <span class="fw-bold">{{ p.observations[0].timestamp.strftime('%Y-%m-%d') }}</span>
+                    </div>
+                </div>
+            </div>
+            <div class="col-12 col-md-4">
+                <div class="card h-100 bg-body-tertiary border-0 shadow-sm">
+                    <div class="card-body d-flex justify-content-between align-items-center">
+                        <span class="text-secondary">Última vez:</span>
+                        <span class="fw-bold">{{ p.observations[-1].timestamp.strftime('%Y-%m-%d') }}</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% else %}
+        <div class="alert alert-secondary text-center py-4">
+            No hay suficientes observaciones para mostrar una tendencia todavía.
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- HISTORICO CHART -->
+    <div class="tab-pane fade" id="tab-history" role="tabpanel">
+        <div class="card shadow-sm border-0 mb-4">
+            <div class="card-body">
+                {% if p.observations and p.observations|length > 1 %}
+                    <div class="d-flex justify-content-end mb-3 gap-2">
+                        <button class="btn btn-sm btn-outline-secondary" onclick="updateChart('7d')">7D</button>
+                        <button class="btn btn-sm btn-outline-secondary active" onclick="updateChart('30d')">30D</button>
+                        <button class="btn btn-sm btn-outline-secondary" onclick="updateChart('90d')">90D</button>
+                        <button class="btn btn-sm btn-outline-secondary" onclick="updateChart('all')">Todo</button>
+                    </div>
+                    <div style="height: 400px; width: 100%;">
+                        <canvas id="historyChart"></canvas>
+                    </div>
+                {% else %}
+                    <div class="alert alert-secondary text-center py-4">
+                        Historial insuficiente para graficar.
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- COMPARAR -->
+    <div class="tab-pane fade" id="tab-compare" role="tabpanel">
+        <div id="compare-content" class="py-4 text-center">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Cargando...</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- OBSERVACIONES -->
+    <div class="tab-pane fade" id="tab-obs" role="tabpanel">
+        <div class="card shadow-sm border-0">
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Fecha</th>
+                            <th>Precio</th>
+                            <th>Ref</th>
+                            <th>Disponibilidad</th>
+                            <th>Promo</th>
+                            <th>Run</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for obs in p.observations|reverse %}
+                        <tr>
+                            <td class="small">{{ obs.timestamp.strftime('%Y-%m-%d %H:%M') }}</td>
+                            <td class="fw-bold">${{ "%.2f"|format(obs.price) }}</td>
+                            <td class="small text-secondary">{{ "${:,.2f}".format(obs.original_price) if obs.original_price else '-' }}</td>
+                            <td>
+                                {% if obs.availability == 'AVAILABLE' %}
+                                    <span class="badge text-bg-success">Sí</span>
+                                {% else %}
+                                    <span class="badge text-bg-danger">No</span>
+                                {% endif %}
+                            </td>
+                            <td class="small">{{ obs.promotion_label or '-' }}</td>
+                            <td class="small text-secondary text-truncate" style="max-width: 100px;" title="{{ obs.run_id }}">{{ obs.run_id }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% if p.observations and p.observations|length > 1 %}
+<script src="{{ url_for('static', filename='js/chart.umd.min.js') }}"></script>
+<script>
+    const obsData = [
+        {% for obs in p.observations %}
+        {
+            x: '{{ obs.timestamp.isoformat() }}',
+            y: {{ obs.price }},
+            orig: {{ obs.original_price or 'null' }},
+            promo: '{{ obs.promotion_label or "" }}'
+        },
+        {% endfor %}
+    ];
+    
+    let chart;
+
+    function renderChart(data) {
+        const ctx = document.getElementById('historyChart').getContext('2d');
+        const theme = document.documentElement.getAttribute('data-bs-theme');
+        const gridColor = theme === 'dark' ? '#333' : '#e0e0e0';
+        const textColor = theme === 'dark' ? '#aaa' : '#666';
+        
+        if (chart) {
+            chart.destroy();
+        }
+        
+        chart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                datasets: [{
+                    label: 'Precio',
+                    data: data,
+                    borderColor: '#0d6efd',
+                    backgroundColor: 'rgba(13, 110, 253, 0.1)',
+                    borderWidth: 2,
+                    pointRadius: 3,
+                    pointHoverRadius: 6,
+                    fill: true,
+                    stepped: 'before' // Price stays same until next obs
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                interaction: {
+                    intersect: false,
+                    mode: 'index',
+                },
+                scales: {
+                    x: {
+                        type: 'category',
+                        labels: data.map(d => new Date(d.x).toLocaleDateString()),
+                        grid: { color: gridColor },
+                        ticks: { color: textColor, maxTicksLimit: 10 }
+                    },
+                    y: {
+                        grid: { color: gridColor },
+                        ticks: {
+                            color: textColor,
+                            callback: function(value) { return '$' + value; }
+                        }
+                    }
+                },
+                plugins: {
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                const pt = context.raw;
+                                let lines = [`Precio: $${pt.y.toFixed(2)}`];
+                                if (pt.orig) lines.push(`Original: $${pt.orig.toFixed(2)}`);
+                                if (pt.promo) lines.push(`Promo: ${pt.promo}`);
+                                return lines;
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    }
+
+    function updateChart(range) {
+        // Simple client-side filtering for offline resilience
+        const now = new Date();
+        let cutoff = 0;
+        if (range === '7d') cutoff = now.getTime() - 7 * 86400000;
+        if (range === '30d') cutoff = now.getTime() - 30 * 86400000;
+        if (range === '90d') cutoff = now.getTime() - 90 * 86400000;
+        
+        const filtered = cutoff === 0 ? obsData : obsData.filter(d => new Date(d.x).getTime() >= cutoff);
+        
+        // Ensure at least two points if possible by including one before cutoff
+        if (filtered.length < 2 && obsData.length >= 2) {
+            const first = obsData.find(d => new Date(d.x).getTime() >= cutoff);
+            if (first) {
+                const idx = obsData.indexOf(first);
+                if (idx > 0) filtered.unshift(obsData[idx - 1]);
+            } else {
+                filtered.push(obsData[obsData.length - 1]);
+            }
+        }
+        
+        renderChart(filtered);
+        
+        // Update active button
+        const buttons = document.querySelectorAll('#tab-history button');
+        buttons.forEach(b => b.classList.remove('active'));
+        event.target.classList.add('active');
+    }
+
+    // Init with 30D
+    document.addEventListener("DOMContentLoaded", function() {
+        const fakeEvent = {target: document.querySelector('#tab-history button.active')};
+        window.event = fakeEvent;
+        updateChart('30d');
+    });
+</script>
+{% endif %}
+
+{% endblock %}

@@ -1,0 +1,18 @@
+{% extends 'base.html' %}
+{% block content %}
+<h3 class="fw-bold mb-4">⚖ Comparar Tiendas</h3>
+
+<div class="mb-4 position-relative">
+    <input type="search" class="form-control form-control-lg" placeholder="Buscar producto a comparar..." 
+           name="q" value="{{ q }}"
+           hx-get="/compare" hx-target="#compareResults" hx-trigger="keyup changed delay:500ms" hx-push-url="true">
+</div>
+
+<div id="compareResults">
+    {% if anchor_mode %}
+        {% include 'partials/compare_results_anchor.html' %}
+    {% else %}
+        {% include 'partials/compare_results.html' %}
+    {% endif %}
+</div>
+{% endblock %}
