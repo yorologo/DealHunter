@@ -1,5 +1,16 @@
 # Changelog
 
+## [2.1.0] - 2026-08-18
+- feat: persistent configuration (`config.toml`)
+- feat: profiles
+- feat: advanced filters (`--min-discount`, `--max-price`, `--only-nxm`)
+- feat: discover/update crawling modes
+- feat: historical price filtering (`--new-low`, `--price-drop`)
+- feat: watchlist
+- feat: price targets
+- feat: multiple output formats (`table`, `json`, `csv`, `markdown`)
+- feat: DB utilities (`db integrity`, `db vacuum`, `db backup`, `db status`)
+
 ## v2.0.0 — Historical Tracking
 * Motor `rappi-historico` añadido para combatir manipulación de *precios originales*.
 * Reestructuración DB: Adición de `runs` e identificador de sesiones temporales.
