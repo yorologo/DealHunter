@@ -4,7 +4,11 @@
 <!-- BREADCRUMBS -->
 <nav aria-label="breadcrumb" class="mb-3">
   <ol class="breadcrumb small">
+    {% if p.store_type == 'restaurants' %}
+    <li class="breadcrumb-item"><a href="/restaurants" class="text-decoration-none">Restaurantes</a></li>
+    {% else %}
     <li class="breadcrumb-item"><a href="/market" class="text-decoration-none">Supermercados</a></li>
+    {% endif %}
     <li class="breadcrumb-item"><a href="/stores/{{ p.store_id }}" class="text-decoration-none">{{ p.store_name }}</a></li>
     <li class="breadcrumb-item active text-truncate d-inline-block" style="max-width: 200px;" aria-current="page">{{ p.product_name }}</li>
   </ol>

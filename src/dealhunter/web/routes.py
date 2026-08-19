@@ -21,7 +21,7 @@ def register_routes(app):
         if not q or len(q) < 3:
             if request.headers.get('HX-Request'):
                 return "<div>Introduce al menos 3 caracteres</div>"
-            return render_template('search_results.html', results={}, q=q)
+            return render_template('search_results.html', results={}, q=q, current_path='/search')
             
         db_path = current_app.config['DATABASE']
         results = search_local(db_path, q)
@@ -141,9 +141,25 @@ def register_routes(app):
             return render_template('partials/catalog_grid.html', data=data, view_mode=request.cookies.get('view_mode', 'cards'))
         return render_template('store_detail.html', detail=detail, data=data, sort=sort, filters=filters, current_path='/stores')
 
-    @app.route('/restaurants')
-    def restaurants(): return render_template('placeholder.html', title="Restaurantes", current_path='/restaurants')
+
     
+
+    from dealhunter.web.queries import get_restaurants_home, get_restaurant_detail
+
+    @app.route('/restaurants')
+    def restaurants():
+        db_path = current_app.config['DATABASE']
+        stores = get_restaurants_home(db_path)
+        return render_template('restaurants.html', stores=stores, current_path='/restaurants')
+        
+    @app.route('/restaurants/<store_id>')
+    def restaurant_detail(store_id):
+        db_path = current_app.config['DATABASE']
+        detail = get_restaurant_detail(db_path, store_id)
+        if not detail:
+            return "Restaurant not found", 404
+        return render_template('restaurant_detail.html', detail=detail, current_path='/restaurants')
+
     @app.route('/watchlist')
     def watchlist_view(): return render_template('placeholder.html', title="Watchlist", current_path='/watchlist')
     

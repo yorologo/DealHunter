@@ -1,0 +1,30 @@
+{% extends 'base.html' %}
+{% block content %}
+<nav aria-label="breadcrumb" class="mb-3">
+  <ol class="breadcrumb small">
+    <li class="breadcrumb-item"><a href="/" class="text-decoration-none">Home</a></li>
+    <li class="breadcrumb-item active" aria-current="page">Restaurantes</li>
+  </ol>
+</nav>
+
+<div class="d-flex justify-content-between align-items-end mb-4">
+    <h3 class="fw-bold m-0">🍔 Restaurantes</h3>
+</div>
+
+{% if stores %}
+<div class="row row-cols-1 row-cols-sm-2 row-cols-md-3 row-cols-lg-4 g-4">
+    {% for s in stores %}
+    <div class="col">
+        {% include 'components/restaurant_card.html' %}
+    </div>
+    {% endfor %}
+</div>
+{% else %}
+<div class="alert alert-secondary text-center py-5">
+    <div class="fs-1 mb-3">🍽️</div>
+    <h4>DealHunter todavía no ha registrado restaurantes</h4>
+    <p class="text-secondary mb-0">El crawler no ha detectado tiendas del tipo "restaurants".</p>
+</div>
+{% endif %}
+
+{% endblock %}

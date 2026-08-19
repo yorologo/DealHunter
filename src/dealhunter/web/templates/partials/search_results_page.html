@@ -1,35 +1,68 @@
-{% if results.products or results.stores %}
-    {% if results.products %}
-    <h5 class="fw-bold mb-3">Productos</h5>
-    <div class="list-group mb-4 shadow-sm">
-        {% for p in results.products %}
-        <a href="/products/{{ p.store_id }}/{{ p.product_id }}" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center">
-            <div>
-                <div class="fw-bold">{{ p.name }}</div>
-                <div class="small text-secondary">{{ p.store_name }} {{ ' - ' ~ p.brand if p.brand else '' }}</div>
-            </div>
-            <span class="badge text-bg-light">Ver</span>
-        </a>
-        {% endfor %}
+{% if results.categories or results.stores or results.products %}
+    <div class="list-group list-group-flush">
+        {% if results.categories %}
+            <div class="list-group-item bg-light text-secondary small fw-bold">CATEGORÍAS</div>
+            {% for c in results.categories %}
+                <a href="/categories/{{ c.name | urlencode }}" class="list-group-item list-group-item-action d-flex align-items-center gap-2">
+                    <span>📦</span>
+                    <span class="fw-medium">{{ c.name }}</span>
+                </a>
+            {% endfor %}
+        {% endif %}
+        
+        {% if results.stores %}
+            <div class="list-group-item bg-light text-secondary small fw-bold">TIENDAS Y RESTAURANTES</div>
+            {% for s in results.stores %}
+                {% if s.type == 'restaurants' %}
+                    <a href="/restaurants/{{ s.store_id }}" class="list-group-item list-group-item-action d-flex align-items-center gap-2">
+                        <span>🍔</span>
+                        <div class="flex-grow-1">
+                            <div class="fw-medium">{{ s.name }}</div>
+                        </div>
+                        <span class="badge bg-secondary-subtle text-secondary">Restaurante</span>
+                    </a>
+                {% else %}
+                    <a href="/stores/{{ s.store_id }}" class="list-group-item list-group-item-action d-flex align-items-center gap-2">
+                        <span>🏪</span>
+                        <div class="flex-grow-1">
+                            <div class="fw-medium">{{ s.name }}</div>
+                            <div class="small text-secondary">{{ s.type }}</div>
+                        </div>
+                    </a>
+                {% endif %}
+            {% endfor %}
+        {% endif %}
+        
+        {% if results.products %}
+            <div class="list-group-item bg-light text-secondary small fw-bold">PRODUCTOS Y PLATILLOS</div>
+            {% for p in results.products %}
+                {% if p.store_type == 'restaurants' %}
+                    <a href="/products/{{ p.store_id }}/{{ p.product_id }}?context=restaurant" class="list-group-item list-group-item-action d-flex align-items-center gap-2">
+                        <span>🍽️</span>
+                        <div class="flex-grow-1">
+                            <div class="fw-medium">{{ p.name }}</div>
+                            <div class="small text-secondary">{{ p.store_name }}</div>
+                        </div>
+                        <span class="badge bg-secondary-subtle text-secondary">Platillo</span>
+                    </a>
+                {% else %}
+                    <a href="/products/{{ p.store_id }}/{{ p.product_id }}" class="list-group-item list-group-item-action d-flex align-items-center gap-2">
+                        <span>🛒</span>
+                        <div class="flex-grow-1">
+                            <div class="fw-medium">{{ p.name }}</div>
+                            <div class="small text-secondary">{{ p.store_name }} {{ ' - ' ~ p.brand if p.brand else '' }}</div>
+                        </div>
+                    </a>
+                {% endif %}
+            {% endfor %}
+        {% endif %}
     </div>
-    {% endif %}
-
-    {% if results.stores %}
-    <h5 class="fw-bold mb-3">Tiendas</h5>
-    <div class="list-group shadow-sm">
-        {% for s in results.stores %}
-        <a href="/stores/{{ s.store_id }}" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center">
-            <div>
-                <div class="fw-bold">{{ s.name }}</div>
-                <div class="small text-secondary">{{ s.type }}</div>
-            </div>
-            <span class="badge text-bg-light">Ver</span>
-        </a>
-        {% endfor %}
+    
+    <div class="p-2 text-center bg-light border-top">
+        <a href="/search?q={{ q }}" class="small text-decoration-none fw-bold">Ver todos los resultados</a>
     </div>
-    {% endif %}
 {% else %}
-    <div class="alert alert-secondary text-center py-4">
+    <div class="p-4 text-center text-secondary">
         No se encontraron resultados para "{{ q }}".
     </div>
 {% endif %}

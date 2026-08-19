@@ -1,0 +1,26 @@
+<div class="card h-100 shadow-sm hover-shadow transition-all border-0">
+    <div class="card-body">
+        <h5 class="fw-bold text-body mb-3">{{ s.name }}</h5>
+        
+        <div class="d-flex flex-column gap-2 small text-secondary mb-3">
+            <div><span class="fw-bold text-body">{{ s.total_dishes }}</span> platillos registrados</div>
+            <div>
+                {% if s.available_dishes > 0 %}
+                    <span class="fw-bold text-success">{{ s.available_dishes }}</span> disponibles
+                {% else %}
+                    <span class="fw-bold text-danger">0</span> disponibles
+                {% endif %}
+            </div>
+            {% if s.promos > 0 %}
+                <div><span class="badge bg-danger-subtle text-danger border border-danger-subtle">{{ s.promos }} Promociones</span></div>
+            {% endif %}
+        </div>
+        
+        <div class="small text-secondary mt-auto">
+            Última obs: {{ s.last_obs[:10] if s.last_obs else 'Nunca' }}
+        </div>
+    </div>
+    <div class="card-footer bg-transparent border-top-0 pt-0 pb-3">
+        <a href="/restaurants/{{ s.store_id }}" class="btn btn-sm btn-outline-primary w-100 fw-bold">Ver Menú</a>
+    </div>
+</div>

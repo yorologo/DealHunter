@@ -94,7 +94,7 @@ from datetime import datetime
 def get_product_detail(db_path, store_id, product_id):
     c = sqlite3.connect(db_path).cursor()
     c.execute('''
-        SELECT p.product_id, p.store_id, p.name, s.name, p.brand, 
+        SELECT p.product_id, p.store_id, p.name, s.name, s.type as store_type, p.brand, 
                p.quantity, p.unit, p.normalized_quantity, p.normalized_unit, p.pack_count
         FROM products p
         JOIN stores s ON p.store_id = s.store_id
@@ -355,9 +355,11 @@ def get_catalog(db_path, filters, sort, page, per_page=25):
         params.append(filters["vertical"])
         
     if filters.get("category"):
-        # Use query_term from observations
-        conds.append("p.product_id IN (SELECT DISTINCT product_id FROM observations WHERE query_term = ?)")
-        params.append(filters["category"])
+        if filters["category"] == "Uncategorized":
+            conds.append("(p.category IS NULL OR p.category = '')")
+        else:
+            conds.append("p.category = ?")
+            params.append(filters["category"])
         
     where_clause = f"WHERE {' AND '.join(conds)}" if conds else ""
     
@@ -373,7 +375,7 @@ def get_catalog(db_path, filters, sort, page, per_page=25):
         order_clause = "ORDER BY p.name ASC"
         
     query = f'''
-        SELECT p.product_id, p.store_id, p.name, s.name, p.brand, p.quantity, p.unit, p.normalized_quantity, p.normalized_unit,
+        SELECT p.product_id, p.store_id, p.name, s.name, s.type as store_type, p.brand, p.quantity, p.unit, p.normalized_quantity, p.normalized_unit,
                MAX(o.timestamp) as ts, o.price
         FROM products p
         JOIN stores s ON p.store_id = s.store_id
@@ -394,12 +396,13 @@ def get_catalog(db_path, filters, sort, page, per_page=25):
             "store_id": r[1],
             "product_name": r[2],
             "store_name": r[3],
-            "brand": r[4],
-            "quantity": r[5],
-            "unit": r[6],
-            "normalized_quantity": r[7],
-            "normalized_unit": r[8],
-            "current_price": r[10]
+            "store_type": r[4],
+            "brand": r[5],
+            "quantity": r[6],
+            "unit": r[7],
+            "normalized_quantity": r[8],
+            "normalized_unit": r[9],
+            "current_price": r[11]
         })
         
     conn.close()
@@ -430,13 +433,15 @@ def get_catalog(db_path, filters, sort, page, per_page=25):
 def get_categories(db_path):
     conn = sqlite3.connect(db_path)
     c = conn.cursor()
-    # query_term in observations acts as category
+    # Use real category from products, fallback to Uncategorized
     c.execute('''
-        SELECT o.query_term, COUNT(DISTINCT o.product_id), COUNT(DISTINCT o.store_id)
-        FROM observations o
-        WHERE o.query_term IS NOT NULL AND o.query_term != ''
-        GROUP BY o.query_term
-        ORDER BY o.query_term ASC
+        SELECT COALESCE(NULLIF(TRIM(p.category), ''), 'Uncategorized') as cat_name, 
+               COUNT(DISTINCT p.product_id), 
+               COUNT(DISTINCT p.store_id)
+        FROM products p
+        JOIN observations o ON p.product_id = o.product_id AND p.store_id = o.store_id
+        GROUP BY cat_name
+        ORDER BY cat_name ASC
     ''')
     cats = [{"name": r[0], "products": r[1], "stores": r[2]} for r in c.fetchall()]
     conn.close()
@@ -472,11 +477,12 @@ def get_store_detail(db_path, store_id):
     
     # categories
     c.execute('''
-        SELECT o.query_term, COUNT(DISTINCT o.product_id)
-        FROM observations o
-        WHERE o.store_id = ? AND o.query_term IS NOT NULL AND o.query_term != ''
-        GROUP BY o.query_term
-        ORDER BY o.query_term ASC
+        SELECT COALESCE(NULLIF(TRIM(p.category), ''), 'Uncategorized') as cat_name, 
+               COUNT(DISTINCT p.product_id)
+        FROM products p
+        WHERE p.store_id = ?
+        GROUP BY cat_name
+        ORDER BY cat_name ASC
     ''', (store_id,))
     cats = [{"name": r[0], "count": r[1]} for r in c.fetchall()]
     
@@ -488,4 +494,197 @@ def get_store_detail(db_path, store_id):
         "products": p_count,
         "last_obs": last_obs,
         "categories": cats
+    }
+
+
+def get_restaurants_home(db_path):
+    conn = sqlite3.connect(db_path)
+    c = conn.cursor()
+    
+    # We want a list of restaurants with stats
+    c.execute('''
+        SELECT s.store_id, s.name, s.brand,
+               COUNT(DISTINCT p.product_id) as total_dishes,
+               MAX(o.timestamp) as last_obs
+        FROM stores s
+        LEFT JOIN products p ON s.store_id = p.store_id
+        LEFT JOIN observations o ON p.product_id = o.product_id AND p.store_id = o.store_id
+        WHERE s.type = 'restaurants'
+        GROUP BY s.store_id
+        ORDER BY s.name ASC
+    ''')
+    
+    stores = []
+    for r in c.fetchall():
+        store_id = r[0]
+        # Count available dishes
+        c.execute('''
+            SELECT COUNT(DISTINCT o.product_id)
+            FROM observations o
+            WHERE o.store_id = ? AND o.availability = 'AVAILABLE'
+            AND o.timestamp = (SELECT MAX(timestamp) FROM observations WHERE product_id = o.product_id AND store_id = ?)
+        ''', (store_id, store_id))
+        available = c.fetchone()[0]
+        
+        # Count promotions
+        c.execute('''
+            SELECT COUNT(DISTINCT o.product_id)
+            FROM observations o
+            WHERE o.store_id = ? AND o.discount_effective > 0
+            AND o.timestamp = (SELECT MAX(timestamp) FROM observations WHERE product_id = o.product_id AND store_id = ?)
+        ''', (store_id, store_id))
+        promos = c.fetchone()[0]
+        
+        stores.append({
+            "store_id": store_id,
+            "name": r[1],
+            "brand": r[2],
+            "total_dishes": r[3],
+            "available_dishes": available,
+            "promos": promos,
+            "last_obs": r[4]
+        })
+        
+    conn.close()
+    return stores
+
+def get_restaurant_detail(db_path, store_id):
+    conn = sqlite3.connect(db_path)
+    c = conn.cursor()
+    
+    c.execute("SELECT name, brand, type FROM stores WHERE store_id = ? AND type = 'restaurants'", (store_id,))
+    row = c.fetchone()
+    if not row:
+        return None
+        
+    res = {
+        "store_id": store_id,
+        "name": row[0],
+        "brand": row[1],
+        "type": row[2]
+    }
+    
+    # Fetch menu items with their latest observations
+    c.execute('''
+        SELECT p.product_id, p.name, COALESCE(NULLIF(TRIM(p.category), ''), 'Otros') as category,
+               o.price, o.original_price, o.discount_effective, o.promotion_label, o.promotion_type, o.availability,
+               MAX(o.timestamp) as ts
+        FROM products p
+        JOIN observations o ON p.product_id = o.product_id AND p.store_id = o.store_id
+        WHERE p.store_id = ?
+        GROUP BY p.product_id
+        ORDER BY category ASC, p.name ASC
+    ''', (store_id,))
+    
+    dishes = []
+    cats = {}
+    total_dishes = 0
+    available_dishes = 0
+    promos = 0
+    
+    for r in c.fetchall():
+        total_dishes += 1
+        is_avail = (r[8] == 'AVAILABLE')
+        if is_avail:
+            available_dishes += 1
+        if r[5] and r[5] > 0:
+            promos += 1
+            
+        dish = {
+            "product_id": r[0],
+            "name": r[1],
+            "category": r[2],
+            "price": r[3],
+            "original_price": r[4],
+            "discount_effective": r[5],
+            "promotion_label": r[6],
+            "promotion_type": r[7],
+            "availability": r[8],
+            "ts": r[9],
+            "has_toppings": "elige" in r[1].lower() or "tu gusto" in r[1].lower() # We'll determine has_toppings dynamically if not explicit
+        }
+        
+        # A simple heuristic for has_toppings based on real data: DealHunter can't scrape modifiable items completely,
+        # but if name contains combo, arma, crea, etc it usually has toppings.
+        # Since DH doesn't have a specific `has_toppings` field in DB, we use basic heuristic or default to false, but the prompt says: "si has_toppings = true mostrar claramente: 'Precio base'". We'll add a check.
+        # Let's say if the name contains 'combo', 'arma', 'elige', 'personaliza', 'opciones'.
+        name_lower = dish["name"].lower()
+        if any(x in name_lower for x in ['combo', 'arma', 'elige', 'personaliza', 'opciones', 'tu gusto', 'agreg']):
+            dish["has_toppings"] = True
+        else:
+            dish["has_toppings"] = False
+            
+        dishes.append(dish)
+        
+        if dish["category"] not in cats:
+            cats[dish["category"]] = []
+        cats[dish["category"]].append(dish)
+        
+    res["total_dishes"] = total_dishes
+    res["available_dishes"] = available_dishes
+    res["promos"] = promos
+    res["categories"] = cats
+    res["last_obs"] = dishes[0]["ts"] if dishes else None
+    
+    conn.close()
+    return res
+
+
+def search_local(db_path, query, limit=50):
+    conn = sqlite3.connect(db_path)
+    c = conn.cursor()
+    
+    # 1. Search Categories (using query_term or category field if it exists)
+    c_results = []
+    if query:
+        c.execute('''
+            SELECT DISTINCT COALESCE(NULLIF(TRIM(category), ''), 'Uncategorized') as cat
+            FROM products 
+            WHERE cat LIKE ?
+            LIMIT 5
+        ''', (f"%{query}%",))
+        for r in c.fetchall():
+            c_results.append({"name": r[0]})
+            
+    # 2. Search Stores
+    s_results = []
+    c.execute('''
+        SELECT store_id, name, type, brand
+        FROM stores
+        WHERE name LIKE ? OR brand LIKE ?
+        LIMIT 10
+    ''', (f"%{query}%", f"%{query}%"))
+    for r in c.fetchall():
+        s_results.append({
+            "store_id": r[0],
+            "name": r[1],
+            "type": r[2],
+            "brand": r[3]
+        })
+        
+    # 3. Search Products (includes dishes)
+    p_results = []
+    query_str = f"SELECT p.product_id, p.store_id, p.name, s.name, p.brand, s.type FROM products p JOIN stores s ON p.store_id = s.store_id "
+    params = []
+    if query:
+        query_str += "WHERE p.name LIKE ? OR p.brand LIKE ? "
+        params.extend([f"%{query}%", f"%{query}%"])
+    query_str += f"LIMIT {limit}"
+    
+    c.execute(query_str, params)
+    for r in c.fetchall():
+        p_results.append({
+            "product_id": r[0],
+            "store_id": r[1],
+            "name": r[2],
+            "store_name": r[3],
+            "brand": r[4],
+            "store_type": r[5]
+        })
+        
+    conn.close()
+    return {
+        "categories": c_results,
+        "stores": s_results,
+        "products": p_results
     }

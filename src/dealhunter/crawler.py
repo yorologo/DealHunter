@@ -227,8 +227,8 @@ def run_discover(config, lat, lng, conn, run_id, dry_run=False):
                             
                         c.execute('''INSERT INTO products (product_id, store_id, name, brand, image, 
                                      normalized_name, quantity, unit, normalized_quantity, normalized_unit,
-                                     fingerprint, pack_count)
-                                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                                     fingerprint, pack_count, category)
+                                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                                      ON CONFLICT(product_id, store_id) DO UPDATE SET
                                      brand = COALESCE(NULLIF(brand, ''), excluded.brand),
                                      normalized_name = COALESCE(NULLIF(normalized_name, ''), excluded.normalized_name),
@@ -237,6 +237,7 @@ def run_discover(config, lat, lng, conn, run_id, dry_run=False):
                                      normalized_quantity = COALESCE(normalized_quantity, excluded.normalized_quantity),
                                      normalized_unit = COALESCE(NULLIF(normalized_unit, ''), excluded.normalized_unit),
                                      pack_count = COALESCE(pack_count, excluded.pack_count),
+                                     category = COALESCE(NULLIF(category, ''), excluded.category),
                                      image = COALESCE(NULLIF(image, ''), excluded.image),
                                      name = COALESCE(NULLIF(name, ''), excluded.name),
                                      fingerprint = CASE 
@@ -249,7 +250,7 @@ def run_discover(config, lat, lng, conn, run_id, dry_run=False):
                                   (p_id, s_id, pname, brand, img,
                                    norm["normalized_name"], norm["quantity"], norm["unit"], 
                                    norm["normalized_quantity"], norm["normalized_unit"], fingerprint,
-                                   norm["pack_count"]))
+                                   norm["pack_count"], cat))
                         
                         c.execute('''INSERT OR IGNORE INTO observations (run_id, store_id, product_id, price, original_price, stock, timestamp, 
                                      discount_price, discount_promotion, discount_effective, discount_source, promotion_type, promotion_label, query_term, availability)

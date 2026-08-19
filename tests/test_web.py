@@ -47,10 +47,10 @@ def test_search(client):
 def test_search_hx(client):
     rv = client.get('/search?q=Coca', headers={'HX-Request': 'true'})
     assert rv.status_code == 200
-    assert b'dropdown-item' in rv.data
+    assert b'list-group-item' in rv.data
 
 def test_placeholders(client):
-    routes = ['/restaurants', '/watchlist', '/alerts', '/admin', '/admin/account']
+    routes = ['/watchlist', '/alerts', '/admin', '/admin/account']
     for r in routes:
         rv = client.get(r)
         assert rv.status_code == 200
