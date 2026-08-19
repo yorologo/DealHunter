@@ -1,12 +1,8 @@
 import sys
 import os
 
-bin_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'bin', 'rappi-ofertas'))
-namespace = {}
-with open(bin_path, 'r') as f:
-    exec(f.read(), namespace)
-
-calculate_discount = namespace['calculate_discount']
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../src')))
+from dealhunter.discounts import calculate_discount
 
 def test_direct_discount():
     p = {"price": 20.0, "real_price": 40.0}

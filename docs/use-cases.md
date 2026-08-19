@@ -43,3 +43,18 @@ DealHunter unifica la métrica en la tabla SQLite, permitiéndote consultar a ni
 * Sin embargo, la **mediana histórica** de ese producto los últimos 30 días ha sido de **$65**.
 * Caída histórica real = **7.7%**.
 * Clasificación: `RAPPI_PROMO`. El sistema ignora la insignia y te advierte que el precio habitual suele ser casi idéntico al actual. (Diferencia crítica entre `promo_status` provisto por el API vs `history_status` derivado empíricamente).
+### Caso 12: Watchlist
+```bash
+rappi-ofertas watch add "Café" --below 100
+rappi-ofertas watch list
+```
+
+### Caso 13: Actualizar Histórico
+```bash
+rappi-ofertas update --dry-run
+```
+
+### Caso 14: Comparar tiendas
+```bash
+rappi-historico compare "Leche Lala"
+```

@@ -1,3 +1,4 @@
+# DealHunter v2.1
 # DealHunter
 
 Herramienta de recolección, normalización y análisis histórico de precios y promociones.
@@ -79,3 +80,12 @@ Por favor revisa [CONTRIBUTING.md](CONTRIBUTING.md) antes de enviar un Pull Requ
 
 ## Disclaimer
 Proyecto de uso personal, analítico y offline. No afiliado con Rappi. La herramienta es estrictamente *read-only* y no evade controles de autenticación. Úsela bajo su propio riesgo y respetando los términos de servicio aplicables.
+
+## Novedades v2.1
+- Configuración persistente (`~/.config/dealhunter/config.toml`)
+- Perfiles combinables con argumentos CLI.
+- Filtros avanzados (`--min-discount`, `--max-price`, `--only-nxm`, `--store`).
+- Modos de Crawler: `discover` para descubrir ofertas nuevas, `update` para refrescar catálogo.
+- Watchlist local para seguimiento de precios.
+- Salida en formatos múltiples (`table`, `json`, `csv`, `markdown`).
+- Comandos útiles: `stats`, `runs`, `db backup`.
