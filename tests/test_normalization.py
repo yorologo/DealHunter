@@ -140,3 +140,34 @@ if __name__ == "__main__":
         passed += 1
         print(f"  PASS  {t.__name__}")
     print(f"\nNormalization tests: {passed} total, {passed} passed, 0 failed.")
+
+def test_unit_price_formatting_special_cases():
+    from dealhunter.normalization import format_unit_price
+    
+    # 620 g at $62 -> $100/kg
+    # The normalizer yields normalized_quantity=0.62, normalized_unit='kg'
+    assert format_unit_price(62.0, 0.62, 'kg') == '$100/kg'
+    
+    # 1 kg at $20.80 -> $20.8/kg
+    assert format_unit_price(20.80, 1.0, 'kg') == '$20.8/kg'
+    
+    # 6 x 355 ml = 2.13 L at $120 -> 120 / 2.13 = $56.33/L
+    assert format_unit_price(120.0, 2.13, 'L') == '$56.338/L'
+
+def test_parse_product_name_multipacks():
+    from dealhunter.normalization import parse_product_name
+    
+    # 6 x 355 ml
+    parsed = parse_product_name("Cerveza 6 x 355 ml")
+    assert parsed["pack_count"] == 6
+    assert parsed["quantity"] == 2130
+    assert parsed["unit"] == "ml"
+    assert parsed["normalized_quantity"] == 2.13
+    assert parsed["normalized_unit"] == "L"
+    
+    # 12 pack
+    parsed = parse_product_name("Agua 12 pack")
+    assert parsed["pack_count"] == 12
+    assert parsed["unit"] == "pack"
+    assert parsed["normalized_quantity"] == 12
+    assert parsed["normalized_unit"] == "pack"

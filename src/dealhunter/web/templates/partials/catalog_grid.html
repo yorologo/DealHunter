@@ -40,7 +40,13 @@
 {% else %}
     <div class="alert alert-secondary text-center py-5">
         <div class="fs-1 mb-3">🤷</div>
-        <h4>No se encontraron resultados</h4>
-        <p class="text-secondary mb-0">Intenta ajustar los filtros para encontrar lo que buscas.</p>
+        {% set has_user_filters = (filters and (filters.get('store') or filters.get('category') or filters.get('only_deals') or filters.get('min_discount'))) %}
+        {% if has_user_filters %}
+            <h4>No se encontraron resultados</h4>
+            <p class="text-secondary mb-0">Tus filtros no encontraron resultados. Intenta ajustarlos.</p>
+        {% else %}
+            <h4>No hay productos almacenados aquí</h4>
+            <p class="text-secondary mb-0">No existen datos capturados para esta sección actualmente. Ejecuta una captura para obtener datos.</p>
+        {% endif %}
     </div>
 {% endif %}

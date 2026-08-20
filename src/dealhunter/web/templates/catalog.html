@@ -22,8 +22,11 @@
                     <div class="col-md-3">
                         <label class="form-label small text-secondary fw-bold">Ordenar por</label>
                         <select name="sort" class="form-select form-select-sm" onchange="document.getElementById('filter-form').dispatchEvent(new Event('submit'))">
-                            <option value="opportunity" {% if sort == 'opportunity' %}selected{% endif %}>Mejor Oportunidad</option>
+                            <option value="opportunity" {% if sort == 'opportunity' %}selected{% endif %}>Mejor Oportunidad (Pi)</option>
+                            <option value="discount" {% if sort == 'discount' %}selected{% endif %}>Mayor Descuento %</option>
+                            <option value="savings" {% if sort == 'savings' %}selected{% endif %}>Mayor Ahorro $</option>
                             <option value="price_asc" {% if sort == 'price_asc' %}selected{% endif %}>Menor Precio</option>
+                            <option value="price_desc" {% if sort == 'price_desc' %}selected{% endif %}>Mayor Precio</option>
                             <option value="name_asc" {% if sort == 'name_asc' %}selected{% endif %}>Nombre A-Z</option>
                             <option value="recent" {% if sort == 'recent' %}selected{% endif %}>Más reciente</option>
                         </select>
@@ -40,6 +43,14 @@
                         <input type="text" name="category" class="form-control form-control-sm" placeholder="Categoría..." value="{{ filters.category or '' }}" onchange="document.getElementById('filter-form').dispatchEvent(new Event('submit'))">
                     </div>
                     {% endif %}
+                    <div class="col-md-3">
+                        <div class="form-check mt-4">
+                            <input class="form-check-input" type="checkbox" name="only_deals" id="only_deals" value="1" {% if filters.only_deals %}checked{% endif %} onchange="document.getElementById('filter-form').dispatchEvent(new Event('submit'))">
+                            <label class="form-check-label small" for="only_deals">
+                                Solo en descuento
+                            </label>
+                        </div>
+                    </div>
                     <div class="col-md-auto ms-auto">
                         <button type="submit" class="btn btn-sm btn-primary">Filtrar</button>
                     </div>

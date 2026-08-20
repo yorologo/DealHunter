@@ -1,0 +1,21 @@
+{% macro render_price(current_price, original_price=None, is_suspicious=False) %}
+<div>
+    <div class="d-flex align-items-center flex-wrap gap-2">
+        <span class="fs-4 fw-bold text-success lh-1">${{ "%.2f"|format(current_price) }}</span>
+        {% if original_price and original_price > current_price %}
+            <span class="fs-6 text-decoration-line-through text-secondary lh-1">~${{ "%.2f"|format(original_price) }}~</span>
+            {% if is_suspicious %}
+                <span class="badge bg-warning text-dark border ms-1" title="El precio original anunciado parece inflado según el historial.">⚠️ Suspicaz</span>
+            {% endif %}
+        {% endif %}
+    </div>
+    {% if original_price and original_price > current_price %}
+        {% set discount = ((original_price - current_price) / original_price) * 100 %}
+        {% set savings = original_price - current_price %}
+        <div class="mt-2 d-flex gap-2">
+            <span class="badge bg-danger-subtle text-danger border border-danger-subtle">-{{ "%.1f"|format(discount) }} %</span>
+            <span class="badge bg-success-subtle text-success border border-success-subtle">Ahorras ${{ "%.2f"|format(savings) }}</span>
+        </div>
+    {% endif %}
+</div>
+{% endmacro %}

@@ -18,31 +18,49 @@
         
         <div class="small text-secondary mb-3">{{ p.brand or '' }}</div>
         
+        {% if p.promotion_label %}
+            <div class="mb-2"><span class="badge bg-danger">{{ p.promotion_label }}</span></div>
+        {% endif %}
+        
         <div class="mt-auto">
             <div class="d-flex justify-content-between align-items-end">
                 <div>
                     <div class="fs-4 fw-bold text-success lh-1">${{ "%.2f"|format(p.current_price) }}</div>
+                    {% set op = p.metrics.original_price if p.metrics else None %}
+                    {% if op and op > p.current_price %}
+                        <div class="fs-6 text-decoration-line-through text-secondary mt-1">~${{ "%.2f"|format(op) }}~
+                        {% if p.metrics and p.metrics.is_suspicious_reference %}
+                            <span class="badge bg-warning text-dark border ms-1" title="Precio original sospechoso">⚠️</span>
+                        {% endif %}
+                        </div>
+                    {% endif %}
                     {% if p.unit_price %}
                         <div class="small text-secondary mt-1">{{ p.unit_price }}</div>
                     {% endif %}
                 </div>
                 
-                {% if p.metrics and p.metrics.discount_vs_median_30d %}
-                    {% if p.metrics.discount_vs_median_30d > 0 %}
-                        <div class="badge bg-success-subtle text-success border border-success-subtle">
-                            -{{ "%.1f"|format(p.metrics.discount_vs_median_30d) }}% vs 30d
-                        </div>
-                    {% elif p.metrics.discount_vs_median_30d < 0 %}
-                        <div class="badge bg-danger-subtle text-danger border border-danger-subtle">
-                            +{{ "%.1f"|format(p.metrics.discount_vs_median_30d * -1) }}% vs 30d
-                        </div>
+                <div class="text-end">
+                    {% if op and op > p.current_price and (not p.metrics or not p.metrics.is_suspicious_reference) %}
+                        {% set discount = ((op - p.current_price) / op) * 100 %}
+                        {% set savings = op - p.current_price %}
+                        <div class="badge bg-danger-subtle text-danger border border-danger-subtle mb-1 d-block">-{{ "%.1f"|format(discount) }}%</div>
+                        <div class="badge bg-success-subtle text-success border border-success-subtle d-block">Ahorras ${{ "%.2f"|format(savings) }}</div>
+                    {% elif p.metrics and p.metrics.discount_vs_median_30d %}
+                        {% if p.metrics.discount_vs_median_30d > 0 %}
+                            <div class="badge bg-success-subtle text-success border border-success-subtle">
+                                -{{ "%.1f"|format(p.metrics.discount_vs_median_30d) }}% vs 30d
+                            </div>
+                        {% elif p.metrics.discount_vs_median_30d < 0 %}
+                            <div class="badge bg-danger-subtle text-danger border border-danger-subtle">
+                                +{{ "%.1f"|format(p.metrics.discount_vs_median_30d * -1) }}% vs 30d
+                            </div>
+                        {% endif %}
                     {% endif %}
-                {% endif %}
+                </div>
             </div>
         </div>
     </div>
     <div class="card-footer bg-transparent border-top-0 pt-0 pb-3 z-2 position-relative">
-        <!-- Compare button needs to be z-2 to be clickable over stretched-link -->
         <a href="/compare?store_id={{ p.store_id }}&product_id={{ p.product_id }}" class="btn btn-sm btn-outline-secondary w-100">⚖ Comparar</a>
     </div>
 </div>

@@ -138,7 +138,14 @@ def backup_db(db_path, tag="backup"):
     if os.path.exists(db_path):
         ts = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
         backup_path = f"{db_path}.{ts}.{tag}.bak"
-        shutil.copy2(db_path, backup_path)
+        
+        source = sqlite3.connect(db_path)
+        dest = sqlite3.connect(backup_path)
+        with source:
+            source.backup(dest)
+        dest.close()
+        source.close()
+        
         return backup_path
     return None
 

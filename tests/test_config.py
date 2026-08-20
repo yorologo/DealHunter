@@ -6,7 +6,7 @@ from dealhunter.config import get_merged_config
 
 def test_defaults():
     cfg = get_merged_config(None)
-    assert cfg["min_discount"] == 0
+    assert cfg["min_discount"] == 40
     assert cfg["top"] == 50
 
 def test_cli_override():

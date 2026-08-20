@@ -82,7 +82,9 @@ def analyze_history(db_path, config, store=None, product=None):
             "UNIT": data["unit"] or "",
             "UNIT_PRICE": unit_price,
             "current_price": metrics["current_price"],
+            "original_price": metrics.get("original_price"),
             "historical_min": metrics["historical_min"],
+            "historical_max": metrics["historical_max"],
             "median_30d": metrics["median_30d"],
             "historical_average": metrics["historical_average"],
             "previous_price": metrics["previous_price"],
@@ -92,7 +94,8 @@ def analyze_history(db_path, config, store=None, product=None):
             "distance_from_historical_min": metrics["distance_from_historical_min"],
             "deal_status": estado,
             "reason": metrics["reason"],
-            "is_suspicious_reference": metrics.get("is_suspicious_reference", False)
+            "is_suspicious_reference": metrics.get("is_suspicious_reference", False),
+            "observations_count": metrics.get("observations_count", 0)
         }
         
         results.append(res)

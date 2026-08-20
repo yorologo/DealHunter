@@ -95,7 +95,7 @@ def get_product_detail(db_path, store_id, product_id):
     c = sqlite3.connect(db_path).cursor()
     c.execute('''
         SELECT p.product_id, p.store_id, p.name, s.name, s.type as store_type, p.brand, 
-               p.quantity, p.unit, p.normalized_quantity, p.normalized_unit, p.pack_count
+               p.category, p.quantity, p.unit, p.normalized_quantity, p.normalized_unit, p.pack_count
         FROM products p
         JOIN stores s ON p.store_id = s.store_id
         WHERE p.store_id = ? AND p.product_id = ?
@@ -109,12 +109,14 @@ def get_product_detail(db_path, store_id, product_id):
         "store_id": row[1],
         "product_name": row[2],
         "store_name": row[3],
-        "brand": row[4],
-        "quantity": row[5],
-        "unit": row[6],
-        "normalized_quantity": row[7],
-        "normalized_unit": row[8],
-        "pack_count": row[9]
+        "store_type": row[4],
+        "brand": row[5],
+        "category": row[6],
+        "quantity": row[7],
+        "unit": row[8],
+        "normalized_quantity": row[9],
+        "normalized_unit": row[10],
+        "pack_count": row[11]
     }
     
     # Get obs
@@ -264,7 +266,7 @@ def get_deals(db_path, filters, sort, page, per_page=25):
         # We must find products where metrics say suspicious
         res = analyze_history(db_path, {})
         for r in res:
-            if r.get("metrics", {}).get("is_suspicious_reference") or getattr(r, 'is_suspicious_reference', False): # wait, analyze_history doesn't return is_suspicious_reference directly, it might be in metrics. Let's check what it returns.
+            if r.get("is_suspicious_reference"):
                 items.append({
                     "type": "pi",
                     "data": r,
@@ -347,44 +349,73 @@ def get_catalog(db_path, filters, sort, page, per_page=25):
     params = []
     
     if filters.get("store"):
-        conds.append("p.store_id = ?")
+        conds.append("store_id = ?")
         params.append(filters["store"])
         
     if filters.get("vertical"):
-        conds.append("s.type = ?")
-        params.append(filters["vertical"])
+        if filters["vertical"] == "turbo":
+            conds.append("store_type IN ('chiper_home', 'chiper_extended', 'chiper_express')")
+        else:
+            conds.append("store_type = ?")
+            params.append(filters["vertical"])
         
     if filters.get("category"):
         if filters["category"] == "Uncategorized":
-            conds.append("(p.category IS NULL OR p.category = '')")
+            conds.append("(category IS NULL OR category = '')")
         else:
-            conds.append("p.category = ?")
+            conds.append("category = ?")
             params.append(filters["category"])
+            
+    if filters.get("only_deals"):
+        conds.append("original_price > current_price")
         
+    if filters.get("min_discount"):
+        try:
+            md = float(filters["min_discount"])
+            conds.append("discount_percent >= ?")
+            params.append(md)
+        except:
+            pass
+
     where_clause = f"WHERE {' AND '.join(conds)}" if conds else ""
-    
-    c.execute(f"SELECT COUNT(*) FROM products p JOIN stores s ON p.store_id = s.store_id {where_clause}", params)
-    total = c.fetchone()[0]
     
     order_clause = "ORDER BY ts DESC"
     if sort == "price_asc":
-        order_clause = "ORDER BY o.price ASC"
+        order_clause = "ORDER BY current_price ASC"
     elif sort == "price_desc":
-        order_clause = "ORDER BY o.price DESC"
+        order_clause = "ORDER BY current_price DESC"
     elif sort == "name_asc":
-        order_clause = "ORDER BY p.name ASC"
+        order_clause = "ORDER BY name ASC"
+    elif sort == "discount":
+        order_clause = "ORDER BY discount_percent DESC"
+    elif sort == "savings":
+        order_clause = "ORDER BY savings DESC"
         
-    query = f'''
-        SELECT p.product_id, p.store_id, p.name, s.name, s.type as store_type, p.brand, p.quantity, p.unit, p.normalized_quantity, p.normalized_unit,
-               MAX(o.timestamp) as ts, o.price
+    base_query = '''
+        SELECT p.product_id, p.store_id, p.name, s.name as store_name, s.type as store_type, p.brand, p.category, p.quantity, p.unit, p.normalized_quantity, p.normalized_unit,
+               MAX(o.timestamp) as ts, o.price as current_price, o.original_price,
+               ((o.original_price - o.price) / o.original_price) * 100 as discount_percent,
+               (o.original_price - o.price) as savings, o.promotion_type, o.promotion_label
         FROM products p
         JOIN stores s ON p.store_id = s.store_id
         JOIN observations o ON p.product_id = o.product_id AND p.store_id = o.store_id
-        {where_clause}
         GROUP BY p.store_id, p.product_id
+    '''
+    
+    query = f'''
+        SELECT * FROM ({base_query}) 
+        {where_clause}
         {order_clause}
         LIMIT ? OFFSET ?
     '''
+    
+    count_query = f'''
+        SELECT COUNT(*) FROM ({base_query})
+        {where_clause}
+    '''
+    
+    c.execute(count_query, params)
+    total = c.fetchone()[0]
     
     c.execute(query, params + [per_page, offset])
     rows = c.fetchall()
@@ -398,19 +429,20 @@ def get_catalog(db_path, filters, sort, page, per_page=25):
             "store_name": r[3],
             "store_type": r[4],
             "brand": r[5],
-            "quantity": r[6],
-            "unit": r[7],
-            "normalized_quantity": r[8],
-            "normalized_unit": r[9],
-            "current_price": r[11]
+            "category": r[6],
+            "quantity": r[7],
+            "unit": r[8],
+            "normalized_quantity": r[9],
+            "normalized_unit": r[10],
+            "current_price": r[12],
+            "promotion_type": r[16],
+            "promotion_label": r[17]
         })
         
     conn.close()
     
     items = enrich_products_with_metrics(db_path, products)
     
-    # If they want to sort by opportunity, we do it post-enrichment for the page
-    # Since we can't sort 20k items by opportunity without computing metrics for all of them
     if sort == "opportunity":
         def get_opp_key(item):
             m = item.get("metrics")

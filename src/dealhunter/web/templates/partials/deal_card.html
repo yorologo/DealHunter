@@ -1,26 +1,63 @@
-<div class="card h-100 shadow-sm border-0">
+<div class="card h-100 shadow-sm border-0 hover-shadow transition-all">
     <div class="card-body d-flex flex-column">
         <!-- DECISIÓN -->
         <div class="d-flex justify-content-between align-items-start mb-2">
-            <h5 class="card-title fw-bold mb-0 text-truncate" title="{{ deal.product_name }}">{{ deal.product_name }}</h5>
+            <h6 class="card-title fw-bold mb-0 lh-sm pe-2">
+                <a href="/products/{{ deal.store_id }}/{{ deal.product_id }}" class="text-decoration-none text-body stretched-link">
+                    {{ deal.product_name }}
+                </a>
+            </h6>
+            <div style="z-index: 2;" class="position-relative">
             {% if deal.deal_status == 'NEW_LOW' %}
-                <span class="badge bg-primary text-white">🔥 NEW_LOW</span>
+                <span class="badge bg-primary text-white text-nowrap">🔥 NEW_LOW</span>
             {% elif deal.deal_status == 'REAL_DEAL' %}
-                <span class="badge bg-success text-white">💰 REAL_DEAL</span>
+                <span class="badge bg-success text-white text-nowrap">💰 REAL_DEAL</span>
             {% elif deal.deal_status == 'GOOD_PRICE' %}
-                <span class="badge bg-info text-dark">🟢 GOOD_PRICE</span>
+                <span class="badge bg-info text-dark text-nowrap">🟢 GOOD_PRICE</span>
             {% else %}
-                <span class="badge bg-secondary">○ NORMAL</span>
+                <span class="badge bg-secondary text-nowrap">○ NORMAL</span>
             {% endif %}
+            </div>
         </div>
         
-        <div class="mb-3">
-            <span class="fs-4 fw-bold text-success">${{ "%.2f"|format(deal.current_price) }}</span>
-            <span class="text-secondary small d-block">Tienda: {{ deal.store_name }}</span>
+        <div class="small text-secondary mb-3">{{ deal.store_name }}</div>
+        
+        <div class="mt-auto">
+            <div class="d-flex justify-content-between align-items-end mb-3">
+                <div>
+                    <div class="fs-4 fw-bold text-success lh-1">${{ "%.2f"|format(deal.current_price) }}</div>
+                    {% if deal.original_price and deal.original_price > deal.current_price %}
+                        <div class="fs-6 text-decoration-line-through text-secondary mt-1">~${{ "%.2f"|format(deal.original_price) }}~
+                        {% if deal.is_suspicious_reference %}
+                            <span class="badge bg-warning text-dark border ms-1" title="Precio original sospechoso">⚠️</span>
+                        {% endif %}
+                        </div>
+                    {% endif %}
+                </div>
+                
+                <div class="text-end">
+                    {% if deal.original_price and deal.original_price > deal.current_price and not deal.is_suspicious_reference %}
+                        {% set discount = ((deal.original_price - deal.current_price) / deal.original_price) * 100 %}
+                        {% set savings = deal.original_price - deal.current_price %}
+                        <div class="badge bg-danger-subtle text-danger border border-danger-subtle mb-1 d-block">-{{ "%.1f"|format(discount) }}%</div>
+                        <div class="badge bg-success-subtle text-success border border-success-subtle d-block">Ahorras ${{ "%.2f"|format(savings) }}</div>
+                    {% elif deal.discount_vs_median_30d %}
+                        {% if deal.discount_vs_median_30d > 0 %}
+                            <div class="badge bg-success-subtle text-success border border-success-subtle">
+                                -{{ "%.1f"|format(deal.discount_vs_median_30d) }}% vs 30d
+                            </div>
+                        {% elif deal.discount_vs_median_30d < 0 %}
+                            <div class="badge bg-danger-subtle text-danger border border-danger-subtle">
+                                +{{ "%.1f"|format(deal.discount_vs_median_30d * -1) }}% vs 30d
+                            </div>
+                        {% endif %}
+                    {% endif %}
+                </div>
+            </div>
         </div>
         
         <!-- EXPLICACIÓN -->
-        <div class="alert alert-secondary py-2 px-3 small mb-3">
+        <div class="alert alert-secondary py-2 px-3 small mb-3 border-0 bg-light text-muted">
             {{ deal.reason }}
         </div>
         
@@ -34,16 +71,9 @@
                 <span class="text-secondary">Min histórico:</span>
                 <span class="fw-medium">${{ "%.2f"|format(deal.historical_min) }}</span>
             </div>
-            <div class="d-flex justify-content-between small">
-                <span class="text-secondary">Precio anterior:</span>
-                <span class="fw-medium">${{ "%.2f"|format(deal.previous_price) }}</span>
-            </div>
         </div>
-        
-        <!-- DATOS TÉCNICOS / ACTIONS -->
-        <div class="d-flex gap-2 mt-auto">
-            <a href="/products/{{ deal.store_id }}/{{ deal.product_id }}" class="btn btn-sm btn-outline-primary flex-grow-1">Ver producto</a>
-            <a href="/compare?q={{ deal.product_name | urlencode }}" class="btn btn-sm btn-outline-secondary">Comparar</a>
-        </div>
+    </div>
+    <div class="card-footer bg-transparent border-top-0 pt-0 pb-3 z-2 position-relative">
+        <a href="/compare?store_id={{ deal.store_id }}&product_id={{ deal.product_id }}" class="btn btn-sm btn-outline-secondary w-100">⚖ Comparar</a>
     </div>
 </div>

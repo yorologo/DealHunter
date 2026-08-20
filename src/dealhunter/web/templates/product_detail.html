@@ -22,6 +22,13 @@
                 <div class="d-flex align-items-center gap-2 mb-2">
                     <span class="badge text-bg-light border text-uppercase">{{ p.store_name }}</span>
                     {% if p.brand %}<span class="badge text-bg-light border">{{ p.brand }}</span>{% endif %}
+                    {% if p.category %}<span class="badge text-bg-light border">{{ p.category }}</span>{% endif %}
+                    {% if p.quantity and p.unit %}
+                        <span class="badge text-bg-light border">{{ p.quantity }} {{ p.unit }}</span>
+                    {% endif %}
+                    {% if p.pack_count and p.pack_count > 1 %}
+                        <span class="badge text-bg-light border">Pack: {{ p.pack_count }}</span>
+                    {% endif %}
                     {% if p.target_price %}
                         <span class="badge text-bg-primary">👁 Objetivo: ${{ "%.2f"|format(p.target_price) }}</span>
                     {% endif %}
