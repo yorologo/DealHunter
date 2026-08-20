@@ -206,15 +206,14 @@ def register_routes(app):
     def alerts(): return render_template('placeholder.html', title="Alertas", current_path='/alerts')
     
 
-    # --- Rappi App Launcher Configuration ---
-    # Verified package on this device. Do NOT accept from client.
-    RAPPI_PACKAGE = "com.grability.rappi"
-    RAPPI_URL_HOSTS = {"www.rappi.com.mx"}
-
     @app.route('/api/open-rappi', methods=['POST'])
     def open_rappi():
-        import subprocess
-        import shutil
+        from dealhunter.web.rappi_native import (
+            RappiNavigationBusy,
+            RappiNavigationError,
+            UnsupportedStoreType,
+            open_store_in_rappi,
+        )
 
         store_id = request.form.get("store_id")
         is_ajax = request.headers.get("X-Requested-With") == "XMLHttpRequest"
@@ -234,58 +233,31 @@ def register_routes(app):
         if not store_id or not store_id.isdigit():
             return _error("Falta ID de tienda válido.")
 
-        # CSRF is validated by the before_request middleware in app.py
-        # Resolve store type server-side
+        # CSRF is validated by the before_request middleware in app.py.
+        # Store metadata is resolved server-side; the client supplies only its ID.
         import sqlite3
-        conn = sqlite3.connect(current_app.config['DATABASE'])
-        c = conn.cursor()
-        c.execute("SELECT type FROM stores WHERE store_id = ?", (store_id,))
-        row = c.fetchone()
-        store_type = row[0] if row else ""
+        with sqlite3.connect(current_app.config['DATABASE']) as conn:
+            row = conn.execute(
+                "SELECT name, type FROM stores WHERE store_id = ?",
+                (store_id,),
+            ).fetchone()
+        if row is None:
+            return _error("La tienda no existe en DealHunter.", 404)
 
-        is_restaurant = store_type in ("restaurant", "restaurants")
-
-        if is_restaurant:
-            url = f"https://www.rappi.com.mx/restaurantes/{store_id}"
-        else:
-            url = f"https://www.rappi.com.mx/tiendas/{store_id}"
-
-        # Verify am is available
-        if not shutil.which("am"):
-            return _error("El comando 'am' no está disponible en este entorno.")
-
-        # Attempt 1: Directed Intent with package targeting + store URL
         try:
-            result = subprocess.run(
-                ["am", "start", "-a", "android.intent.action.VIEW",
-                 "-d", url, "-p", RAPPI_PACKAGE],
-                capture_output=True, text=True, timeout=5, shell=False
+            open_store_in_rappi(store_id, row[1])
+        except UnsupportedStoreType:
+            return _error("Este tipo de tienda no tiene navegación nativa verificada.", 422)
+        except RappiNavigationBusy:
+            return _error("Rappi ya está procesando otra navegación.", 409)
+        except RappiNavigationError:
+            return _error(
+                "No fue posible abrir la tienda exacta en Rappi. "
+                "Verifica que Shizuku esté activo y Termux autorizado.",
+                502,
             )
-            if result.returncode == 0 and "Error" not in (result.stdout or ""):
-                return _success("✓ Tienda abierta en la app de Rappi")
-        except Exception:
-            pass
 
-        # Attempt 2: Open Rappi app to home screen (package works, deep link doesn't)
-        try:
-            result = subprocess.run(
-                ["am", "start", "-a", "android.intent.action.MAIN",
-                 "-c", "android.intent.category.LAUNCHER",
-                 "-p", RAPPI_PACKAGE],
-                capture_output=True, text=True, timeout=5, shell=False
-            )
-            if result.returncode == 0 and "Error" not in (result.stdout or ""):
-                return _success(
-                    "✓ App de Rappi abierta. "
-                    "La tienda no pudo abrirse directamente — "
-                    "busca manualmente en la app."
-                )
-        except Exception:
-            pass
-
-        # All attempts failed — Rappi not installed or not reachable
-        return _error("No fue posible abrir esta tienda en la app de Rappi. "
-                       "Verifica que Rappi esté instalada.")
+        return _success("✓ Tienda exacta abierta en la app de Rappi")
 
     @app.errorhandler(404)
     def page_not_found(e):
@@ -294,5 +266,4 @@ def register_routes(app):
     @app.errorhandler(500)
     def internal_error(e):
         return render_template('placeholder.html', title="Error Interno", subtitle="No pudimos leer los datos.\nCódigo: DB_ERROR\nTus datos no fueron modificados.", current_path=""), 500
-
 

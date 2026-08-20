@@ -1,249 +1,234 @@
-"""Tests for the native Rappi app launcher (/api/open-rappi).
+"""Tests for exact-store native Rappi navigation."""
 
-Verifies that the launcher:
-- Uses directed Android Intent with explicit Rappi package
-- NEVER falls back to a browser
-- Returns JSON for AJAX requests
-- Validates CSRF tokens
-- Rejects invalid store IDs
-- Handles Rappi not being installed gracefully
-"""
-import pytest
-import sys, os
+import os
 import sqlite3
-from unittest.mock import patch, MagicMock
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../src')))
+import sys
+from unittest.mock import MagicMock, patch
+
+import pytest
+
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../src")))
+
 from dealhunter.web.app import create_app
 
 
 @pytest.fixture
-def client():
-    app = create_app({"TESTING": True, "DATABASE": "test_open_rappi.db"})
-    with app.app_context():
-        conn = sqlite3.connect(app.config['DATABASE'])
-        c = conn.cursor()
-        c.execute("CREATE TABLE IF NOT EXISTS stores (store_id TEXT, name TEXT, type TEXT)")
-        c.execute("DELETE FROM stores")
-        c.execute("INSERT INTO stores VALUES ('111', 'McDonalds', 'restaurant')")
-        c.execute("INSERT INTO stores VALUES ('222', 'Chedraui', 'market')")
-        c.execute("INSERT INTO stores VALUES ('333', 'Oxxo', 'turbo')")
-        conn.commit()
-    with app.test_client() as client:
-        yield client
+def client(tmp_path):
+    db_path = tmp_path / "open-rappi.db"
+    app = create_app({"TESTING": True, "DATABASE": str(db_path)})
+    with sqlite3.connect(db_path) as conn:
+        conn.execute("CREATE TABLE IF NOT EXISTS stores (store_id TEXT, name TEXT, type TEXT)")
+        conn.executemany(
+            "INSERT INTO stores VALUES (?, ?, ?)",
+            (
+                ("111", "Tacos Moy Santa Esther", "restaurants"),
+                ("222", "City Market", "market"),
+                ("333", "Unsupported Store", "express_parent"),
+                ("444", "Turbo", "chiper_home"),
+                ("555", "Turbo Market", "chiper_extended"),
+            ),
+        )
+    with app.test_client() as test_client:
+        yield test_client
 
 
-def _get_csrf_token(client):
-    with client.session_transaction() as sess:
-        import secrets
-        token = secrets.token_hex(32)
-        sess['csrf_token'] = token
-    return token
+def _csrf(client):
+    with client.session_transaction() as session:
+        session["csrf_token"] = "test-csrf-token"
+    return "test-csrf-token"
 
 
-# --- Core: Directed Intent builds correct command ---
-
-@patch("shutil.which", return_value="/usr/bin/am")
-@patch("subprocess.run")
-def test_restaurant_uses_package_targeted_intent(mock_run, mock_which, client):
-    """Intent must target com.grability.rappi explicitly."""
-    mock_run.return_value = MagicMock(returncode=0, stdout="Starting: Intent")
-    token = _get_csrf_token(client)
-    resp = client.post('/api/open-rappi',
-                       data={"store_id": "111", "csrf_token": token},
-                       headers={"X-Requested-With": "XMLHttpRequest"})
-    assert resp.status_code == 200
-    data = resp.get_json()
-    assert data["ok"] is True
-    # Verify the am command included -p com.grability.rappi
-    call_args = mock_run.call_args_list[0][0][0]
-    assert "-p" in call_args
-    assert "com.grability.rappi" in call_args
-    assert "android.intent.action.VIEW" in call_args
-    assert "https://www.rappi.com.mx/restaurantes/111" in call_args
+def _success_result():
+    return MagicMock(returncode=0, stdout="Status: ok\nActivity: com.grability.rappi", stderr="")
 
 
-@patch("shutil.which", return_value="/usr/bin/am")
-@patch("subprocess.run")
-def test_market_uses_tiendas_url(mock_run, mock_which, client):
-    """Market stores use /tiendas/ URL path."""
-    mock_run.return_value = MagicMock(returncode=0, stdout="Starting: Intent")
-    token = _get_csrf_token(client)
-    resp = client.post('/api/open-rappi',
-                       data={"store_id": "222", "csrf_token": token},
-                       headers={"X-Requested-With": "XMLHttpRequest"})
-    assert resp.status_code == 200
-    call_args = mock_run.call_args_list[0][0][0]
-    assert "https://www.rappi.com.mx/tiendas/222" in call_args
-    assert "com.grability.rappi" in call_args
+def _post(client, store_id="111", **extra):
+    data = {"store_id": store_id, "csrf_token": _csrf(client), **extra}
+    return client.post(
+        "/api/open-rappi",
+        data=data,
+        headers={"X-Requested-With": "XMLHttpRequest"},
+    )
 
 
-# --- No browser fallback ---
+@patch("dealhunter.web.rappi_native.shutil.which", return_value="/usr/bin/rish")
+@patch("dealhunter.web.rappi_native.subprocess.run")
+def test_open_rappi_native_deeplink_when_supported(mock_run, _mock_which, client):
+    mock_run.return_value = _success_result()
 
-@patch("shutil.which", return_value="/usr/bin/am")
-@patch("subprocess.run")
-def test_never_calls_termux_open_url(mock_run, mock_which, client):
-    """termux-open-url must NEVER be called — it opens the browser."""
-    mock_run.return_value = MagicMock(returncode=0, stdout="Starting: Intent")
-    token = _get_csrf_token(client)
-    client.post('/api/open-rappi',
-                data={"store_id": "111", "csrf_token": token},
-                headers={"X-Requested-With": "XMLHttpRequest"})
-    for call in mock_run.call_args_list:
-        args = call[0][0]
-        assert "termux-open-url" not in args, "termux-open-url must never be used"
+    response = _post(client, "111")
 
-
-@patch("shutil.which", return_value="/usr/bin/am")
-@patch("subprocess.run")
-def test_never_uses_chrome_package(mock_run, mock_which, client):
-    """No subprocess call may reference Chrome or any browser package."""
-    mock_run.return_value = MagicMock(returncode=0, stdout="Starting: Intent")
-    token = _get_csrf_token(client)
-    client.post('/api/open-rappi',
-                data={"store_id": "111", "csrf_token": token},
-                headers={"X-Requested-With": "XMLHttpRequest"})
-    for call in mock_run.call_args_list:
-        args = call[0][0]
-        for browser in ["com.android.chrome", "org.mozilla.firefox", "com.brave.browser"]:
-            assert browser not in args, f"Browser package {browser} must never be used"
+    assert response.status_code == 200
+    assert response.get_json()["ok"] is True
+    args, kwargs = mock_run.call_args
+    assert args[0][:2] == ["/usr/bin/rish", "-c"]
+    command = args[0][2]
+    assert "gbrappi://com.grability.rappi?store_type=restaurant&store_id=111" in command
+    assert "-p com.grability.rappi" in command
+    assert "android.intent.action.VIEW" in command
+    assert kwargs["shell"] is False
 
 
-@patch("shutil.which", return_value="/usr/bin/am")
-@patch("subprocess.run")
-def test_no_redirect_to_rappi_website(mock_run, mock_which, client):
-    """AJAX response must be JSON, not a redirect to rappi.com.mx."""
-    mock_run.return_value = MagicMock(returncode=0, stdout="Starting: Intent")
-    token = _get_csrf_token(client)
-    resp = client.post('/api/open-rappi',
-                       data={"store_id": "111", "csrf_token": token},
-                       headers={"X-Requested-With": "XMLHttpRequest"})
-    assert resp.status_code == 200
-    assert resp.content_type.startswith("application/json")
-    # Must NOT be a redirect
-    assert resp.status_code != 302
+@patch("dealhunter.web.rappi_native.shutil.which", return_value="/usr/bin/rish")
+@patch("dealhunter.web.rappi_native.subprocess.run")
+def test_market_uses_native_store_id(mock_run, _mock_which, client):
+    mock_run.return_value = _success_result()
+
+    response = _post(client, "222")
+
+    assert response.status_code == 200
+    command = mock_run.call_args.args[0][2]
+    assert "store_type=market&store_id=222" in command
 
 
-# --- Fallback: deep link fails, launcher works ---
+@pytest.mark.parametrize(
+    ("store_id", "native_type"),
+    (("444", "chiper_home"), ("555", "chiper_extended")),
+)
+@patch("dealhunter.web.rappi_native.shutil.which", return_value="/usr/bin/rish")
+@patch("dealhunter.web.rappi_native.subprocess.run")
+def test_turbo_store_types_use_verified_native_ids(
+    mock_run, _mock_which, store_id, native_type, client
+):
+    mock_run.return_value = _success_result()
 
-@patch("shutil.which", return_value="/usr/bin/am")
-@patch("subprocess.run")
-def test_fallback_to_launcher_when_deeplink_fails(mock_run, mock_which, client):
-    """When VIEW intent fails, fall back to MAIN/LAUNCHER (still Rappi app, not browser)."""
-    # First call (VIEW) fails, second call (LAUNCHER) succeeds
-    mock_run.side_effect = [
-        MagicMock(returncode=1, stdout="Error: Activity not started"),
-        MagicMock(returncode=0, stdout="Starting: Intent")
-    ]
-    token = _get_csrf_token(client)
-    resp = client.post('/api/open-rappi',
-                       data={"store_id": "222", "csrf_token": token},
-                       headers={"X-Requested-With": "XMLHttpRequest"})
-    assert resp.status_code == 200
-    data = resp.get_json()
-    assert data["ok"] is True
-    assert "busca manualmente" in data["message"]
-    # Second call must be LAUNCHER, still targeting Rappi
-    launcher_args = mock_run.call_args_list[1][0][0]
-    assert "android.intent.action.MAIN" in launcher_args
-    assert "com.grability.rappi" in launcher_args
+    response = _post(client, store_id)
+
+    assert response.status_code == 200
+    command = mock_run.call_args.args[0][2]
+    assert f"store_type={native_type}&store_id={store_id}" in command
 
 
-# --- Rappi not installed ---
+@patch("dealhunter.web.rappi_native.shutil.which", return_value="/usr/bin/rish")
+@patch("dealhunter.web.rappi_native.subprocess.run")
+def test_open_rappi_never_uses_browser(mock_run, _mock_which, client):
+    mock_run.return_value = _success_result()
 
-@patch("shutil.which", return_value="/usr/bin/am")
-@patch("subprocess.run")
-def test_rappi_not_reachable(mock_run, mock_which, client):
-    """When both intents fail, return clear error — never open browser."""
-    mock_run.side_effect = [
-        MagicMock(returncode=1, stdout="Error: Activity not started"),
-        MagicMock(returncode=1, stdout="Error: Activity not started"),
-    ]
-    token = _get_csrf_token(client)
-    resp = client.post('/api/open-rappi',
-                       data={"store_id": "111", "csrf_token": token},
-                       headers={"X-Requested-With": "XMLHttpRequest"})
-    data = resp.get_json()
-    assert data["ok"] is False
-    assert "Rappi" in data["error"]
+    response = _post(client)
+
+    assert response.status_code == 200
+    command = mock_run.call_args.args[0][2].casefold()
+    assert "http://" not in command
+    assert "https://" not in command
+    assert "rappi.com.mx" not in command
+    assert "launcher" not in command
+    assert "termux-open" not in command
+    assert "chrome" not in command
 
 
-# --- am not available ---
+@patch("dealhunter.web.rappi_native.shutil.which", return_value="/usr/bin/rish")
+@patch("dealhunter.web.rappi_native.subprocess.run")
+def test_open_rappi_store_lookup_is_server_side(mock_run, _mock_which, client):
+    mock_run.return_value = _success_result()
 
-@patch("shutil.which", return_value=None)
-def test_am_not_available(mock_which, client):
-    """If 'am' command doesn't exist, return error — never use browser fallback."""
-    token = _get_csrf_token(client)
-    resp = client.post('/api/open-rappi',
-                       data={"store_id": "111", "csrf_token": token},
-                       headers={"X-Requested-With": "XMLHttpRequest"})
-    data = resp.get_json()
-    assert data["ok"] is False
-    assert "am" in data["error"]
+    response = _post(
+        client,
+        "111",
+        store_name="attacker supplied name",
+        store_type="market",
+        url="https://example.invalid",
+    )
+
+    assert response.status_code == 200
+    command = mock_run.call_args.args[0][2]
+    assert "store_type=restaurant&store_id=111" in command
+    assert "attacker" not in command
+    assert "example.invalid" not in command
 
 
-# --- Security: CSRF (handled by before_request middleware, returns 400) ---
+@patch("dealhunter.web.rappi_native.subprocess.run")
+def test_open_rappi_rejects_unknown_store(mock_run, client):
+    response = _post(client, "999")
+
+    assert response.status_code == 404
+    assert response.get_json()["ok"] is False
+    mock_run.assert_not_called()
+
+
+@patch("dealhunter.web.rappi_native.subprocess.run")
+def test_unsupported_store_type_fails_safely(mock_run, client):
+    response = _post(client, "333")
+
+    assert response.status_code == 422
+    assert response.get_json()["ok"] is False
+    mock_run.assert_not_called()
+
+
+@patch("dealhunter.web.rappi_native.shutil.which", return_value="/usr/bin/rish")
+@patch("dealhunter.web.rappi_native.subprocess.run")
+def test_open_rappi_launcher_failure(mock_run, _mock_which, client):
+    mock_run.return_value = MagicMock(returncode=1, stdout="", stderr="Error: Activity not started")
+
+    response = _post(client)
+
+    assert response.status_code == 502
+    assert response.get_json()["ok"] is False
+    assert mock_run.call_count == 1
+
+
+@patch("dealhunter.web.rappi_native.shutil.which", return_value=None)
+def test_shizuku_shell_missing_fails_closed(_mock_which, client):
+    response = _post(client)
+
+    assert response.status_code == 502
+    assert response.get_json()["ok"] is False
+
+
+def test_navigation_lock_rejects_concurrent_request(client):
+    from dealhunter.web.rappi_native import NAVIGATION_LOCK
+
+    assert NAVIGATION_LOCK.acquire(blocking=False)
+    try:
+        with patch("dealhunter.web.rappi_native.shutil.which", return_value="/usr/bin/rish"):
+            response = _post(client)
+    finally:
+        NAVIGATION_LOCK.release()
+
+    assert response.status_code == 409
+    assert response.get_json()["ok"] is False
+
 
 def test_missing_csrf_rejected(client):
-    resp = client.post('/api/open-rappi',
-                       data={"store_id": "111"},
-                       headers={"X-Requested-With": "XMLHttpRequest"})
-    assert resp.status_code == 400
+    response = client.post(
+        "/api/open-rappi",
+        data={"store_id": "111"},
+        headers={"X-Requested-With": "XMLHttpRequest"},
+    )
+    assert response.status_code == 400
 
 
 def test_invalid_csrf_rejected(client):
-    resp = client.post('/api/open-rappi',
-                       data={"store_id": "111", "csrf_token": "forged"},
-                       headers={"X-Requested-With": "XMLHttpRequest"})
-    assert resp.status_code == 400
+    response = client.post(
+        "/api/open-rappi",
+        data={"store_id": "111", "csrf_token": "forged"},
+        headers={"X-Requested-With": "XMLHttpRequest"},
+    )
+    assert response.status_code == 400
 
-
-# --- Security: input validation ---
 
 def test_missing_store_id(client):
-    token = _get_csrf_token(client)
-    resp = client.post('/api/open-rappi',
-                       data={"csrf_token": token},
-                       headers={"X-Requested-With": "XMLHttpRequest"})
-    assert resp.status_code == 400
-    data = resp.get_json()
-    assert data["ok"] is False
+    response = _post(client, "")
+    assert response.status_code == 400
+    assert response.get_json()["ok"] is False
 
 
 def test_non_numeric_store_id_rejected(client):
-    token = _get_csrf_token(client)
-    resp = client.post('/api/open-rappi',
-                       data={"store_id": "../etc/passwd", "csrf_token": token},
-                       headers={"X-Requested-With": "XMLHttpRequest"})
-    assert resp.status_code == 400
+    response = _post(client, "../etc/passwd")
+    assert response.status_code == 400
+    assert response.get_json()["ok"] is False
 
 
-# --- shell=False enforcement ---
+@patch("dealhunter.web.rappi_native.shutil.which", return_value="/usr/bin/rish")
+@patch("dealhunter.web.rappi_native.subprocess.run")
+def test_non_ajax_redirects_back_not_to_rappi(mock_run, _mock_which, client):
+    mock_run.return_value = _success_result()
+    token = _csrf(client)
 
-@patch("shutil.which", return_value="/usr/bin/am")
-@patch("subprocess.run")
-def test_shell_false(mock_run, mock_which, client):
-    """subprocess.run must always be called with shell=False."""
-    mock_run.return_value = MagicMock(returncode=0, stdout="Starting: Intent")
-    token = _get_csrf_token(client)
-    client.post('/api/open-rappi',
-                data={"store_id": "111", "csrf_token": token},
-                headers={"X-Requested-With": "XMLHttpRequest"})
-    for call in mock_run.call_args_list:
-        kwargs = call[1]
-        assert kwargs.get("shell") is False or kwargs.get("shell") is None, \
-            "subprocess.run must use shell=False"
+    response = client.post(
+        "/api/open-rappi",
+        data={"store_id": "111", "csrf_token": token},
+        headers={"Referer": "/restaurants/111"},
+    )
 
-
-# --- Non-AJAX: redirect back, not to rappi.com.mx ---
-
-@patch("shutil.which", return_value="/usr/bin/am")
-@patch("subprocess.run")
-def test_non_ajax_redirects_back_not_to_rappi(mock_run, mock_which, client):
-    """Non-AJAX POST must redirect to referrer, NOT to rappi.com.mx."""
-    mock_run.return_value = MagicMock(returncode=0, stdout="Starting: Intent")
-    token = _get_csrf_token(client)
-    resp = client.post('/api/open-rappi',
-                       data={"store_id": "111", "csrf_token": token},
-                       headers={"Referer": "/restaurants/111"})
-    assert resp.status_code == 302
-    assert "rappi.com.mx" not in resp.location
+    assert response.status_code == 302
+    assert "rappi.com.mx" not in response.location
