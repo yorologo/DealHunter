@@ -1,0 +1,53 @@
+<div class="table-responsive">
+    <table class="table table-striped table-hover">
+        <thead>
+            <tr>
+                <th>Run ID</th>
+                <th>Iniciado</th>
+                <th>Duración</th>
+                <th class="d-none d-md-table-cell">Vertical</th>
+                <th>Estado</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for run in runs %}
+            <tr>
+                <td><code class="small">{{ run.run_id[:12] }}…</code></td>
+                <td class="small">{{ run.started_at }}</td>
+                <td class="small">{{ run.duration or '-' }}</td>
+                <td class="d-none d-md-table-cell small">{{ run.vertical_name or '-' }}</td>
+                <td>
+                    <span class="badge {% if run.status == 'COMPLETED' %}bg-success{% elif run.status == 'FAILED' %}bg-danger{% elif run.status in ('PARTIAL', 'PARTIAL_RUN') %}bg-warning text-dark{% elif run.status == 'RUNNING' %}bg-info{% else %}bg-secondary{% endif %}">
+                        {{ run.status }}
+                    </span>
+                </td>
+                <td>
+                    <a href="/admin/runs/{{ run.run_id }}" class="btn btn-sm btn-outline-info">Detalle</a>
+                </td>
+            </tr>
+            {% else %}
+            <tr><td colspan="6" class="text-center text-muted py-4">No hay runs registrados.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<!-- Pagination -->
+{% if total_pages > 1 %}
+<div class="d-flex justify-content-between align-items-center mt-2">
+    <span class="text-muted small">{{ total }} runs · Página {{ page }} de {{ total_pages }}</span>
+    <div class="btn-group btn-group-sm">
+        {% if page > 1 %}
+        <button class="btn btn-outline-secondary"
+                hx-get="/admin/runs?page={{ page - 1 }}{% if status_filter %}&status={{ status_filter }}{% endif %}"
+                hx-target="#runs-container">← Anterior</button>
+        {% endif %}
+        {% if page < total_pages %}
+        <button class="btn btn-outline-secondary"
+                hx-get="/admin/runs?page={{ page + 1 }}{% if status_filter %}&status={{ status_filter }}{% endif %}"
+                hx-target="#runs-container">Siguiente →</button>
+        {% endif %}
+    </div>
+</div>
+{% endif %}

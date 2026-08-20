@@ -1,0 +1,4 @@
+<div class="alert {% if success %}alert-success{% else %}alert-danger{% endif %} d-flex align-items-center" role="alert">
+    <span class="me-2">{% if success %}✅{% else %}❌{% endif %}</span>
+    {{ message }}
+</div>

@@ -166,12 +166,6 @@ def register_routes(app):
     @app.route('/alerts')
     def alerts(): return render_template('placeholder.html', title="Alertas", current_path='/alerts')
     
-    @app.route('/admin')
-    def admin(): return render_template('placeholder.html', title="Sistema", current_path='/admin')
-    
-    @app.route('/admin/account')
-    def admin_account(): return render_template('placeholder.html', title="Cuenta Rappi", subtitle="Diagnóstico read-only. DealHunter nunca almacena tokens de sesión.", current_path='/admin/account')
-
     @app.errorhandler(404)
     def page_not_found(e):
         return render_template('placeholder.html', title="404 - No Encontrado", subtitle="La página que buscas no existe.", current_path=""), 404
