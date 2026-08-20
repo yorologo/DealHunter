@@ -267,18 +267,64 @@ def get_deals(db_path, filters, sort, page, per_page=25):
         res = analyze_history(db_path, {})
         for r in res:
             if r.get("is_suspicious_reference"):
+                item_data = {
+                    "product_id": r["product_id"],
+                    "store_id": r["store_id"],
+                    "product_name": r["product_name"],
+                    "store_name": r["store_name"],
+                    "brand": r.get("BRAND"),
+                    "quantity": r.get("QUANTITY"),
+                    "unit": r.get("UNIT"),
+                    "current_price": r["current_price"],
+                    "unit_price": r.get("UNIT_PRICE"),
+                    "metrics": {
+                        "deal_status": r["deal_status"],
+                        "original_price": r.get("original_price"),
+                        "is_suspicious_reference": r.get("is_suspicious_reference"),
+                        "discount_vs_median_30d": r.get("discount_vs_median_30d"),
+                        "reason": r.get("reason"),
+                        "historical_min": r.get("historical_min"),
+                        "historical_max": r.get("historical_max"),
+                        "median_30d": r.get("median_30d"),
+                        "historical_average": r.get("historical_average"),
+                        "previous_price": r.get("previous_price"),
+                    }
+                }
                 items.append({
                     "type": "pi",
-                    "data": r,
+                    "data": item_data,
                     "sort_date": datetime.now()
                 })
     else:
         # Todo
         res = analyze_history(db_path, {"status": ["NEW_LOW", "REAL_DEAL", "GOOD_PRICE"]})
         for r in res:
+            item_data = {
+                "product_id": r["product_id"],
+                "store_id": r["store_id"],
+                "product_name": r["product_name"],
+                "store_name": r["store_name"],
+                "brand": r.get("BRAND"),
+                "quantity": r.get("QUANTITY"),
+                "unit": r.get("UNIT"),
+                "current_price": r["current_price"],
+                "unit_price": r.get("UNIT_PRICE"),
+                "metrics": {
+                    "deal_status": r["deal_status"],
+                    "original_price": r.get("original_price"),
+                    "is_suspicious_reference": r.get("is_suspicious_reference"),
+                    "discount_vs_median_30d": r.get("discount_vs_median_30d"),
+                    "reason": r.get("reason"),
+                    "historical_min": r.get("historical_min"),
+                    "historical_max": r.get("historical_max"),
+                    "median_30d": r.get("median_30d"),
+                    "historical_average": r.get("historical_average"),
+                    "previous_price": r.get("previous_price"),
+                }
+            }
             items.append({
                 "type": "pi",
-                "data": r,
+                "data": item_data,
                 "sort_date": datetime.now()
             })
             
