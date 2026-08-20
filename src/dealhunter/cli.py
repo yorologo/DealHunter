@@ -1,4 +1,5 @@
 import argparse
+import math
 import sys
 from .config import get_merged_config, save_config, load_config
 from .db import setup_db, db_status, db_integrity, db_vacuum, backup_db
@@ -9,6 +10,58 @@ from .doctor import run_doctor, format_doctor_output
 from datetime import datetime
 
 VERSION = "2.7.0"
+LOCATION_CHANGE_WARNING_METERS = 500.0
+
+
+def _require_location(parser, config):
+    """Return an explicit crawl location or stop before creating a run."""
+    lat = config.get("lat")
+    lng = config.get("lng")
+    if lat is None or lng is None:
+        parser.error(
+            "Crawler location is required. Set both --lat/--lng or save lat/lng "
+            "in the DealHunter config."
+        )
+    try:
+        lat = float(lat)
+        lng = float(lng)
+    except (TypeError, ValueError):
+        parser.error("Crawler lat/lng must be numeric.")
+    if not -90 <= lat <= 90 or not -180 <= lng <= 180:
+        parser.error("Crawler lat/lng are outside valid coordinate ranges.")
+    return lat, lng
+
+
+def _distance_m(lat1, lng1, lat2, lng2):
+    """Great-circle distance for detecting a meaningful context change."""
+    phi1, phi2 = math.radians(lat1), math.radians(lat2)
+    d_phi = math.radians(lat2 - lat1)
+    d_lng = math.radians(lng2 - lng1)
+    a = (
+        math.sin(d_phi / 2) ** 2
+        + math.cos(phi1) * math.cos(phi2) * math.sin(d_lng / 2) ** 2
+    )
+    return 6_371_000 * 2 * math.asin(math.sqrt(a))
+
+
+def _warn_on_location_change(conn, lat, lng):
+    """Warn on a new crawl context; never mutate or delete history."""
+    row = conn.execute(
+        """SELECT lat, lng FROM runs
+           WHERE lat IS NOT NULL AND lng IS NOT NULL
+           ORDER BY started_at DESC LIMIT 1"""
+    ).fetchone()
+    if not row:
+        return
+    distance = _distance_m(float(row[0]), float(row[1]), lat, lng)
+    if distance >= LOCATION_CHANGE_WARNING_METERS:
+        print(
+            "WARNING: LOCATION_CONTEXT_CHANGED "
+            f"({distance:.0f} m from the most recent captured context). "
+            "Existing history was preserved; review comparability explicitly.",
+            file=sys.stderr,
+        )
+
 
 def build_parser():
     # Base parser for shared arguments
@@ -171,6 +224,11 @@ def main(args_list=None):
                 err = classify_error(e)
                 print(f"Error checking account: {err}", file=sys.stderr)
         return
+
+    crawler_commands = ("discover", "update", "restaurants", None)
+    location = None
+    if args.command in crawler_commands:
+        location = _require_location(parser, config)
         
     conn = setup_db()
     
@@ -226,7 +284,7 @@ def main(args_list=None):
         return
         
     # Crawler commands
-    if args.command in ("discover", "update", "restaurants", None):
+    if args.command in crawler_commands:
         if args.command == "restaurants":
             config["vertical"] = ["restaurants"]
             if getattr(args, "restaurant", None):
@@ -234,7 +292,8 @@ def main(args_list=None):
 
         run_id = f"run_{datetime.now().strftime('%Y%m%d_%H%M%S_%f')}"
         c = conn.cursor()
-        lat, lng = config.get("lat", 19.4326), config.get("lng", -99.1332)
+        lat, lng = location
+        _warn_on_location_change(conn, lat, lng)
         c.execute('''INSERT INTO runs (run_id, started_at, lat, lng, radius, status) 
                      VALUES (?, CURRENT_TIMESTAMP, ?, ?, ?, 'RUNNING')''', 
                   (run_id, lat, lng, config.get("radius", 5.0)))

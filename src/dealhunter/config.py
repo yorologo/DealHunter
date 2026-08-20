@@ -59,6 +59,8 @@ def _dump_value(v):
 def get_merged_config(cli_args, profile_name=None):
     # defaults
     config = {
+        "lat": None,
+        "lng": None,
         "min_discount": 0,
         "max_discount": 100,
         "radius": 5.0,
@@ -100,4 +102,3 @@ def get_merged_config(cli_args, profile_name=None):
                 config[k] = v
                 
     return config
-

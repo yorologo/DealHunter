@@ -47,6 +47,8 @@ def main():
         assert res.returncode == 0
         res = run_cmd("python3 bin/rappi-ofertas config get min_discount")
         assert "40" in res.stdout
+        assert run_cmd("python3 bin/rappi-ofertas config set lat 0").returncode == 0
+        assert run_cmd("python3 bin/rappi-ofertas config set lng 0").returncode == 0
         
         # Test runs
         res = run_cmd("python3 bin/rappi-ofertas runs")
