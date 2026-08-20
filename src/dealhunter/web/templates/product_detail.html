@@ -36,14 +36,13 @@
                 
                 <div class="d-flex justify-content-between align-items-start">
                     <h2 class="fw-bold mb-3">{{ p.product_name }}</h2>
-                    <form action="/api/open-rappi" method="POST" target="_blank" class="ms-3 d-inline">
+                    <form class="ms-3 d-inline rappi-launcher" data-store-id="{{ p.store_id }}">
                         <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-                        <input type="hidden" name="target_type" value="product">
                         <input type="hidden" name="store_id" value="{{ p.store_id }}">
-                        <input type="hidden" name="product_id" value="{{ p.product_id }}">
                         <button type="submit" class="btn btn-sm btn-danger fw-bold rounded-pill shadow-sm px-3 py-2">
                             🛵 Abrir en Rappi
                         </button>
+                        <span class="rappi-feedback ms-2 small"></span>
                     </form>
                 </div>
                 {% if p.deal_score is not none and p.deal_score >= 0 %}

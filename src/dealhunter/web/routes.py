@@ -1,4 +1,4 @@
-from flask import render_template, request, current_app, redirect, url_for, flash
+from flask import render_template, request, current_app, redirect, url_for, flash, jsonify
 from dealhunter.web.queries import (
     get_home_metrics, get_home_deals, get_watchlist, search_local, 
     get_product_detail, get_product_compare, get_anchor_compare,
@@ -206,39 +206,86 @@ def register_routes(app):
     def alerts(): return render_template('placeholder.html', title="Alertas", current_path='/alerts')
     
 
+    # --- Rappi App Launcher Configuration ---
+    # Verified package on this device. Do NOT accept from client.
+    RAPPI_PACKAGE = "com.grability.rappi"
+    RAPPI_URL_HOSTS = {"www.rappi.com.mx"}
+
     @app.route('/api/open-rappi', methods=['POST'])
     def open_rappi():
+        import subprocess
+        import shutil
+
         store_id = request.form.get("store_id")
-        target_type = request.form.get("target_type")
-        
-        if not store_id:
-            flash("Falta ID de tienda.", "danger")
+        is_ajax = request.headers.get("X-Requested-With") == "XMLHttpRequest"
+
+        def _error(msg, code=400):
+            if is_ajax:
+                return jsonify({"ok": False, "error": msg}), code
+            flash(msg, "danger")
             return redirect(request.referrer or url_for('home'))
-            
+
+        def _success(msg):
+            if is_ajax:
+                return jsonify({"ok": True, "message": msg})
+            flash(msg, "success")
+            return redirect(request.referrer or url_for('home'))
+
+        if not store_id or not store_id.isdigit():
+            return _error("Falta ID de tienda válido.")
+
+        # CSRF is validated by the before_request middleware in app.py
+        # Resolve store type server-side
         import sqlite3
         conn = sqlite3.connect(current_app.config['DATABASE'])
         c = conn.cursor()
         c.execute("SELECT type FROM stores WHERE store_id = ?", (store_id,))
         row = c.fetchone()
         store_type = row[0] if row else ""
-        
+
         is_restaurant = store_type in ("restaurant", "restaurants")
-        
+
         if is_restaurant:
             url = f"https://www.rappi.com.mx/restaurantes/{store_id}"
         else:
             url = f"https://www.rappi.com.mx/tiendas/{store_id}"
-            
-        import subprocess
+
+        # Verify am is available
+        if not shutil.which("am"):
+            return _error("El comando 'am' no está disponible en este entorno.")
+
+        # Attempt 1: Directed Intent with package targeting + store URL
         try:
-            subprocess.run(["termux-open-url", url], check=False, timeout=3)
+            result = subprocess.run(
+                ["am", "start", "-a", "android.intent.action.VIEW",
+                 "-d", url, "-p", RAPPI_PACKAGE],
+                capture_output=True, text=True, timeout=5, shell=False
+            )
+            if result.returncode == 0 and "Error" not in (result.stdout or ""):
+                return _success("✓ Tienda abierta en la app de Rappi")
         except Exception:
-            try:
-                subprocess.run(["am", "start", "-a", "android.intent.action.VIEW", "-d", url], check=False, timeout=3)
-            except Exception:
-                pass
-                
-        return redirect(url)
+            pass
+
+        # Attempt 2: Open Rappi app to home screen (package works, deep link doesn't)
+        try:
+            result = subprocess.run(
+                ["am", "start", "-a", "android.intent.action.MAIN",
+                 "-c", "android.intent.category.LAUNCHER",
+                 "-p", RAPPI_PACKAGE],
+                capture_output=True, text=True, timeout=5, shell=False
+            )
+            if result.returncode == 0 and "Error" not in (result.stdout or ""):
+                return _success(
+                    "✓ App de Rappi abierta. "
+                    "La tienda no pudo abrirse directamente — "
+                    "busca manualmente en la app."
+                )
+        except Exception:
+            pass
+
+        # All attempts failed — Rappi not installed or not reachable
+        return _error("No fue posible abrir esta tienda en la app de Rappi. "
+                       "Verifica que Rappi esté instalada.")
 
     @app.errorhandler(404)
     def page_not_found(e):

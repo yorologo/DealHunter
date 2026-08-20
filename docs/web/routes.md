@@ -32,5 +32,8 @@ Este es el mapa completo de rutas Web operativas en v2.7.0.
 | `/admin/database/integrity` | POST | Valida corrupción SQLite | DB |
 | `/admin/settings` | GET | Panel de configuración (Read-only) | Config file |
 | `/admin/settings/update` | POST | Modificación de setting (SAFE_EDITABLE) | Disk |
+| `/api/open-rappi` | POST | Abre la tienda en la app oficial de Rappi (Android Intent dirigido) | Android |
+| `/search` | GET | Búsqueda global | DB |
+| `/best` | GET | Mejores ofertas por Deal Score | DB |
 
-> Nota: Las rutas POST están protegidas contra CSRF obligatoriamente. Las rutas GET no realizan peticiones de red externas.
+> Nota: Las rutas POST están protegidas contra CSRF obligatoriamente. Las rutas GET no realizan peticiones de red externas. `/api/open-rappi` utiliza un Intent de Android dirigido exclusivamente al paquete oficial de Rappi (`com.grability.rappi`) — **nunca abre un navegador**.

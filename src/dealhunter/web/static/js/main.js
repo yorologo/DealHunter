@@ -39,3 +39,42 @@ function clearMultiselect(name) {
         document.getElementById('filter-form').dispatchEvent(new Event('submit'));
     }
 }
+
+// --- Rappi App Launcher (directed Android Intent, no browser) ---
+document.addEventListener('DOMContentLoaded', function() {
+    document.querySelectorAll('.rappi-launcher').forEach(function(form) {
+        form.addEventListener('submit', function(e) {
+            e.preventDefault();
+            var btn = form.querySelector('button[type="submit"]');
+            var feedback = form.querySelector('.rappi-feedback');
+            var data = new FormData(form);
+
+            btn.disabled = true;
+            btn.textContent = '⏳ Abriendo…';
+            if (feedback) feedback.textContent = '';
+
+            fetch('/api/open-rappi', {
+                method: 'POST',
+                headers: {'X-Requested-With': 'XMLHttpRequest'},
+                body: data
+            })
+            .then(function(r) { return r.json(); })
+            .then(function(j) {
+                btn.disabled = false;
+                btn.textContent = '🛵 Abrir en Rappi';
+                if (feedback) {
+                    feedback.textContent = j.ok ? j.message : (j.error || 'Error desconocido');
+                    feedback.className = 'rappi-feedback ms-2 small ' + (j.ok ? 'text-success' : 'text-danger');
+                }
+            })
+            .catch(function() {
+                btn.disabled = false;
+                btn.textContent = '🛵 Abrir en Rappi';
+                if (feedback) {
+                    feedback.textContent = 'Error de conexión con el servidor.';
+                    feedback.className = 'rappi-feedback ms-2 small text-danger';
+                }
+            });
+        });
+    });
+});

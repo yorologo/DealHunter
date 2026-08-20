@@ -5,7 +5,8 @@
 - feat: Advanced Restaurant Taxonomy extraction directly from NextJS metadata
 - feat: Native multiselect filtering (UNION logic) for Stores and Categories
 - feat: Price Integrity Engine (glitch detection, currency mismatch handling)
-- feat: Verifiable Android/Termux navigation resolving to explicit store pages
+- feat: Native Rappi app launcher via directed Android Intent (`am start -p com.grability.rappi`)
+- fix: Replace `termux-open-url` (browser) with package-targeted Intent for "Abrir en Rappi"
 - fix: Elimination of hardcoded 65% discount arbitrary limits
 - fix: Structured taxonomy enforcement and robust URL fallback resolution
 
