@@ -1,0 +1,125 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container-fluid">
+    <nav aria-label="breadcrumb" class="mb-3">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="/admin">Administración</a></li>
+            <li class="breadcrumb-item"><a href="/admin/runs">Runs</a></li>
+            <li class="breadcrumb-item active">{{ run.run_id[:12] if run else 'No encontrado' }}…</li>
+        </ol>
+    </nav>
+
+    {% if not run %}
+    <div class="alert alert-warning">Run no encontrado.</div>
+    {% else %}
+    <h2 class="mb-1">Detalle de Run</h2>
+    <p class="text-muted"><code>{{ run.run_id }}</code></p>
+
+    <!-- Status Banner -->
+    <div class="alert {% if run.status == 'COMPLETED' %}alert-success{% elif run.status == 'FAILED' %}alert-danger{% elif run.status in ('PARTIAL', 'PARTIAL_RUN') %}alert-warning{% else %}alert-info{% endif %} d-flex align-items-center" role="alert">
+        <span class="fs-4 me-2">
+            {% if run.status == 'COMPLETED' %}✅{% elif run.status == 'FAILED' %}❌{% elif run.status in ('PARTIAL', 'PARTIAL_RUN') %}⚠️{% else %}🔄{% endif %}
+        </span>
+        <div>
+            <strong>{{ run.status }}</strong>
+            {% if run.duration %}<span class="ms-2 text-muted">· {{ run.duration }}</span>{% endif %}
+        </div>
+    </div>
+
+    <!-- Metrics Cards -->
+    <div class="row g-3 mb-4">
+        <div class="col-6 col-md-3">
+            <div class="card shadow-sm text-center">
+                <div class="card-body py-2">
+                    <div class="fs-4 fw-bold text-primary">{{ run.observation_count or 0 }}</div>
+                    <div class="small text-muted">Observaciones</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-6 col-md-3">
+            <div class="card shadow-sm text-center">
+                <div class="card-body py-2">
+                    <div class="fs-4 fw-bold text-primary">{{ run.product_count or 0 }}</div>
+                    <div class="small text-muted">Productos</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-6 col-md-3">
+            <div class="card shadow-sm text-center">
+                <div class="card-body py-2">
+                    <div class="fs-4 fw-bold text-primary">{{ run.store_count or 0 }}</div>
+                    <div class="small text-muted">Tiendas</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-6 col-md-3">
+            <div class="card shadow-sm text-center">
+                <div class="card-body py-2">
+                    <div class="fs-4 fw-bold">{{ run.duration or '-' }}</div>
+                    <div class="small text-muted">Duración</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Timeline -->
+    <div class="card shadow-sm mb-4">
+        <div class="card-body">
+            <h5 class="card-title">Timestamps</h5>
+            <table class="table table-sm mt-2 mb-0">
+                <tbody>
+                    <tr>
+                        <th class="text-muted" style="width: 150px;">Iniciado</th>
+                        <td>{{ run.started_at or '-' }}</td>
+                    </tr>
+                    <tr>
+                        <th class="text-muted">Finalizado</th>
+                        <td>{{ run.finished_at or '-' }}</td>
+                    </tr>
+                    <tr>
+                        <th class="text-muted">Duración</th>
+                        <td>{{ run.duration or '-' }}</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Vertical / Checkpoint Data -->
+    {% if run.vertical_data %}
+    <div class="card shadow-sm mb-4">
+        <div class="card-body">
+            <h5 class="card-title">Datos del Checkpoint</h5>
+            {% if run.vertical_data is mapping %}
+            <table class="table table-sm mt-2 mb-0">
+                <tbody>
+                    {% for key, val in run.vertical_data.items() %}
+                    <tr>
+                        <th class="text-muted" style="width: 200px;">{{ key }}</th>
+                        <td>
+                            {% if val is mapping or val is iterable and val is not string %}
+                            <code>{{ val }}</code>
+                            {% else %}
+                            {{ val }}
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <pre class="bg-body-secondary p-3 rounded mt-2 mb-0"><code>{{ run.vertical_data | tojson(indent=2) }}</code></pre>
+            {% endif %}
+        </div>
+    </div>
+    {% elif run.vertical %}
+    <div class="card shadow-sm mb-4">
+        <div class="card-body">
+            <h5 class="card-title">Vertical</h5>
+            <p class="mt-2 mb-0">{{ run.vertical }}</p>
+        </div>
+    </div>
+    {% endif %}
+    {% endif %}
+</div>
+{% endblock %}

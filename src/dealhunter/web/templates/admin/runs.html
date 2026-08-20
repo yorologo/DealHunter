@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container-fluid">
+    <nav aria-label="breadcrumb" class="mb-3">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="/admin">Administración</a></li>
+            <li class="breadcrumb-item active">Ejecuciones</li>
+        </ol>
+    </nav>
+
+    <h2 class="mb-1">🔄 Ejecuciones (Runs)</h2>
+    <p class="text-muted">Historial de crawleo y progreso.</p>
+
+    <!-- Status Filters -->
+    <div class="d-flex flex-wrap gap-2 mb-3">
+        <a href="/admin/runs" class="btn btn-sm {% if not status_filter %}btn-primary{% else %}btn-outline-primary{% endif %}">
+            Todos {% if summary %}({{ summary.values()|sum }}){% endif %}
+        </a>
+        {% for s in ['COMPLETED', 'PARTIAL', 'PARTIAL_RUN', 'FAILED', 'RUNNING'] %}
+        {% if summary.get(s, 0) > 0 %}
+        <a href="/admin/runs?status={{ s }}" class="btn btn-sm {% if status_filter == s %}{% if s == 'COMPLETED' %}btn-success{% elif s == 'FAILED' %}btn-danger{% elif s in ('PARTIAL', 'PARTIAL_RUN') %}btn-warning{% else %}btn-info{% endif %}{% else %}{% if s == 'COMPLETED' %}btn-outline-success{% elif s == 'FAILED' %}btn-outline-danger{% elif s in ('PARTIAL', 'PARTIAL_RUN') %}btn-outline-warning{% else %}btn-outline-info{% endif %}{% endif %}">
+            {{ s }} ({{ summary[s] }})
+        </a>
+        {% endif %}
+        {% endfor %}
+    </div>
+
+    <div id="runs-container">
+        {% include 'admin/partials/runs_table.html' %}
+    </div>
+</div>
+{% endblock %}

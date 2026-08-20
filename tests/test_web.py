@@ -50,7 +50,7 @@ def test_search_hx(client):
     assert b'list-group-item' in rv.data
 
 def test_placeholders(client):
-    routes = ['/watchlist', '/alerts', '/admin', '/admin/account']
+    routes = ['/watchlist', '/alerts']
     for r in routes:
         rv = client.get(r)
         assert rv.status_code == 200

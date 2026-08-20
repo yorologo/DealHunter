@@ -1,0 +1,57 @@
+{% if status.status == 'VALID' %}
+<div class="card shadow-sm border-success">
+    <div class="card-body">
+        <h5 class="card-title text-success">✅ Sesión Válida</h5>
+        <table class="table table-sm mt-3 mb-0">
+            <tbody>
+                <tr><th class="text-muted" style="width: 180px;">Región</th><td>{{ status.region }}</td></tr>
+                <tr><th class="text-muted">Mercado</th><td>{{ status.market }}</td></tr>
+                <tr>
+                    <th class="text-muted">Membresía</th>
+                    <td>
+                        {% if status.has_prime %}
+                        <span class="badge bg-success">{{ status.prime_type or 'Prime' }}</span>
+                        {% else %}
+                        <span class="badge bg-secondary">Sin membresía</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% if status.active_promos is defined %}
+                <tr><th class="text-muted">Promociones activas</th><td>{{ status.active_promos }}</td></tr>
+                {% endif %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% elif status.status == 'NOT_CONFIGURED' %}
+<div class="card shadow-sm border-warning">
+    <div class="card-body">
+        <h5 class="card-title text-warning">⚠️ Token no configurado</h5>
+        <p class="text-muted mb-0">Configura <code>RAPPI_BEARER_TOKEN</code> como variable de entorno para habilitar diagnósticos de cuenta.</p>
+    </div>
+</div>
+{% elif status.status == 'UNAVAILABLE' %}
+<div class="card shadow-sm border-warning">
+    <div class="card-body">
+        <h5 class="card-title text-warning">⚠️ Sesión no disponible</h5>
+        <p class="text-muted">El token existe pero la sesión no es válida o expiró.</p>
+        {% if status.error %}
+        <p class="small text-muted mb-0">Detalle: {{ status.error }}</p>
+        {% endif %}
+    </div>
+</div>
+{% elif status.status == 'ERROR' %}
+<div class="card shadow-sm border-danger">
+    <div class="card-body">
+        <h5 class="card-title text-danger">❌ Error</h5>
+        <p class="text-muted mb-0">{{ status.error or 'Error desconocido al verificar la cuenta.' }}</p>
+    </div>
+</div>
+{% else %}
+<div class="card shadow-sm">
+    <div class="card-body">
+        <h5 class="card-title">Estado: {{ status.status }}</h5>
+        <p class="text-muted mb-0">Resultado inesperado.</p>
+    </div>
+</div>
+{% endif %}

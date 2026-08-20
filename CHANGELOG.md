@@ -1,5 +1,19 @@
 # Changelog
 
+## [2.7.0] - 2026-08-20
+- feat: DealHunter Administration Web Interface
+- feat: Admin Home with live metrics and system health
+- feat: Account diagnostics (read-only, network opt-in via POST)
+- feat: Runs list and Run Detail (lat/lng privacy preserved)
+- feat: Structured Events/Errors dashboard derived from runs
+- feat: Doctor integration with network check via POST
+- feat: Database diagnostics and secure backup UI
+- feat: Settings UI with config precedence visibility
+- feat: SAFE_EDITABLE, READ_ONLY, and SECRET_FORBIDDEN classifications
+- feat: CSRF protection on all mutable endpoints
+- feat: Secret hardening (secrets are masked and never transmitted to HTML)
+- feat: Local-only behavior by default (0 external requests on page loads)
+
 ## [2.6.0] - 2026-08-19
 - feat: DealHunter Web Foundation (Flask + HTMX + Bootstrap)
 - feat: Web Application Shell with responsive Desktop Sidebar & Mobile Bottom Nav

@@ -22,5 +22,11 @@
     <li><a href="/alerts" class="nav-link {{ 'active' if current_path == '/alerts' else 'text-body' }}">🔔 Alertas</a></li>
 
     <li class="nav-item mt-3 mb-1 fw-bold text-uppercase small text-secondary px-3">Administrar</li>
-    <li><a href="/admin" class="nav-link {{ 'active' if current_path.startswith('/admin') else 'text-body' }}">🛠 Sistema</a></li>
+    <li><a href="/admin" class="nav-link {{ 'active' if current_path == '/admin' else 'text-body' }}">🛠 Sistema</a></li>
+    <li><a href="/admin/account" class="nav-link {{ 'active' if current_path == '/admin/account' else 'text-body' }} ps-4 small">👤 Cuenta</a></li>
+    <li><a href="/admin/runs" class="nav-link {{ 'active' if current_path == '/admin/runs' else 'text-body' }} ps-4 small">🔄 Runs</a></li>
+    <li><a href="/admin/events" class="nav-link {{ 'active' if current_path == '/admin/events' else 'text-body' }} ps-4 small">⚠️ Eventos</a></li>
+    <li><a href="/admin/doctor" class="nav-link {{ 'active' if current_path == '/admin/doctor' else 'text-body' }} ps-4 small">🩺 Doctor</a></li>
+    <li><a href="/admin/database" class="nav-link {{ 'active' if current_path == '/admin/database' else 'text-body' }} ps-4 small">💾 Base de datos</a></li>
+    <li><a href="/admin/settings" class="nav-link {{ 'active' if current_path == '/admin/settings' else 'text-body' }} ps-4 small">⚙️ Configuración</a></li>
 </ul>

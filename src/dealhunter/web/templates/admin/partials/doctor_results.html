@@ -1,0 +1,45 @@
+{% if overall is defined %}
+<div class="alert {% if overall == 'HEALTHY' %}alert-success{% elif overall == 'ERROR' %}alert-danger{% else %}alert-secondary{% endif %} d-flex align-items-center mb-3">
+    <span class="fs-4 me-2">{% if overall == 'HEALTHY' %}✅{% elif overall == 'ERROR' %}❌{% else %}❓{% endif %}</span>
+    <strong>Estado general (con red):</strong>&nbsp;{{ overall }}
+</div>
+{% endif %}
+
+<div class="table-responsive">
+    <table class="table table-bordered mb-0">
+        <thead class="table-light">
+            <tr>
+                <th style="width: 200px;">Componente</th>
+                <th style="width: 120px;">Estado</th>
+                <th>Detalles</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for name, status, detail in checks %}
+            <tr class="{% if status == 'ERROR' %}table-danger{% elif status == 'OK' %}{% elif status == 'WARNING' %}table-warning{% elif status in ('SKIP', 'NOT_CHECKED') %}table-light{% endif %}">
+                <td><strong>{{ name }}</strong></td>
+                <td>
+                    <span class="badge {% if status == 'ERROR' %}bg-danger{% elif status == 'OK' %}bg-success{% elif status == 'WARNING' %}bg-warning text-dark{% elif status == 'AVAILABLE' %}bg-info{% elif status == 'NOT_CHECKED' %}bg-secondary{% elif status == 'NOT_CONFIGURED' %}bg-warning text-dark{% else %}bg-secondary{% endif %}">
+                        {{ status }}
+                    </span>
+                </td>
+                <td>
+                    {% if detail %}
+                        {% if detail.info %}
+                            <span class="text-muted">{{ detail.info }}</span>
+                        {% endif %}
+                        {% if detail.reason %}
+                            <strong class="text-danger">{{ detail.reason }}</strong>
+                        {% endif %}
+                        {% if detail.action %}
+                            <br><span class="small text-muted">💡 {{ detail.action }}</span>
+                        {% endif %}
+                    {% else %}
+                        <span class="text-muted">—</span>
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>

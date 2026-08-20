@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container-fluid">
+    <nav aria-label="breadcrumb" class="mb-3">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="/admin">Administración</a></li>
+            <li class="breadcrumb-item active">Doctor</li>
+        </ol>
+    </nav>
+
+    <h2 class="mb-1">🩺 Diagnóstico del Sistema</h2>
+    <p class="text-muted">Verifica el estado de DealHunter. Los resultados siguientes son locales (sin red).</p>
+
+    <!-- Overall Status -->
+    <div class="alert {% if overall == 'HEALTHY' %}alert-success{% elif overall == 'ERROR' %}alert-danger{% else %}alert-secondary{% endif %} d-flex align-items-center mb-4">
+        <span class="fs-4 me-2">{% if overall == 'HEALTHY' %}✅{% elif overall == 'ERROR' %}❌{% else %}❓{% endif %}</span>
+        <div>
+            <strong>Estado general:</strong> {{ overall }}
+            <span class="text-muted small ms-2">(solo comprobaciones locales)</span>
+        </div>
+    </div>
+
+    <!-- Check Results Table -->
+    <div class="card shadow-sm mb-4">
+        <div class="card-body p-0">
+            {% include 'admin/partials/doctor_results.html' %}
+        </div>
+    </div>
+
+    <!-- Network Check (opt-in) -->
+    <div class="card shadow-sm mb-4">
+        <div class="card-body">
+            <h5 class="card-title">🌐 Diagnóstico con Red</h5>
+            <p class="text-muted small">Incluye verificación de conectividad con providers y estado de cuenta. Requiere acción explícita.</p>
+            <button class="btn btn-primary"
+                    hx-post="/admin/doctor/check"
+                    hx-target="#doctor-network-results"
+                    hx-headers='{"X-CSRF-Token": "{{ csrf_token }}"}'
+                    hx-indicator="#doctor-spinner">
+                Ejecutar diagnóstico con red
+            </button>
+            <span id="doctor-spinner" class="htmx-indicator ms-2">
+                <span class="spinner-border spinner-border-sm" role="status"></span> Verificando...
+            </span>
+        </div>
+    </div>
+
+    <div id="doctor-network-results"></div>
+</div>
+{% endblock %}

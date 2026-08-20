@@ -1,0 +1,104 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container-fluid">
+    <nav aria-label="breadcrumb" class="mb-3">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="/admin">Administración</a></li>
+            <li class="breadcrumb-item active">Base de Datos</li>
+        </ol>
+    </nav>
+
+    <h2 class="mb-1">💾 Base de Datos</h2>
+    <p class="text-muted">Estado, esquema y mantenimiento de SQLite.</p>
+
+    {% if stats.error %}
+    <div class="alert alert-danger">{{ stats.error }}</div>
+    {% else %}
+
+    <div class="row g-3 mb-4">
+        <!-- Statistics -->
+        <div class="col-md-6">
+            <div class="card shadow-sm h-100">
+                <div class="card-body">
+                    <h5 class="card-title">📊 Estadísticas</h5>
+                    <table class="table table-sm mt-3 mb-0">
+                        <tbody>
+                            <tr><th class="text-muted">Ruta</th><td><code class="small">{{ stats.path }}</code></td></tr>
+                            <tr><th class="text-muted">Tamaño</th><td>{{ stats.size_mb }} MB</td></tr>
+                            <tr><th class="text-muted">Versión de esquema</th><td>v{{ stats.version }} {% if stats.version == schema_version %}<span class="badge bg-success">actual</span>{% else %}<span class="badge bg-warning text-dark">desactualizada</span>{% endif %}</td></tr>
+                            <tr><th class="text-muted">Productos</th><td>{{ stats.products }}</td></tr>
+                            <tr><th class="text-muted">Observaciones</th><td>{{ stats.observations }}</td></tr>
+                            <tr><th class="text-muted">Tiendas</th><td>{{ stats.stores }}</td></tr>
+                            <tr><th class="text-muted">Runs</th><td>{{ stats.runs }}</td></tr>
+                            <tr><th class="text-muted">Alertas</th><td>{{ stats.alerts|default(0) }}</td></tr>
+                            <tr><th class="text-muted">Watchlist</th><td>{{ stats.watchlist|default(0) }}</td></tr>
+                            <tr><th class="text-muted">Último run</th><td>{{ stats.last_run or 'Nunca' }}</td></tr>
+                            <tr><th class="text-muted">Última observación</th><td>{{ stats.last_observation or 'Nunca' }}</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Actions -->
+        <div class="col-md-6">
+            <div class="card shadow-sm h-100">
+                <div class="card-body">
+                    <h5 class="card-title">🔧 Acciones</h5>
+                    <p class="text-muted small">Acciones seguras de mantenimiento. No se permite SQL arbitrario.</p>
+                    <div class="d-grid gap-2 mt-3">
+                        <button class="btn btn-outline-primary"
+                                hx-post="/admin/database/integrity"
+                                hx-target="#db-action-result"
+                                hx-headers='{"X-CSRF-Token": "{{ csrf_token }}"}'
+                                hx-indicator="#db-spinner">
+                            🔍 Verificar Integridad
+                        </button>
+                        <button class="btn btn-outline-success"
+                                hx-post="/admin/database/backup"
+                                hx-target="#db-action-result"
+                                hx-headers='{"X-CSRF-Token": "{{ csrf_token }}"}'
+                                hx-indicator="#db-spinner"
+                                hx-confirm="¿Crear un backup de la base de datos?">
+                            💾 Crear Backup
+                        </button>
+                    </div>
+                    <span id="db-spinner" class="htmx-indicator mt-2">
+                        <span class="spinner-border spinner-border-sm" role="status"></span> Procesando...
+                    </span>
+                    <div id="db-action-result" class="mt-3"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Schema Detail -->
+    {% if stats.tables %}
+    <div class="card shadow-sm">
+        <div class="card-body">
+            <h5 class="card-title">📋 Esquema</h5>
+            <div class="table-responsive mt-3">
+                <table class="table table-sm table-striped mb-0">
+                    <thead>
+                        <tr>
+                            <th>Tabla</th>
+                            <th class="text-end">Filas</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for t in stats.tables %}
+                        <tr>
+                            <td><code>{{ t.name }}</code></td>
+                            <td class="text-end">{{ t.rows }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    {% endif %}
+</div>
+{% endblock %}
