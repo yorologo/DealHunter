@@ -264,14 +264,25 @@ def settings():
             classification = "SECRET_FORBIDDEN"
         else:
             classification = "READ_ONLY"
-        settings_list.append({
-            'key': key,
-            'value': '••••••••' if classification == "SECRET_FORBIDDEN" else global_cfg[key],
-            'default': None,
-            'source': 'config.toml',
-            'classification': classification,
-            'type': type(global_cfg[key]).__name__,
-        })
+
+        if classification == "SECRET_FORBIDDEN":
+            settings_list.append({
+                'key': key,
+                'configured': bool(global_cfg[key]),
+                'editable': False,
+                'classification': classification,
+                'source': 'config.toml'
+            })
+        else:
+            settings_list.append({
+                'key': key,
+                'value': global_cfg[key],
+                'default': None,
+                'source': 'config.toml',
+                'classification': classification,
+                'type': type(global_cfg[key]).__name__,
+                'editable': False,
+            })
 
     # Profiles info
     profiles = list(global_cfg.get('profiles', {}).keys())

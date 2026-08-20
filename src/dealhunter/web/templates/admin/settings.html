@@ -82,7 +82,12 @@
                             </td>
                             <td>
                                 {% if s.classification == 'SECRET_FORBIDDEN' %}
-                                <span class="text-muted">••••••••</span>
+                                {% if s.configured %}
+                                <span class="badge bg-success">CONFIGURADO</span>
+                                <div class="text-muted small mt-1">Valor protegido y no persistible desde la web.</div>
+                                {% else %}
+                                <span class="badge bg-secondary">NO CONFIGURADO</span>
+                                {% endif %}
                                 {% elif s.value is iterable and s.value is not string %}
                                 <code class="small">{{ s.value }}</code>
                                 {% else %}

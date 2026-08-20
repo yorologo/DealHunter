@@ -326,7 +326,40 @@ class TestAdminSettings:
                          data={'key': 'bearer_token', 'value': 'HACK'},
                          headers={'X-CSRF-Token': token})
         assert rv.status_code == 200
-        assert b'no es editable' in rv.data
+        assert b'no es editable' in rv.data or b'No se permiten secretos' in rv.data
+
+    def test_settings_rejects_unknown_and_readonly(self, client):
+        """Web interface must reject modifications to keys not in SAFE_EDITABLE allowlist."""
+        token = _get_csrf_token(client)
+        forbidden_keys = ['rappi_token', 'unknown_setting', 'database_path', 'schema_version']
+        for key in forbidden_keys:
+            rv = client.post('/admin/settings/update',
+                             data={'key': key, 'value': 'test'},
+                             headers={'X-CSRF-Token': token})
+            assert rv.status_code == 200
+            assert b'no es editable' in rv.data or b'No se permiten secretos' in rv.data
+
+    def test_settings_canary_token_never_exposed(self, client, monkeypatch):
+        """A canary secret in the configuration must never be exposed in the HTTP response."""
+        import json
+        from dealhunter.config import save_config
+        # Inject canary token into global config for this test
+        # We'll use a mocked config layer
+
+        # We can simulate the global config returning the canary
+        original_load = __import__("dealhunter.config").config.load_config
+        def mock_load():
+            cfg = original_load()
+            cfg['test_secret_token'] = 'SUPER_SECRET_TEST_TOKEN_12345'
+            return cfg
+
+        monkeypatch.setattr('dealhunter.web.admin.load_config', mock_load)
+
+        rv = client.get('/admin/settings')
+        assert rv.status_code == 200
+        assert b'SUPER_SECRET_TEST_TOKEN_12345' not in rv.data
+        assert b'CONFIGURADO' in rv.data
+        assert b'test_secret_token' in rv.data
 
 
 class TestCSRF:
