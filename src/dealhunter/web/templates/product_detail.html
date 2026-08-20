@@ -35,6 +35,37 @@
                 </div>
                 
                 <h2 class="fw-bold mb-3">{{ p.product_name }}</h2>
+                {% if p.deal_score is not none and p.deal_score >= 0 %}
+                <div class="card bg-dark text-white border-0 shadow-sm mb-4 d-inline-flex flex-row align-items-center rounded-3 overflow-hidden">
+                    <div class="px-4 py-3 d-flex flex-column align-items-center justify-content-center bg-black bg-opacity-25 border-end border-secondary border-opacity-25" style="min-width: 120px;">
+                        <span class="fs-6 text-uppercase mb-1 fw-semibold text-secondary">Deal Score</span>
+                        <div class="d-flex align-items-baseline gap-1">
+                            <span class="fs-1 fw-bold lh-1">{{ p.deal_score }}</span>
+                            <span class="fs-5 text-secondary">/100</span>
+                        </div>
+                    </div>
+                    <div class="px-4 py-3">
+                        <div class="fs-5 fw-bold mb-1 d-flex align-items-center gap-2">
+                            {% if p.deal_score >= 90 %}🔥 Excepcional
+                            {% elif p.deal_score >= 80 %}🟢 Excelente
+                            {% elif p.deal_score >= 70 %}👍 Buena compra
+                            {% elif p.deal_score >= 60 %}🟡 Interesante
+                            {% else %}Normal{% endif %}
+                            
+                            <span class="badge bg-secondary bg-opacity-50 fs-6 ms-2">Confianza: {{ p.score_data.confidence }}</span>
+                        </div>
+                        {% if p.score_data.reasons %}
+                        <ul class="list-unstyled mb-0 small text-white-50">
+                            {% for r in p.score_data.reasons %}
+                            <li class="d-flex align-items-center gap-2 mb-1">
+                                <span class="text-success">✓</span> {{ r.text }}
+                            </li>
+                            {% endfor %}
+                        </ul>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endif %}
                 
                 <div class="d-flex flex-wrap align-items-center gap-3 mb-3">
                     {% if p.metrics %}

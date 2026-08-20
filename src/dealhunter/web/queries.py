@@ -124,7 +124,7 @@ def get_product_detail(db_path, store_id, product_id):
         SELECT price, timestamp, original_price, availability, discount_promotion, promotion_type, promotion_label, run_id
         FROM observations
         WHERE store_id = ? AND product_id = ?
-        ORDER BY timestamp ASC
+        ORDER BY timestamp ASC, ROWID ASC
     ''', (store_id, product_id))
     
     obs_rows = c.fetchall()
@@ -150,8 +150,17 @@ def get_product_detail(db_path, store_id, product_id):
     p["metrics"] = compute_price_metrics(obs) if obs else None
     if p["metrics"]:
         p["unit_price"] = format_unit_price(p["metrics"]["current_price"], p["normalized_quantity"], p["normalized_unit"])
+        
+        # Calculate Deal Score
+        from dealhunter.score import calculate_deal_score
+        # we don't have market min price here easily without another query, so we skip it (returns None)
+        score_data = calculate_deal_score(p["metrics"], p["metrics"]["current_price"], p["metrics"].get("original_price"))
+        p["score_data"] = score_data
+        p["deal_score"] = score_data["score"]
     else:
         p["unit_price"] = None
+        p["deal_score"] = None
+        p["score_data"] = None
         
     # Alerts
     c.execute("SELECT alert_type, triggered_at FROM alerts WHERE product_id = ? AND store_id = ? ORDER BY triggered_at DESC", (product_id, store_id))
@@ -191,7 +200,7 @@ def enrich_products_with_metrics(db_path, products):
         conds.append("(product_id = ? AND store_id = ?)")
         params.extend([p["product_id"], p["store_id"]])
         
-    query = f"SELECT store_id, product_id, price, timestamp, original_price FROM observations WHERE {' OR '.join(conds)} ORDER BY timestamp ASC"
+    query = f"SELECT store_id, product_id, price, timestamp, original_price FROM observations WHERE {' OR '.join(conds)} ORDER BY timestamp ASC, ROWID ASC"
     c.execute(query, params)
     obs_rows = c.fetchall()
     
@@ -439,13 +448,16 @@ def get_catalog(db_path, filters, sort, page, per_page=25):
         
     base_query = '''
         SELECT p.product_id, p.store_id, p.name, s.name as store_name, s.type as store_type, p.brand, p.category, p.quantity, p.unit, p.normalized_quantity, p.normalized_unit,
-               MAX(o.timestamp) as ts, o.price as current_price, o.original_price,
+               o.timestamp as ts, o.price as current_price, o.original_price,
                ((o.original_price - o.price) / o.original_price) * 100 as discount_percent,
                (o.original_price - o.price) as savings, o.promotion_type, o.promotion_label
         FROM products p
         JOIN stores s ON p.store_id = s.store_id
-        JOIN observations o ON p.product_id = o.product_id AND p.store_id = o.store_id
-        GROUP BY p.store_id, p.product_id
+        JOIN (
+            SELECT product_id, store_id, timestamp, price, original_price, promotion_type, promotion_label,
+                   ROW_NUMBER() OVER (PARTITION BY store_id, product_id ORDER BY timestamp DESC, ROWID DESC) as rn
+            FROM observations
+        ) o ON p.product_id = o.product_id AND p.store_id = o.store_id AND o.rn = 1
     '''
     
     query = f'''

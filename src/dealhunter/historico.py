@@ -12,7 +12,7 @@ def analyze_history(db_path, config, store=None, product=None):
     query = '''
         SELECT o.store_id, o.product_id, p.name, s.name, o.price, o.timestamp, o.discount_effective, o.original_price,
                p.brand, p.normalized_name, p.quantity, p.unit, p.normalized_quantity, p.normalized_unit,
-               p.fingerprint, p.pack_count
+               p.fingerprint, p.pack_count, s.type as store_type, p.category
         FROM observations o
         JOIN products p ON o.product_id = p.product_id AND o.store_id = p.store_id
         JOIN stores s ON o.store_id = s.store_id
@@ -30,17 +30,17 @@ def analyze_history(db_path, config, store=None, product=None):
     if conditions:
         query += " WHERE " + " AND ".join(conditions)
         
-    query += " ORDER BY o.timestamp ASC"
+    query += " ORDER BY o.timestamp ASC, o.ROWID ASC"
     c.execute(query, params)
     rows = c.fetchall()
     
     grouped = {}
     for r in rows:
-        store_id, product_id, p_name, s_name, price, ts_str, d_eff, orig_price, brand, norm_name, qty, unit, n_qty, n_unit, fp, pack_count = r
+        store_id, product_id, p_name, s_name, price, ts_str, d_eff, orig_price, brand, norm_name, qty, unit, n_qty, n_unit, fp, pack_count, store_type, category = r
         key = (store_id, product_id)
         if key not in grouped:
             grouped[key] = {
-                "product_name": p_name, "store_name": s_name, 
+                "product_name": p_name, "store_name": s_name, "store_type": store_type, "category": category,
                 "brand": brand, "normalized_name": norm_name, "quantity": qty, "unit": unit,
                 "normalized_quantity": n_qty, "normalized_unit": n_unit, "fingerprint": fp,
                 "pack_count": pack_count,
@@ -77,6 +77,8 @@ def analyze_history(db_path, config, store=None, product=None):
             "product_id": key[1],
             "product_name": data["product_name"],
             "store_name": data["store_name"],
+            "store_type": data.get("store_type"),
+            "category": data.get("category"),
             "BRAND": data["brand"] or "",
             "QUANTITY": data["quantity"] or "",
             "UNIT": data["unit"] or "",
@@ -138,7 +140,7 @@ def compare_stores(db_path, query, exact_only=False, no_fuzzy=False):
     c.execute('''
         SELECT product_id, store_id, price, timestamp, original_price
         FROM observations
-        ORDER BY timestamp ASC
+        ORDER BY timestamp ASC, ROWID ASC
     ''')
     obs_rows = c.fetchall()
     
@@ -290,7 +292,7 @@ def compare_with_anchor(db_path, store_id, product_id):
     c.execute('''
         SELECT product_id, store_id, price, timestamp, original_price
         FROM observations
-        ORDER BY timestamp ASC
+        ORDER BY timestamp ASC, ROWID ASC
     ''')
     obs_rows = c.fetchall()
     for r in obs_rows:

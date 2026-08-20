@@ -1,0 +1,55 @@
+{% extends 'base.html' %}
+{% block content %}
+
+<div class="container-fluid p-0">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h3 class="fw-bold mb-0 d-flex align-items-center gap-2">
+            <span>🏆</span> Mejores compras ahora
+        </h3>
+    </div>
+
+    <!-- Filter Form Card -->
+    <div class="card shadow-sm border-0 mb-4">
+        <div class="card-body">
+            <form id="filter-form" hx-get="/best" hx-target="#catalog-grid" hx-push-url="true" class="row g-3 align-items-end">
+                <div class="col-md-3">
+                    <label class="form-label small text-secondary fw-bold">Ordenar por</label>
+                    <select class="form-select form-select-sm" name="sort" onchange="document.getElementById('filter-form').dispatchEvent(new Event('submit'))">
+                        <option value="score" {% if sort == 'score' %}selected{% endif %}>Mejor Deal Score (🏆)</option>
+                        <option value="discount" {% if sort == 'discount' %}selected{% endif %}>Mayor Descuento %</option>
+                        <option value="savings" {% if sort == 'savings' %}selected{% endif %}>Mayor Ahorro $</option>
+                        <option value="price" {% if sort == 'price' %}selected{% endif %}>Menor Precio</option>
+                        <option value="recent" {% if sort == 'recent' %}selected{% endif %}>Más reciente</option>
+                    </select>
+                </div>
+                
+                <div class="col-md-3">
+                    <label class="form-label small text-secondary fw-bold">Tipo de tienda</label>
+                    <select class="form-select form-select-sm" name="store_type" onchange="document.getElementById('filter-form').dispatchEvent(new Event('submit'))">
+                        <option value="" {% if not filters.store_type %}selected{% endif %}>Todos</option>
+                        <option value="market" {% if filters.store_type == 'market' %}selected{% endif %}>Supermercados</option>
+                        <option value="turbo" {% if filters.store_type == 'turbo' %}selected{% endif %}>Turbo</option>
+                        <option value="restaurants" {% if filters.store_type == 'restaurants' %}selected{% endif %}>Restaurantes</option>
+                    </select>
+                </div>
+
+                <div class="col-md-3">
+                    <label class="form-label small text-secondary fw-bold">Categoría</label>
+                    <input type="text" class="form-control form-control-sm" name="category" placeholder="Categoría..." value="{{ filters.category or '' }}" onchange="document.getElementById('filter-form').dispatchEvent(new Event('submit'))">
+                </div>
+
+                <div class="col-md-auto ms-auto">
+                    <button type="submit" class="btn btn-sm btn-primary">Filtrar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Product Grid -->
+    <div id="catalog-grid">
+        {% include 'partials/catalog_grid.html' %}
+    </div>
+
+</div>
+
+{% endblock %}

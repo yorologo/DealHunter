@@ -64,6 +64,29 @@ def register_routes(app):
             return render_template('compare.html', results=res, q=q, anchor_mode=False, current_path='/compare')
 
     @app.route('/deals')
+    
+    @app.route('/best')
+    def best():
+        from dealhunter.web.best import get_best_buys
+        db_path = current_app.config['DATABASE']
+        page = int(request.args.get('page', 1))
+        sort = request.args.get('sort', 'score')
+        category = request.args.get('category', '')
+        store_type = request.args.get('store_type', '')
+        
+        filters = {}
+        if category: filters["category"] = category
+        if store_type: filters["store_type"] = store_type
+        
+        data = get_best_buys(db_path, filters, sort, page)
+        
+        if request.headers.get('HX-Request') and not request.headers.get('HX-Boosted'):
+            return render_template('partials/catalog_grid.html', data=data, view_mode=request.cookies.get('view_mode', 'cards'), is_best_buys=True)
+            
+        return render_template('best.html', data=data, sort=sort, filters={"category": category, "store_type": store_type}, current_path='/best', is_best_buys=True)
+
+
+    @app.route('/deals')
     def deals():
         db_path = current_app.config['DATABASE']
         page = int(request.args.get('page', 1))
