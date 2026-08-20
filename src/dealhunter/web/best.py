@@ -48,12 +48,13 @@ def get_best_buys(db_path, filters, sort, page, per_page=25):
             
     for r in valid_res:
         fp = r.get("fingerprint")
-        min_price = min(fingerprint_prices[fp]) if fp else None
-        count = len(fingerprint_prices[fp]) if fp else 1
-        
-        score_data = calculate_deal_score(r, r["current_price"], r.get("original_price"), min_price, count)
+        market_prices = fingerprint_prices[fp] if fp else []
+        score_data = calculate_deal_score(r, r["current_price"], r.get("original_price"), market_prices)
         r["score_data"] = score_data
         r["deal_score"] = score_data["score"]
+        
+        conf = score_data.get("confidence", "baja")
+        r["confidence_rank"] = 3 if conf == "alta" else (2 if conf == "media" else 1)
         # Format for catalog_grid expects "metrics" with discount_percent and savings
         if "metrics" not in r:
             r["metrics"] = r.copy() # fallback
@@ -66,7 +67,7 @@ def get_best_buys(db_path, filters, sort, page, per_page=25):
             
     # Sort
     if sort == "score":
-        valid_res.sort(key=lambda x: (x["deal_score"], x.get("timestamp", ""), x["store_id"], x["product_id"]), reverse=True)
+        valid_res.sort(key=lambda x: (x["confidence_rank"], x["deal_score"], x.get("timestamp", ""), x["store_id"], x["product_id"]), reverse=True)
     elif sort == "discount":
         valid_res.sort(key=lambda x: (x["metrics"]["discount_percent"], x["deal_score"], x["store_id"], x["product_id"]), reverse=True)
     elif sort == "savings":
@@ -76,7 +77,7 @@ def get_best_buys(db_path, filters, sort, page, per_page=25):
     elif sort == "recent":
         valid_res.sort(key=lambda x: (x.get("timestamp", ""), x["deal_score"], x["store_id"], x["product_id"]), reverse=True)
     else:
-        valid_res.sort(key=lambda x: (x["deal_score"], x.get("timestamp", ""), x["store_id"], x["product_id"]), reverse=True)
+        valid_res.sort(key=lambda x: (x["confidence_rank"], x["deal_score"], x.get("timestamp", ""), x["store_id"], x["product_id"]), reverse=True)
         
     total = len(valid_res)
     start = (page - 1) * per_page

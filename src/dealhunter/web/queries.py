@@ -154,7 +154,7 @@ def get_product_detail(db_path, store_id, product_id):
         # Calculate Deal Score
         from dealhunter.score import calculate_deal_score
         # we don't have market min price here easily without another query, so we skip it (returns None)
-        score_data = calculate_deal_score(p["metrics"], p["metrics"]["current_price"], p["metrics"].get("original_price"))
+        score_data = calculate_deal_score(p["metrics"], p["metrics"]["current_price"], p["metrics"].get("original_price"), None)
         p["score_data"] = score_data
         p["deal_score"] = score_data["score"]
     else:

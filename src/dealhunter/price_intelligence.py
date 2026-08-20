@@ -88,5 +88,6 @@ def compute_price_metrics(obs_list):
         "status": status,
         "reason": reason,
         "is_suspicious_reference": is_suspicious,
-        "observations_count": len(obs_list)
+        "observations_count": len(obs_list),
+        "history_days": (obs_list[-1]["timestamp"] - obs_list[0]["timestamp"]).days if len(obs_list) > 1 else 0
     }
