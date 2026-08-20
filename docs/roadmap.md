@@ -8,7 +8,7 @@
 - **v2.5**: Alertas off-grid con deduplicación de SQLite.
 - **v2.6**: Web UI Foundation (HTMX/Flask), componentes y gráficas locales.
 - **v2.7**: Administración Web (Seguridad, Diagnostics, Settings, DB backup).
-- **KISS Iterations**: Deal Score V1, Taxonomy (Next.js fallback), Price Integrity, Multiselect Filters, Android Intent Navigation.
+- **KISS Iterations**: Deal Score V1, Taxonomy (Next.js fallback), Price Integrity, Multiselect Filters, capture-zone provenance, safe zone realignment and exact-store native Rappi navigation.
 
 ## Próximo (v2.8 — Follow Experience)
 - UI Web de Watchlist

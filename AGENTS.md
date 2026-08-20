@@ -44,6 +44,9 @@ The project must prioritize demonstrable value, not the largest advertised disco
 - **Formatters**: Unit-price formatter shared.
 - **Admin Network**: Admin GET is local-only (0 external requests). Network diagnostics require explicit POST.
 - **Security**: Secrets NEVER passed to templates. Config Settings allowlist (`SAFE_EDITABLE`). CSRF required for POST. DB actions limited to safe read/backup.
+- **Location context**: Crawls require explicit `lat/lng` from CLI/profile/global config. Never restore a hardcoded city fallback. Persist provenance once per `runs` row; a significant change warns and preserves history until an explicit, backed-up decision.
+- **Rappi navigation**: Resolve `store_id` and type server-side, use the verified `gbrappi` exact-store contract through Shizuku, and keep `com.grability.rappi` fixed. Browser, website and Home fallbacks are forbidden. Unsupported types fail closed.
+- **UI/OCR boundary**: Android hierarchy, screenshots or OCR may support account/zone diagnostics and manual navigation verification only. They are not a normal product/price crawler and temporary sensitive artifacts must be discarded.
 
 ### 1. Local-first
 
@@ -3080,4 +3083,3 @@ Do not block the web implementation on:
 - AI/LLM matching
 
 These remain future work unless explicitly requested.
-

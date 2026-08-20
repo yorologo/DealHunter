@@ -2,11 +2,18 @@
 
 DealHunter utiliza una CLI muy predecible. Aquí tienes ejemplos prácticos. Todos los datos generados son locales.
 
+Antes del primer crawl, configura localmente la misma ubicación de entrega que está activa en Rappi:
+
+```bash
+./bin/rappi-ofertas config set lat TU_LATITUD
+./bin/rappi-ofertas config set lng TU_LONGITUD
+```
+
 ## Caso 1 — Buscar mejores ofertas cercanas
 **Objetivo:** Obtener las promociones del área general predefinida por las *seed keywords* de todos los verticales.
 **Comando:**
 ```bash
-./bin/rappi-ofertas --lat 19.4326 --lng -99.1332 --vertical general
+./bin/rappi-ofertas discover --vertical general
 ```
 **Qué hace:** Itera desde supermercados hasta tiendas de tecnología y mascotas, llenando tu base de datos y deteniéndose automáticamente cuando nota que la búsqueda ya no trae productos nuevos.
 
@@ -14,28 +21,28 @@ DealHunter utiliza una CLI muy predecible. Aquí tienes ejemplos prácticos. Tod
 **Objetivo:** Ignorar medicinas y croquetas para enfocarte sólo en tu despensa.
 **Comando:**
 ```bash
-./bin/rappi-ofertas --lat 19.4326 --lng -99.1332 --vertical supermercado
+./bin/rappi-ofertas discover --vertical supermercado
 ```
 
 ## Caso 3 — Farmacias
 **Objetivo:** Buscar promociones de temporada en medicamentos.
 **Comando:**
 ```bash
-./bin/rappi-ofertas --lat 19.4326 --lng -99.1332 --vertical farmacia
+./bin/rappi-ofertas discover --vertical farmacia
 ```
 
 ## Caso 4 — Tecnología
 **Objetivo:** Encontrar remates de cables, memorias o periféricos en tiendas MacStore, Lumen o Steren cercanas.
 **Comando:**
 ```bash
-./bin/rappi-ofertas --lat 19.4326 --lng -99.1332 --vertical tecnologia
+./bin/rappi-ofertas discover --vertical tecnologia
 ```
 
 ## Caso 5 — Mascotas
 **Objetivo:** Rastrear alimento en tiendas como Petco o Maskota.
 **Comando:**
 ```bash
-./bin/rappi-ofertas --lat 19.4326 --lng -99.1332 --vertical mascotas
+./bin/rappi-ofertas discover --vertical mascotas
 ```
 
 ## Caso 10 — Consultar histórico
@@ -65,8 +72,10 @@ crontab -e
 
 Agrega una línea para correr tu escaneo, por ejemplo a las 07:00, 10:00, 13:00 y 19:00 todos los días:
 ```cron
-0 7,10,13,19 * * * cd /data/data/com.termux/files/home/rappi-deal-hunter && ./bin/rappi-ofertas discover --lat TU_LATITUD --lng TU_LONGITUD --vertical general >> logs/crawler-cron.log 2>&1
+0 7,10,13,19 * * * cd /data/data/com.termux/files/home/rappi-deal-hunter && ./bin/rappi-ofertas discover --vertical general >> logs/crawler-cron.log 2>&1
 ```
+
+La línea programada usa el `lat/lng` canónico de `~/.config/dealhunter/config.toml`; así no puede divergir silenciosamente de una ejecución manual auditada.
 
 Estos horarios no son intervalos uniformes. Están pensados para capturar:
 - **07:00** — Inicio del día (promociones matutinas, restock).

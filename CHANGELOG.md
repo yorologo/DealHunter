@@ -6,7 +6,11 @@
 - feat: Native multiselect filtering (UNION logic) for Stores and Categories
 - feat: Price Integrity Engine (glitch detection, currency mismatch handling)
 - feat: Native Rappi app launcher via directed Android Intent (`am start -p com.grability.rappi`)
+- feat: Exact-store Rappi deep links (`gbrappi` + server-side `store_id`) for verified Restaurant, Market and Turbo store types through Shizuku
+- feat: Run-level capture provenance and explicit local `lat/lng` configuration with non-destructive location-change warnings
 - fix: Replace `termux-open-url` (browser) with package-targeted Intent for "Abrir en Rappi"
+- fix: Remove the hardcoded CDMX crawler fallback and the false-success Rappi Home/website fallbacks
+- fix: Make the installed 07:00/10:00/13:00/19:00 cron consume the same canonical location configuration
 - fix: Elimination of hardcoded 65% discount arbitrary limits
 - fix: Structured taxonomy enforcement and robust URL fallback resolution
 
@@ -104,4 +108,3 @@
 ## v0.1.0 — Research / PoC
 * Pruebas de concepto vía logcat y Shizuku.
 * Inspección de SDUI en Flutter/Dart.
-
