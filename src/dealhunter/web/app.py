@@ -20,7 +20,6 @@ def create_app(test_config=None):
 
     @app.before_request
     def check_csrf():
-        if current_app.config.get('TESTING'): return
         if 'csrf_token' not in session:
             session['csrf_token'] = secrets.token_hex(32)
         g.csrf_token = session['csrf_token']

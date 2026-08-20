@@ -17,24 +17,31 @@ def client():
     with app.test_client() as client:
         yield client
 
+def _get_csrf_token(client):
+    with client.session_transaction() as sess:
+        import secrets
+        token = secrets.token_hex(32)
+        sess['csrf_token'] = token
+    return token
+
 def test_open_rappi_restaurant(client):
-    response = client.post('/api/open-rappi', data={"store_id": "111", "target_type": "store"})
+    response = client.post('/api/open-rappi', data={"store_id": "111", "target_type": "store", "csrf_token": _get_csrf_token(client)})
     assert response.status_code == 302
     assert response.location == "https://www.rappi.com.mx/restaurantes/111"
 
 def test_open_rappi_market(client):
     # NOTE: product_exact is UNSUPPORTED because Rappi Web UI lacks stable product IDs routes.
     # So we ALWAYS fallback to store exact landing.
-    response = client.post('/api/open-rappi', data={"store_id": "222", "target_type": "store"})
+    response = client.post('/api/open-rappi', data={"store_id": "222", "target_type": "store", "csrf_token": _get_csrf_token(client)})
     assert response.status_code == 302
     assert response.location == "https://www.rappi.com.mx/tiendas/222"
 
 def test_open_rappi_rejects_untrusted_target(client):
-    response = client.post('/api/open-rappi', data={"target_type": "store"})
+    response = client.post('/api/open-rappi', data={"target_type": "store", "csrf_token": _get_csrf_token(client)})
     assert response.status_code == 302
     assert response.location == "/" # redirects home
 
 def test_open_rappi_product_unsupported_fallback(client):
-    response = client.post('/api/open-rappi', data={"store_id": "111", "target_type": "product"})
+    response = client.post('/api/open-rappi', data={"store_id": "111", "target_type": "product", "csrf_token": _get_csrf_token(client)})
     assert response.status_code == 302
     assert response.location == "https://www.rappi.com.mx/restaurantes/111"

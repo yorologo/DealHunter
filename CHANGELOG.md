@@ -1,5 +1,14 @@
 # Changelog
 
+## [Unreleased]
+- feat: Deal Score V1 stabilization and Deal/Market Advantage isolation
+- feat: Advanced Restaurant Taxonomy extraction directly from NextJS metadata
+- feat: Native multiselect filtering (UNION logic) for Stores and Categories
+- feat: Price Integrity Engine (glitch detection, currency mismatch handling)
+- feat: Verifiable Android/Termux navigation resolving to explicit store pages
+- fix: Elimination of hardcoded 65% discount arbitrary limits
+- fix: Structured taxonomy enforcement and robust URL fallback resolution
+
 ## [2.7.0] - 2026-08-20
 - feat: DealHunter Administration Web Interface
 - feat: Admin Home with live metrics and system health
