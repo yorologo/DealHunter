@@ -2,7 +2,7 @@ from flask import render_template, request, current_app
 from dealhunter.web.queries import (
     get_home_metrics, get_home_deals, get_watchlist, search_local, 
     get_product_detail, get_product_compare, get_anchor_compare,
-    get_deals, get_catalog, get_categories, get_stores, get_store_detail
+    get_deals, get_catalog, get_categories, get_stores, get_store_detail, get_available_stores, get_available_categories
 )
 
 def register_routes(app):
@@ -102,8 +102,8 @@ def register_routes(app):
         db_path = current_app.config['DATABASE']
         page = int(request.args.get('page', 1))
         sort = request.args.get('sort', 'opportunity')
-        store = request.args.get('store', '')
-        category = request.args.get('category', '')
+        store = request.args.getlist('store')
+        category = request.args.getlist('category')
         filters = {"vertical": "market"}
         if store: filters["store"] = store
         if category: filters["category"] = category
@@ -111,15 +111,17 @@ def register_routes(app):
         data = get_catalog(db_path, filters, sort, page)
         if request.headers.get('HX-Request') and not request.headers.get('HX-Boosted'):
             return render_template('partials/catalog_grid.html', data=data, view_mode=request.cookies.get('view_mode', 'cards'))
-        return render_template('catalog.html', data=data, sort=sort, filters=filters, title="Supermercados", current_path='/market', emoji="🛒")
+        av_stores = get_available_stores(db_path, "market")
+        av_cats = get_available_categories(db_path, "market", store)
+        return render_template('catalog.html', data=data, sort=sort, filters=filters, av_stores=av_stores, av_cats=av_cats, title="Supermercados", current_path='/market', emoji="🛒")
         
     @app.route('/turbo')
     def turbo():
         db_path = current_app.config['DATABASE']
         page = int(request.args.get('page', 1))
         sort = request.args.get('sort', 'opportunity')
-        store = request.args.get('store', '')
-        category = request.args.get('category', '')
+        store = request.args.getlist('store')
+        category = request.args.getlist('category')
         filters = {"vertical": "turbo"}
         if store: filters["store"] = store
         if category: filters["category"] = category
@@ -176,8 +178,8 @@ def register_routes(app):
         db_path = current_app.config['DATABASE']
         page = int(request.args.get('page', 1))
         sort = request.args.get('sort', 'discount')
-        store = request.args.get('store', '')
-        category = request.args.get('category', '')
+        store = request.args.getlist('store')
+        category = request.args.getlist('category')
         filters = {"vertical": "restaurants"}
         if store: filters["store"] = store
         if category: filters["category"] = category

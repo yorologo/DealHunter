@@ -1,3 +1,4 @@
+{% from 'components/multiselect.html' import multiselect %}
 {% extends 'base.html' %}
 {% block content %}
 
@@ -34,9 +35,13 @@
                 </div>
 
                 <div class="col-md-3">
-                    <label class="form-label small text-secondary fw-bold">Categoría</label>
-                    <input type="text" class="form-control form-control-sm" name="category" placeholder="Categoría..." value="{{ filters.category or '' }}" onchange="document.getElementById('filter-form').dispatchEvent(new Event('submit'))">
-                </div>
+                        <label class="form-label small text-secondary fw-bold">Categorías</label>
+                        {% set formatted_cats = [] %}
+                        {% for c in av_cats %}
+                            {% set _ = formatted_cats.append({'id': c, 'name': c}) %}
+                        {% endfor %}
+                        {{ multiselect('category', 'Categorías', formatted_cats, filters.category, 'Buscar categoría...', None, None) }}
+                    </div>
 
                 <div class="col-md-auto ms-auto">
                     <button type="submit" class="btn btn-sm btn-primary">Filtrar</button>

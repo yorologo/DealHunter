@@ -14,7 +14,17 @@
             <span class="badge text-bg-light border text-uppercase">{{ detail.type }}</span>
             <div class="small text-secondary">ID: {{ detail.store_id }}</div>
         </div>
-        <h2 class="fw-bold mb-3">{{ detail.name }}</h2>
+        <div class="d-flex justify-content-between align-items-start">
+            <h2 class="fw-bold mb-3">{{ detail.name }}</h2>
+            <form action="/api/open-rappi" method="POST" target="_blank" class="ms-3 d-inline">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                <input type="hidden" name="target_type" value="store">
+                <input type="hidden" name="store_id" value="{{ detail.store_id }}">
+                <button type="submit" class="btn btn-sm btn-danger fw-bold rounded-pill shadow-sm px-3 py-2">
+                    🛵 Abrir Tienda
+                </button>
+            </form>
+        </div>
         <div class="row g-3">
             <div class="col-6 col-md-3">
                 <div class="small text-secondary">Productos</div>

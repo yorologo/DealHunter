@@ -27,6 +27,7 @@ def setup_db(db_path=None):
                   pack_count INTEGER,
                   category TEXT,
                   has_toppings INTEGER,
+                  category_source TEXT DEFAULT 'unknown',
                   PRIMARY KEY (store_id, product_id))''')
                   
     c.execute('''CREATE TABLE IF NOT EXISTS runs (
@@ -127,6 +128,7 @@ def migrate(conn, db_path):
         if version < 7:
             try:
                 c.execute("ALTER TABLE products ADD COLUMN has_toppings INTEGER")
+                c.execute("ALTER TABLE products ADD COLUMN category_source TEXT DEFAULT 'unknown'")
             except sqlite3.OperationalError:
                 pass
         # update version

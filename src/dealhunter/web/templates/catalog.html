@@ -1,3 +1,4 @@
+{% from 'components/multiselect.html' import multiselect %}
 {% extends 'base.html' %}
 {% block content %}
 
@@ -33,14 +34,18 @@
                     </div>
                     {% if current_path != '/stores' and current_path != '/stores/' ~ filters.store %}
                     <div class="col-md-3">
-                        <label class="form-label small text-secondary fw-bold">Tienda</label>
-                        <input type="text" name="store" class="form-control form-control-sm" placeholder="ID Tienda..." value="{{ filters.store or '' }}" onchange="document.getElementById('filter-form').dispatchEvent(new Event('submit'))">
+                        <label class="form-label small text-secondary fw-bold">Tiendas</label>
+                        {{ multiselect('store', 'Tiendas', av_stores, filters.store, 'Buscar tienda...', '/partials/categories', '#category-options') }}
                     </div>
                     {% endif %}
                     {% if current_path != '/categories' and '/categories/' not in current_path %}
                     <div class="col-md-3">
-                        <label class="form-label small text-secondary fw-bold">Categoría</label>
-                        <input type="text" name="category" class="form-control form-control-sm" placeholder="Categoría..." value="{{ filters.category or '' }}" onchange="document.getElementById('filter-form').dispatchEvent(new Event('submit'))">
+                        <label class="form-label small text-secondary fw-bold">Categorías</label>
+                        {% set formatted_cats = [] %}
+                        {% for c in av_cats %}
+                            {% set _ = formatted_cats.append({'id': c, 'name': c}) %}
+                        {% endfor %}
+                        {{ multiselect('category', 'Categorías', formatted_cats, filters.category, 'Buscar categoría...', None, None) }}
                     </div>
                     {% endif %}
                     <div class="col-md-3">

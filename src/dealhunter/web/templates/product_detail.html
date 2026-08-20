@@ -34,7 +34,18 @@
                     {% endif %}
                 </div>
                 
-                <h2 class="fw-bold mb-3">{{ p.product_name }}</h2>
+                <div class="d-flex justify-content-between align-items-start">
+                    <h2 class="fw-bold mb-3">{{ p.product_name }}</h2>
+                    <form action="/api/open-rappi" method="POST" target="_blank" class="ms-3 d-inline">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                        <input type="hidden" name="target_type" value="product">
+                        <input type="hidden" name="store_id" value="{{ p.store_id }}">
+                        <input type="hidden" name="product_id" value="{{ p.product_id }}">
+                        <button type="submit" class="btn btn-sm btn-danger fw-bold rounded-pill shadow-sm px-3 py-2">
+                            🛵 Abrir en Rappi
+                        </button>
+                    </form>
+                </div>
                 {% if p.deal_score is not none and p.deal_score >= 0 %}
                 <div class="card bg-dark text-white border-0 shadow-sm mb-4 d-inline-flex flex-row align-items-center rounded-3 overflow-hidden">
                     <div class="px-4 py-3 d-flex flex-column align-items-center justify-content-center bg-black bg-opacity-25 border-end border-secondary border-opacity-25" style="min-width: 120px;">

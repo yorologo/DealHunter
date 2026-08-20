@@ -403,9 +403,17 @@ def get_catalog(db_path, filters, sort, page, per_page=25):
     conds = []
     params = []
     
+    if not filters.get("store"):
+        conds.append("NOT (store_type = 'restaurants' AND discount_percent > 65.0)")
+        
     if filters.get("store"):
-        conds.append("store_id = ?")
-        params.append(filters["store"])
+        stores = filters["store"]
+        if isinstance(stores, list) and stores:
+            conds.append(f"store_id IN ({','.join(['?']*len(stores))})")
+            params.extend(stores)
+        elif stores and isinstance(stores, str):
+            conds.append("store_id = ?")
+            params.append(stores)
         
     if filters.get("vertical"):
         if filters["vertical"] == "turbo":
@@ -768,3 +776,36 @@ def search_local(db_path, query, limit=50):
         "stores": s_results,
         "products": p_results
     }
+
+def get_available_stores(db_path, vertical=None):
+    conn = sqlite3.connect(db_path)
+    c = conn.cursor()
+    if vertical:
+        if vertical == "turbo":
+            c.execute("SELECT store_id, name FROM stores WHERE type IN ('chiper_home', 'chiper_extended', 'chiper_express') ORDER BY name")
+        else:
+            c.execute("SELECT store_id, name FROM stores WHERE type = ? ORDER BY name", (vertical,))
+    else:
+        c.execute("SELECT store_id, name FROM stores ORDER BY name")
+    return [{"id": r[0], "name": r[1]} for r in c.fetchall()]
+
+def get_available_categories(db_path, vertical=None, store_ids=None):
+    conn = sqlite3.connect(db_path)
+    c = conn.cursor()
+    query = "SELECT DISTINCT category FROM products p JOIN stores s ON p.store_id = s.store_id WHERE category IS NOT NULL AND category != ''"
+    params = []
+    if vertical:
+        if vertical == "turbo":
+            query += " AND s.type IN ('chiper_home', 'chiper_extended', 'chiper_express')"
+        else:
+            query += " AND s.type = ?"
+            params.append(vertical)
+    
+    if store_ids:
+        placeholders = ",".join(["?"] * len(store_ids))
+        query += f" AND p.store_id IN ({placeholders})"
+        params.extend(store_ids)
+        
+    query += " ORDER BY category"
+    c.execute(query, params)
+    return [r[0] for r in c.fetchall()]

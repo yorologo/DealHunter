@@ -1,0 +1,12 @@
+{% for opt in options %}
+<div class="form-check {{ name }}-item">
+    <input class="form-check-input {{ name }}-check" type="checkbox" name="{{ name }}" value="{{ opt.id }}" id="{{ name }}-{{ loop.index }}"
+        {% if opt.id in selected_values %}checked{% endif %}
+        {% if hx_get %}hx-get="{{ hx_get }}" hx-target="{{ hx_target }}" hx-include="#filter-form"{% endif %}>
+    <label class="form-check-label text-truncate w-100" style="font-size: 0.85rem;" for="{{ name }}-{{ loop.index }}" title="{{ opt.name }}">
+        {{ opt.name }}
+    </label>
+</div>
+{% else %}
+<div class="text-muted small text-center my-2">No hay opciones</div>
+{% endfor %}

@@ -1,0 +1,23 @@
+{% macro multiselect(name, label, options, selected_values, search_placeholder="Buscar...", hx_get=None, hx_target=None) %}
+<div class="dropdown">
+    <button class="btn btn-sm btn-outline-secondary dropdown-toggle w-100 text-start d-flex justify-content-between align-items-center bg-white" type="button" data-bs-toggle="dropdown" data-bs-auto-close="outside" aria-expanded="false">
+        <span>
+            {{ label }}
+            {% if selected_values|length > 0 %}
+                <span class="badge bg-primary ms-1">{{ selected_values|length }}</span>
+            {% endif %}
+        </span>
+    </button>
+    <div class="dropdown-menu p-3 shadow-sm" style="width: 250px;">
+        <input type="text" class="form-control form-control-sm mb-2 {{ name }}-search" placeholder="{{ search_placeholder }}" onkeyup="filterMultiselect(this, '.{{ name }}-item')">
+        <div class="options-container" id="{{ name }}-options" style="max-height: 250px; overflow-y: auto; overflow-x: hidden;">
+            {% include 'partials/multiselect_options.html' %}
+        </div>
+        <hr class="dropdown-divider">
+        <div class="d-flex justify-content-between">
+            <button type="button" class="btn btn-sm btn-link text-decoration-none p-0" onclick="clearMultiselect('{{ name }}')">Limpiar</button>
+            <button type="button" class="btn btn-sm btn-primary py-0" onclick="document.getElementById('filter-form').dispatchEvent(new Event('submit'))">Aplicar</button>
+        </div>
+    </div>
+</div>
+{% endmacro %}
