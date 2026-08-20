@@ -1,42 +1,43 @@
-# Price Intelligence Engine (v2.4)
+# Price Intelligence
 
-El motor de **Price Intelligence** evalúa históricamente el precio de los productos para detectar oportunidades reales y clasificar los descuentos de forma conservadora. Se basa únicamente en la historia comprobable dentro de SQLite.
+El motor de **Price Intelligence** combate la manipulación de "precios originales" evaluando precios actuales contra el histórico empírico del producto en la misma tienda.
 
-## Métricas Históricas
+## Estados Documentados
 
-Para cada producto con historial (≥3 observaciones y >24 hrs de separación), se calcula:
-- **`current_price`**: Precio de la observación más reciente.
-- **`historical_min`** / **`historical_max`**: Extremos históricos absolutos.
-- **`median_30d`**: Mediana de las observaciones de los últimos 30 días.
-- **`historical_average`**: Promedio histórico total.
-- **`price_change`** y **`price_change_percent`**: Diferencia vs la observación inmediatamente anterior.
-- **`discount_vs_median_30d`**: Descuento porcentual contra la mediana de los últimos 30 días.
-- **`distance_from_historical_min`**: Distancia porcentual hacia el mínimo histórico.
+```mermaid
+flowchart TD
+    CURRENT[Precio actual]
+    HISTORY[Histórico]
+    MEDIAN[Mediana 30d]
+    MIN[Mínimo histórico]
 
-## Clasificación de Ofertas (Status)
+    CURRENT --> PI[Price Intelligence]
+    HISTORY --> PI
+    MEDIAN --> PI
+    MIN --> PI
 
-Cada producto recibe un único estado `status` según reglas estrictas:
+    PI --> NEWLOW[NEW_LOW]
+    PI --> REAL[REAL_DEAL]
+    PI --> GOOD[GOOD_PRICE]
+    PI --> NORMAL[NORMAL]
+    PI --> INSUFFICIENT[INSUFFICIENT_HISTORY]
+```
 
-- **`NEW_LOW`**: El `current_price` es menor al mínimo histórico anterior (requiere que la base ya tuviera precios previos superiores).
-- **`REAL_DEAL`**: El precio es claramente inferior a la tendencia: `discount_vs_median_30d >= 15.0%`.
-- **`GOOD_PRICE`**: El precio es moderadamente inferior a la tendencia: `discount_vs_median_30d >= 5.0%`.
-- **`NORMAL`**: Sin ventaja histórica demostrable (fluctuaciones menores al 5% o precios más altos).
-- **`INSUFFICIENT_HISTORY`**: Menos de 3 observaciones o historia registrada en menos de 1 día (24 hrs). Evita generar falsos positivos por falta de datos.
+- `INSUFFICIENT_HISTORY`: Menos de 3 observaciones o < 1 día de historial.
+- `NEW_LOW`: Precio actual es inferior al mínimo histórico anterior.
+- `REAL_DEAL`: Precio actual es ≥ 15% inferior a la mediana móvil de los últimos 30 días.
+- `GOOD_PRICE`: Precio actual es ≥ 5% (pero < 15%) inferior a la mediana de 30 días.
+- `NORMAL`: No presenta ventaja histórica demostrable.
 
-## Suspicious Reference Price
+### Indicadores Flag
 
-El motor alerta (marca `is_suspicious_reference = True`) si un proveedor reporta un `original_price` (precio tachado/anunciado) exagerado.
-- **Regla**: `original_price > historical_max * 1.2`
-- Si la tienda afirma que el producto costaba \$150, pero en todo el historial registrado por DealHunter nunca superó los \$110, se levanta este flag. Esto no acusa fraude, sino que alerta una "inconsistencia con el histórico".
+DealHunter reporta advertencias adosadas al estado principal.
+- `SUSPICIOUS_REFERENCE_PRICE`: Se levanta si el "precio original" anunciado por el supermercado supera ampliamente el máximo histórico registrado para ese producto, sugiriendo inflación artificial.
 
-## Cross-Store Historical Comparison
+## Descuentos
 
-El CLI `bin/rappi-historico compare` y `deals` integran estas métricas. En la comparación multi-tienda:
-- Se agrupan productos equivalentes usando el motor de matching.
-- Se selecciona el de menor precio (`best_current_price`).
-- Se expone visualmente el `MEDIAN_30D`, `HIST_MIN` y el `VS_MEDIAN`.
-- Se expone el `STATUS` histórico.
+Los descuentos se normalizan usando fórmulas comprobables:
+- **Descuento directo**: `(1 - price / original_price) * 100`
+- **Promociones NxM**: `(1 - units_condition / promotion_value) * 100` (Ej. `2x1` = 50%, `3x2` = 33.33%)
 
-## Limitaciones
-- **Temporalidad**: La detección de anomalías depende directamente del crawling continuo. Un producto monitoreado esporádicamente puede tener `INSUFFICIENT_HISTORY`.
-- **Inflación**: La mediana a 30 días es más robusta que el promedio, pero no contempla inflación a muy largo plazo.
+El core nunca suma descuentos incompatibles y presenta el `effective_discount` priorizado.

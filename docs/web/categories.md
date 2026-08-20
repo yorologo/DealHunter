@@ -1,4 +1,6 @@
-# Categories Semantics
-- En la base inicial, `query_term` se presentaba erróneamente como categoría principal.
-- Ahora, `category_name` real proveniente del crawler (p.get("category_name")) se persiste en `products.category` (Schema v6).
-- Si no existe categoría, el sistema hace fallback a 'Uncategorized' / 'Otros'.
+# Categories
+
+La taxonomía en DealHunter proviene de `products.category` (almacenado desde v6 mediante `category_name` estructurado de API), asegurando congruencia con el proveedor.
+**No se utiliza `query_term` como taxonomía visual.**
+
+Los elementos que el proveedor categoriza nulamente se agrupan bajo el fallback visual consistente (generalmente `Otros`).

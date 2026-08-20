@@ -1,57 +1,25 @@
-# Interfaz de Línea de Comandos (CLI)
+# CLI Reference
 
-Existen dos binarios principales: el minero y el auditor de ofertas.
+DealHunter provee la lógica mediante dos binarios canónicos:
 
-## 1. `rappi-ofertas`
-El motor principal de peticiones a la Search API y volcado de base de datos.
-
-### Uso
+## `rappi-ofertas`
+Herramienta de exploración interactiva y extracciones masivas:
 ```bash
-./bin/rappi-ofertas [--vertical VERTICAL] [--lat LAT] [--lng LNG]
+bin/rappi-ofertas discover --min-discount 30
+bin/rappi-ofertas update
+bin/rappi-ofertas doctor
+bin/rappi-ofertas account status
 ```
 
-### Argumentos Reales
-* `--vertical` (str, opcional): Limita o amplía los diccionarios semilla de rastreo para evitar que alimentos dominen sobre mascotas o electrónica. Valores posibles: `general` (barre todos secuencialmente), `supermercado`, `farmacia`, `mascotas`, `bebe`, `higiene`, `hogar`, `tecnologia`. (Default: `general`).
-* `--lat` (float, opcional): Latitud geográfica del punto central de escaneo. (Default: 19.4326).
-* `--lng` (float, opcional): Longitud geográfica. (Default: -99.1332).
-* `--test` (flag, opcional): Ejecuta el vertical restringido `test_run` para validar funcionalidad técnica o DB bindings sin provocar escaneos mayores.
-
----
-
-## 2. `rappi-historico`
-Consume la base de datos local pre-rastreada para auditar precios sin conectarse a internet.
-
-### Uso
+## `rappi-historico`
+Análisis prolongado, motor de alertas, bases de datos y servicio web:
 ```bash
-./bin/rappi-historico [--min-history-days N] [--top N] [--json]
+bin/rappi-historico history
+bin/rappi-historico compare
+bin/rappi-historico watchlist list
+bin/rappi-historico alerts evaluate
+bin/rappi-historico db status
+bin/rappi-historico web --port 8765
 ```
 
-### Argumentos Reales
-* `--min-history-days` (float, opcional): Exigencia de maduración de la data antes de emitir dictamen matemático (evita validar ofertas dudosas de primer día). (Default: `1.0`).
-* `--store` (str, opcional): Filtra el motor por un `store_id` específico.
-* `--product` (str, opcional): Filtra un producto exacto a evaluar.
-* `--top` (int, opcional): Número máximo de ofertas reales a imprimir en la tabla estándar output. (Default: `50`).
-* `--json` (flag, opcional): Enmudece la salida tabular humana y deja todo impreso en `history-analysis.json`.
-
----
-
-## `restaurants`
-Descubre ofertas exclusivamente en el catálogo de restaurantes. Reutiliza el pipeline de `discover`.
-
-```bash
-rappi-ofertas restaurants --query "pizza" --min-discount 20
-```
-
-**Argumentos Adicionales:**
-* `--restaurant <nombre>`: Filtra por nombre de restaurante (funciona como alias de `--store`).
-
----
-
-## `account status`
-Consulta read-only del estado de la sesión si se provee un token vía la variable de entorno `RAPPI_BEARER_TOKEN`.
-
-> Authentication tokens are ephemeral and are never persisted by DealHunter.
-
-```bash
-RAPPI_BEARER_TOKEN="ey..." rappi-ofertas account status
-```
+Utilice el flag `--help` en terminal para listar los comandos exhaustivos operativos de v2.7.0.

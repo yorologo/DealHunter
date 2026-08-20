@@ -1,24 +1,15 @@
-# DealHunter Restaurants Experience
+# Restaurants Web Experience
 
-La fase B3 implementó una experiencia de restaurante dedicada, diferenciándola completamente del modelo de supermercado.
+La vista de restaurantes refleja las categorías y menú de forma estructurada.
 
-## Precio Base y Toppings / Modificadores
-DealHunter no puede scrapear ni indexar todas las combinaciones posibles de toppings, extras y modificadores de platillos (ej. "combo arma tu gusto").
-Por lo tanto, hemos establecido las siguientes reglas:
-- **Precio Base**: USAMOS ESTRICTAMENTE metadata estructurada del origen (has_toppings). NUNCA inferimos ni inventamos atributos por NLP/palabras clave.
-- En la interfaz, mostramos explícitamente "Precio base" y advertimos que el precio "Puede cambiar al seleccionar opciones".
-- **Histórico**: Solo se realiza y muestra análisis de inteligencia de precios para el "Precio base" capturado.
+## Modificadores y Toppings
+DealHunter emplea la bandera estricta `has_toppings` obtenida de la metadata estructurada del proveedor.
+**No se utiliza NLP, análisis de texto, ni heurísticas (como "combo", "personaliza", "elige") para deducirlo.**
 
-## Availability y Stock NULL
-A diferencia de un supermercado, los platillos de restaurante rara vez tienen inventario numérico (stock).
-- Si `stock = NULL`, no mostramos métricas numéricas engañosas ni la etiqueta "Stock detectado".
-- Nos apoyamos enteramente en el flag de disponibilidad (availability = `AVAILABLE` / `UNAVAILABLE`).
-- Los componentes visuales (ej. `dish_card`) muestran claramente el platillo atenuado (opacidad reducida) y con un badge de "Agotado / No disponible" si `availability == 'UNAVAILABLE'`.
+Cuando `has_toppings = true`, la UI advierte explícitamente: *"Precio base. Puede cambiar al seleccionar opciones."*
 
-## Promociones Soportadas
-- **Direct discount (Descuento directo)**: Promociones a nivel de platillo se muestran en el card mediante badges dedicados y tachando el precio original.
-- **Limitación Global**: DealHunter NO imputa descuentos globales (ej. envío gratis, descuentos de carrito o mínimos de orden) al precio base del platillo.
-
-## Categorías de Menú
-- Se corrigió el modelo semántico: `category_name` ahora fluye desde la API, se guarda en SQLite (`products.category`) y sirve como eje taxonómico principal.
-- Los platillos se agrupan en su vista de detalle de restaurante usando su categoría original del proveedor. Los que carecen de categoría se agrupan bajo "Otros" (Uncategorized).
+## Limitaciones Históricas
+El tracker de precios y el histórico rastrean exclusivamente el **precio base**. DealHunter no consolida:
+- Precios finales condicionados a múltiples toppings o exclusiones de menú.
+- Delivery fee (costo de envío).
+- Ratings o ETAs.

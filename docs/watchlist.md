@@ -1,12 +1,5 @@
-# Watchlist y Objetivos de Precio
+# Watchlist
 
-Puedes añadir productos a una lista de seguimiento con un objetivo de precio.
+Módulo que permite al usuario seguir entidades (`products` seguidos). Permite fijar un `target_price` empírico y sirve como el input principal para disparar `TARGET_PRICE` alerts en el CLI.
 
-**Añadir:**
-`rappi-ofertas watch add "Croquetas" --below 500`
-
-**Listar:**
-`rappi-ofertas watch list`
-
-**Eliminar:**
-`rappi-ofertas watch remove 1`
+La gestión por CLI es plenamente operativa (`rappi-historico watchlist ...`), mientras que la gestión desde UI Web está programada para ser lanzada en v2.8.

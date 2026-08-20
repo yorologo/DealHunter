@@ -45,6 +45,5 @@ erDiagram
         TEXT discount_source
         TEXT promotion_type
         TEXT promotion_label
-        TEXT query_term
     }
 ```

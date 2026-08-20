@@ -1,35 +1,18 @@
-# Configuración DealHunter
+# Configuration
 
-La configuración se guarda en `~/.config/dealhunter/config.toml` o en la ruta definida por `XDG_CONFIG_HOME`.
+DealHunter soporta configuración dinámica a nivel global y mediante perfiles específicos que priorizan overrides vía CLI.
 
-## Jerarquía
+Precedencia vigente:
+`CLI > Profile > Global (config.toml) > Default`
 
-1. CLI Arguments (Máxima prioridad)
-2. Perfil (`--profile nombre`)
-3. Global (`config.toml`)
-4. Defaults internos
+La UI de administración web presenta y clarifica el **valor efectivo** que el crawler asume al momento, junto con el **origen**.
 
-## Comandos
+## Variables de Entorno Seguras
+Para proteger secretos, no los definas en `config.toml`. 
+El token debe exportarse en terminal antes de ejecutar (Ej: `RAPPI_BEARER_TOKEN="tu_token_aqui" bin/rappi-ofertas ...`).
 
-```bash
-rappi-ofertas config show
-rappi-ofertas config set min_discount 40
-rappi-ofertas config get min_discount
-rappi-ofertas config reset
-```
-
-## Ejemplo TOML
-
-```toml
-min_discount = 30
-max_requests = 1000
-
-[profiles.despensa]
-min_discount = 40
-vertical = ["supermercado"]
-query = ["leche", "café"]
-
-[profiles.farmacia]
-vertical = ["farmacia"]
-min_discount = 50
-```
+## Ejemplos de Ajustes Seguros (`SAFE_EDITABLE`)
+- `min_discount`: Descuento mínimo aceptado (0 a 100)
+- `max_requests`: Cuota (budget) máxima de consultas HTTP por run.
+- `radius`: Cobertura del rastreador.
+- `compact`: Estilo de visualización terminal.

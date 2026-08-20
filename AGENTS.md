@@ -26,7 +26,24 @@ The project must prioritize demonstrable value, not the largest advertised disco
 
 ---
 
-## Core Principles
+## CURRENT STABLE
+
+- **Version**: v2.7.0
+- **Schema**: 7
+
+### Web Modules Status:
+- **COMPRAR**: Completado (Deals, Market, Turbo, Restaurants, Categories, Stores)
+- **INVESTIGAR**: Completado (Products, Detail, History, Compare)
+- **SEGUIR**: Watchlist y Alerts Engine operativos en Core/CLI. Interfaz web pendiente para v2.8.
+- **ADMINISTRAR**: Completado (Admin Home, Account Diagnostics, Runs, Events, Doctor, Database Backup, Settings)
+
+## Core Technical Rules Stabilized:
+- **Categories**: Structured category only (`products.category` from `category_name`), no heuristics.
+- **Toppings**: Structured `has_toppings` only, no NLP inference on names.
+- **Comparison**: Anchor compare (Precision-first, SQL limits candidates, `compute_match` decides).
+- **Formatters**: Unit-price formatter shared.
+- **Admin Network**: Admin GET is local-only (0 external requests). Network diagnostics require explicit POST.
+- **Security**: Secrets NEVER passed to templates. Config Settings allowlist (`SAFE_EDITABLE`). CSRF required for POST. DB actions limited to safe read/backup.
 
 ### 1. Local-first
 
