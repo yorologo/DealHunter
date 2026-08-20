@@ -15,8 +15,15 @@ def get_best_buys(db_path, filters, sort, page, per_page=25):
         if not r.get("current_price"): continue
         
         # apply category filter
-        if filters.get("category") and r.get("category") != filters["category"]:
-            continue
+        if filters.get("category"):
+            cats = filters["category"]
+            c = r.get("category") or "Uncategorized"
+            if isinstance(cats, list) and cats:
+                if c not in cats:
+                    continue
+            elif isinstance(cats, str) and cats:
+                if c != cats:
+                    continue
             
         # apply store_type filter
         if filters.get("store_type"):

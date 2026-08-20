@@ -71,7 +71,7 @@ def register_routes(app):
         db_path = current_app.config['DATABASE']
         page = int(request.args.get('page', 1))
         sort = request.args.get('sort', 'score')
-        category = request.args.get('category', '')
+        category = request.args.getlist('category')
         store_type = request.args.get('store_type', '')
         
         filters = {}

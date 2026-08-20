@@ -423,11 +423,25 @@ def get_catalog(db_path, filters, sort, page, per_page=25):
             params.append(filters["vertical"])
         
     if filters.get("category"):
-        if filters["category"] == "Uncategorized":
-            conds.append("(category IS NULL OR category = '')")
-        else:
-            conds.append("category = ?")
-            params.append(filters["category"])
+        cats = filters["category"]
+        if isinstance(cats, list) and cats:
+            if "Uncategorized" in cats:
+                # If Uncategorized is in the list, we need to handle NULL/empty
+                others = [c for c in cats if c != "Uncategorized"]
+                if others:
+                    conds.append(f"(category IS NULL OR category = '' OR category IN ({','.join(['?']*len(others))}))")
+                    params.extend(others)
+                else:
+                    conds.append("(category IS NULL OR category = '')")
+            else:
+                conds.append(f"category IN ({','.join(['?']*len(cats))})")
+                params.extend(cats)
+        elif cats and isinstance(cats, str):
+            if cats == "Uncategorized":
+                conds.append("(category IS NULL OR category = '')")
+            else:
+                conds.append("category = ?")
+                params.append(cats)
             
     if filters.get("only_deals"):
         conds.append("original_price > current_price")
