@@ -2,6 +2,16 @@ def calculate_discount(p):
     price = float(p.get("price") or 0)
     real_price = float(p.get("real_price") or 0)
     
+    have_discount = p.get("have_discount")
+    api_discount = p.get("discount")
+    
+    if have_discount is False:
+        # Force price to equal real_price if Rappi says there's no discount, bypassing currency glitches
+        price = real_price
+    elif api_discount is not None and float(api_discount) > 0 and real_price > 0:
+        # Reconstruct the price in the correct currency based on the official discount percentage
+        price = real_price * (1.0 - float(api_discount))
+        
     discount_price = 0.0
     if real_price > 0 and price < real_price:
         discount_price = (1 - (price / real_price)) * 100.0

@@ -212,3 +212,40 @@ def register_routes(app):
     @app.errorhandler(500)
     def internal_error(e):
         return render_template('placeholder.html', title="Error Interno", subtitle="No pudimos leer los datos.\nCódigo: DB_ERROR\nTus datos no fueron modificados.", current_path=""), 500
+
+@app.route('/api/open-rappi', methods=['POST'])
+def open_rappi():
+    store_id = request.form.get("store_id")
+    target_type = request.form.get("target_type")
+    
+    if not store_id:
+        flash("Falta ID de tienda.", "danger")
+        return redirect(request.referrer or url_for('home'))
+        
+    c = get_db().cursor()
+    c.execute("SELECT type FROM stores WHERE store_id = ?", (store_id,))
+    row = c.fetchone()
+    store_type = row[0] if row else ""
+    
+    is_restaurant = store_type in ("restaurant", "restaurants")
+    
+    # Use fallback: exact store URL since exact product URL formats vary or redirect.
+    if is_restaurant:
+        url = f"https://www.rappi.com.mx/restaurantes/{store_id}"
+    else:
+        url = f"https://www.rappi.com.mx/tiendas/{store_id}"
+        
+    # Attempt termux-open-url
+    import subprocess
+    try:
+        subprocess.run(["termux-open-url", url], check=False, timeout=3)
+    except Exception:
+        # Fallback to direct am start
+        try:
+            subprocess.run(["am", "start", "-a", "android.intent.action.VIEW", "-d", url], check=False, timeout=3)
+        except Exception:
+            pass
+            
+    # Always redirect the browser so the user doesn't get stuck on a blank page
+    return redirect(url)
+

@@ -404,7 +404,7 @@ def get_catalog(db_path, filters, sort, page, per_page=25):
     params = []
     
     if not filters.get("store"):
-        conds.append("NOT (store_type = 'restaurants' AND discount_percent > 65.0)")
+        pass # Workaround removed: conds.append("NOT (store_type = 'restaurants' AND discount_percent > 65.0)")
         
     if filters.get("store"):
         stores = filters["store"]

@@ -27,7 +27,7 @@ MOCK_TURBO_RESPONSE = {
                     "category_name": "Bebidas",
                     "price": 30.0,
                     "real_price": 40.0,
-                    "discount": 25,
+                    "discount": 0.25,
                     "in_stock": True,
                     "stock": 10,
                     "image": "coca.jpg"

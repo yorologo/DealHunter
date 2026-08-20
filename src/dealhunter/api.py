@@ -50,3 +50,47 @@ def fetch_account_profile(token):
         raise classify_error(e)
     except Exception as e:
         raise classify_error(e)
+
+def fetch_restaurant_categories(store_id):
+    import re
+    url = f"https://www.rappi.com.mx/restaurantes/{store_id}"
+    headers = {
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120.0.0.0 Safari/537.36"
+    }
+    req = urllib.request.Request(url, headers=headers, method="GET")
+    try:
+        with urllib.request.urlopen(req, timeout=15) as response:
+            html = response.read().decode('utf-8')
+            m = re.search(r'<script id="__NEXT_DATA__" type="application/json">(.*?)</script>', html)
+            if not m:
+                return {}
+            data = json.loads(m.group(1))
+            
+            # Find corridors
+            corridors = []
+            def extract_corridors(d):
+                if isinstance(d, dict):
+                    if 'corridors' in d and isinstance(d['corridors'], list):
+                        corridors.extend(d['corridors'])
+                    else:
+                        for v in d.values():
+                            extract_corridors(v)
+                elif isinstance(d, list):
+                    for v in d:
+                        extract_corridors(v)
+            
+            extract_corridors(data)
+            
+            category_map = {}
+            for c in corridors:
+                cat_name = c.get("name", "")
+                if not cat_name:
+                    continue
+                for p in c.get("products", []):
+                    pid = p.get("id") or p.get("product_id")
+                    if pid:
+                        category_map[str(pid)] = cat_name
+            return category_map
+    except Exception as e:
+        return {}
