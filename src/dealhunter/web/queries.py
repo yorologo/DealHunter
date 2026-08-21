@@ -418,6 +418,8 @@ def get_catalog(db_path, filters, sort, page, per_page=25):
     if filters.get("vertical"):
         if filters["vertical"] == "turbo":
             conds.append("store_type IN ('chiper_home', 'chiper_extended', 'chiper_express')")
+        elif filters["vertical"] == "market":
+            conds.append("store_type NOT IN ('chiper_home', 'chiper_extended', 'chiper_express', 'restaurants')")
         else:
             conds.append("store_type = ?")
             params.append(filters["vertical"])
@@ -797,6 +799,8 @@ def get_available_stores(db_path, vertical=None):
     if vertical:
         if vertical == "turbo":
             c.execute("SELECT store_id, name FROM stores WHERE type IN ('chiper_home', 'chiper_extended', 'chiper_express') ORDER BY name")
+        elif vertical == "market":
+            c.execute("SELECT store_id, name FROM stores WHERE type NOT IN ('chiper_home', 'chiper_extended', 'chiper_express', 'restaurants') ORDER BY name")
         else:
             c.execute("SELECT store_id, name FROM stores WHERE type = ? ORDER BY name", (vertical,))
     else:
@@ -811,6 +815,8 @@ def get_available_categories(db_path, vertical=None, store_ids=None):
     if vertical:
         if vertical == "turbo":
             query += " AND s.type IN ('chiper_home', 'chiper_extended', 'chiper_express')"
+        elif vertical == "market":
+            query += " AND s.type NOT IN ('chiper_home', 'chiper_extended', 'chiper_express', 'restaurants')"
         else:
             query += " AND s.type = ?"
             params.append(vertical)

@@ -3,7 +3,7 @@
 import sqlite3
 import json
 import math
-from datetime import datetime
+from datetime import datetime, timezone
 
 
 def get_runs_paginated(db_path, page=1, per_page=20, status_filter=None):
@@ -42,6 +42,8 @@ def get_runs_paginated(db_path, page=1, per_page=20, status_filter=None):
         run['duration'] = _calc_duration(run.get('started_at'), run.get('finished_at'))
         # Parse vertical for summary info
         run['vertical_name'] = _parse_vertical_name(run.get('vertical'))
+        # Convert to local time for display
+        run['started_at'] = _utc_to_local_str(run.get('started_at'))
         runs.append(run)
 
     return runs, total_pages, total
@@ -75,6 +77,11 @@ def get_run_detail(db_path, run_id):
     # Count distinct stores
     c.execute("SELECT COUNT(DISTINCT store_id) FROM observations WHERE run_id = ?", (run_id,))
     run['store_count'] = c.fetchone()[0]
+
+    # Convert times to local for display
+    run['started_at'] = _utc_to_local_str(run.get('started_at'))
+    if run.get('finished_at'):
+        run['finished_at'] = _utc_to_local_str(run.get('finished_at'))
 
     # Parse vertical data
     if run.get('vertical'):
@@ -134,7 +141,7 @@ def get_events(db_path, page=1, per_page=50):
 
         events.append({
             "run_id": run_id,
-            "started_at": started_at,
+            "started_at": _utc_to_local_str(started_at),
             "status": status,
             "severity": severity,
             "error_code": error_code,
@@ -246,3 +253,16 @@ def _parse_vertical_name(vertical_json):
         return None
     except (json.JSONDecodeError, TypeError):
         return vertical_json if isinstance(vertical_json, str) and len(vertical_json) < 30 else None
+
+
+def _utc_to_local_str(timestamp_str):
+    """Convert UTC timestamp string to local timezone string."""
+    if not timestamp_str:
+        return None
+    try:
+        dt = datetime.fromisoformat(str(timestamp_str).replace("Z", ""))
+        # Assume naive strings from DB are UTC
+        dt = dt.replace(tzinfo=timezone.utc)
+        return dt.astimezone().strftime("%Y-%m-%d %H:%M:%S")
+    except (ValueError, TypeError):
+        return timestamp_str

@@ -35,7 +35,7 @@ def get_best_buys(db_path, filters, sort, page, per_page=25):
                 if r_st not in ("chiper_home", "chiper_extended", "chiper_express"):
                     continue
             elif st == "market":
-                if r_st != "market":
+                if r_st in ("chiper_home", "chiper_extended", "chiper_express", "restaurants"):
                     continue
             elif st == "restaurants":
                 if r_st != "restaurants":

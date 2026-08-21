@@ -41,4 +41,4 @@ def create_app(test_config=None):
 
 def run_server(port=8765, debug=False):
     app = create_app()
-    app.run(host='127.0.0.1', port=port, debug=debug)
+    app.run(host='0.0.0.0', port=port, debug=debug)
