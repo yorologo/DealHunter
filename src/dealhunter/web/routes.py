@@ -83,7 +83,8 @@ def register_routes(app):
         if request.headers.get('HX-Request') and not request.headers.get('HX-Boosted'):
             return render_template('partials/catalog_grid.html', data=data, view_mode=request.cookies.get('view_mode', 'cards'), is_best_buys=True)
             
-        return render_template('best.html', data=data, sort=sort, filters={"category": category, "store_type": store_type}, current_path='/best', is_best_buys=True)
+        av_cats = get_available_categories(db_path, store_type if store_type else None)
+        return render_template('best.html', data=data, sort=sort, filters={"category": category, "store_type": store_type}, av_cats=av_cats, current_path='/best', is_best_buys=True)
 
 
     @app.route('/deals')
@@ -129,9 +130,22 @@ def register_routes(app):
         data = get_catalog(db_path, filters, sort, page)
         if request.headers.get('HX-Request') and not request.headers.get('HX-Boosted'):
             return render_template('partials/catalog_grid.html', data=data, view_mode=request.cookies.get('view_mode', 'cards'))
-        return render_template('catalog.html', data=data, sort=sort, filters=filters, title="Rappi Turbo", current_path='/turbo', emoji="⚡")
+        av_stores = get_available_stores(db_path, "turbo")
+        av_cats = get_available_categories(db_path, "turbo", store)
+        return render_template('catalog.html', data=data, sort=sort, filters=filters, av_stores=av_stores, av_cats=av_cats, title="Rappi Turbo", current_path='/turbo', emoji="⚡")
         
+
+    @app.route('/partials/categories')
+    def partial_categories():
+        db_path = current_app.config['DATABASE']
+        store = request.args.getlist('store')
+        vertical = request.args.get('vertical', 'market')
+        av_cats = get_available_categories(db_path, vertical, store)
+        formatted_cats = [{'id': c, 'name': c} for c in av_cats]
+        return render_template('partials/multiselect_options.html', options=formatted_cats, name='category', selected_values=request.args.getlist('category'))
+
     @app.route('/categories')
+
     def categories():
         db_path = current_app.config['DATABASE']
         cats = get_categories(db_path)
@@ -142,11 +156,16 @@ def register_routes(app):
         db_path = current_app.config['DATABASE']
         page = int(request.args.get('page', 1))
         sort = request.args.get('sort', 'opportunity')
+        store = request.args.getlist('store')
         filters = {"category": category}
+        if store: filters["store"] = store
+        if request.args.get('only_deals'): filters['only_deals'] = True
         data = get_catalog(db_path, filters, sort, page)
         if request.headers.get('HX-Request') and not request.headers.get('HX-Boosted'):
             return render_template('partials/catalog_grid.html', data=data, view_mode=request.cookies.get('view_mode', 'cards'))
-        return render_template('catalog.html', data=data, sort=sort, filters=filters, title=f"Categoría: {category}", current_path='/categories', emoji="📦")
+        av_stores = get_available_stores(db_path)
+        av_cats = get_available_categories(db_path, None, store)
+        return render_template('catalog.html', data=data, sort=sort, filters=filters, av_stores=av_stores, av_cats=av_cats, title=f"Categoría: {category}", current_path='/categories', emoji="📦")
         
     @app.route('/stores')
     def stores():
@@ -189,7 +208,9 @@ def register_routes(app):
         if request.headers.get('HX-Request'):
             return render_template('partials/catalog_grid.html', data=data, current_path='/restaurants')
             
-        return render_template('catalog.html', data=data, sort=sort, filters=filters, title="Restaurantes", current_path='/restaurants', emoji="🍔")
+        av_stores = get_available_stores(db_path, "restaurants")
+        av_cats = get_available_categories(db_path, "restaurants", store)
+        return render_template('catalog.html', data=data, sort=sort, filters=filters, av_stores=av_stores, av_cats=av_cats, title="Restaurantes", current_path='/restaurants', emoji="🍔")
         
     @app.route('/restaurants/<store_id>')
     def restaurant_detail(store_id):

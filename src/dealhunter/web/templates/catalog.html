@@ -20,6 +20,7 @@
         <div class="card shadow-sm border-0">
             <div class="card-body">
                 <form id="filter-form" hx-get="{{ current_path }}" hx-target="#catalog-grid" hx-push-url="true" class="row g-3 align-items-end">
+                    {% if filters.vertical %}<input type="hidden" name="vertical" value="{{ filters.vertical }}">{% endif %}
                     <div class="col-md-3">
                         <label class="form-label small text-secondary fw-bold">Ordenar por</label>
                         <select name="sort" class="form-select form-select-sm" onchange="document.getElementById('filter-form').dispatchEvent(new Event('submit'))">
