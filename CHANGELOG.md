@@ -14,6 +14,16 @@
 - fix: Elimination of hardcoded 65% discount arbitrary limits
 - fix: Structured taxonomy enforcement and robust URL fallback resolution
 
+## [2.8.1] - 2026-08-21
+
+### Background Runtime
+- DealHunter Web adquiere automáticamente Termux Wake Lock al iniciar
+- mantiene mejor el servidor activo cuando Termux está en segundo plano
+- libera el wake lock en cierre limpio (Nota: esto es global para Termux y podría afectar a otros procesos si ya tenían el lock)
+- Doctor muestra el estado de Background Runtime
+- no altera automáticamente Doze/AppOps
+- Android aún puede matar el proceso por presión extrema de memoria (OOM)
+
 ## [2.8.0] - 2026-08-21
 
 ### Catalog Sync
