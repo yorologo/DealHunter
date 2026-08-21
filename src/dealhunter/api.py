@@ -3,14 +3,17 @@ import urllib.error
 import json
 from .errors import DealHunterError, classify_error
 
-def fetch_unified_search(query, lat, lng):
+def fetch_unified_search(query, lat, lng, auth_token=None):
     url = "https://services.mxgrability.rappi.com/api/pns-global-search-api/v1/unified-search"
     payload = json.dumps({"query": query, "lat": lat, "lng": lng, "limit": 1000}).encode('utf-8')
     headers = {
         "Accept": "application/json",
         "Content-Type": "application/json",
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120.0.0.0 Safari/537.36"
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120.0.0.0 Safari/537.36",
+        "Origin": "https://www.rappi.com.mx"
     }
+    if auth_token:
+        headers["Authorization"] = f"Bearer {auth_token}"
     req = urllib.request.Request(url, data=payload, headers=headers, method='POST')
     try:
         with urllib.request.urlopen(req, timeout=15) as response:

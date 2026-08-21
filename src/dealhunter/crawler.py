@@ -7,11 +7,11 @@ from .errors import DealHunterError, classify_error
 from .checkpoint import RunCheckpoint, save_checkpoint
 
 VERTICALS = {
-    "supermercado": ["super", "mercado", "oferta", "descuento", "2x1", "soriana", "fresko", "calii", "costco", "chedraui", "city market", "abastos"],
-    "farmacia": ["farmacia", "medicamentos", "vitaminas", "suplementos", "pastillas", "jarabe", "similares", "condesa", "guadalajara", "farmatodo", "benavides"],
+    "supermercado": ["super", "mercado", "oferta", "descuento", "2x1", "soriana", "fresko", "calii", "costco", "chedraui", "city market", "abastos", "mercado y abarrotes", "bebidas", "abarrotes"],
+    "farmacia": ["farmacia", "medicamentos", "vitaminas", "suplementos", "pastillas", "jarabe", "similares", "condesa", "guadalajara", "farmatodo", "benavides", "cuidado digestivo", "salud sexual", "dolor e inflamacion", "gripa y alergias", "salud nutricional", "dermocosmetica", "salud visual", "cuidado de la piel", "cuidado oral", "botiquin"],
     "mascotas": ["mascotas", "perro", "gato", "croquetas", "petco", "maskota"],
-    "bebe": ["bebe", "pañales", "formula", "biberon", "toallitas", "papilla"],
-    "higiene": ["higiene", "jabon", "shampoo", "desodorante", "pasta dental", "crema", "bed bath", "lush", "l'occitane", "sally beauty"],
+    "bebe": ["bebe", "pañales", "formula", "biberon", "toallitas", "papilla", "cuidado del bebe", "infantil"],
+    "higiene": ["higiene", "jabon", "shampoo", "desodorante", "pasta dental", "crema", "bed bath", "lush", "l'occitane", "sally beauty", "cuidado personal", "cuidado del cabello", "aseo personal"],
     "hogar": ["hogar", "limpieza", "detergente", "limpiador", "escoba", "suavizante"],
     "tecnologia": ["tecnologia", "cables", "audifonos", "usb", "electronica", "macstore", "lumen", "radioshack"],
     "express": ["miniso", "office depot", "officemax", "papeleria", "libreria", "gandhi", "sanborns", "fantasias miguel", "lego", "juguetron", "juguetes", "regalos"],

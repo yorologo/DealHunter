@@ -44,9 +44,9 @@ The project must prioritize demonstrable value, not the largest advertised disco
 - **Formatters**: Unit-price formatter shared.
 - **Admin Network**: Admin GET is local-only (0 external requests). Network diagnostics require explicit POST.
 - **Security**: Secrets NEVER passed to templates. Config Settings allowlist (`SAFE_EDITABLE`). CSRF required for POST. DB actions limited to safe read/backup.
+- **Rappi navigation & Catalog Fetching**: Resolve `store_id` and type server-side. While the verified `gbrappi` exact-store contract through Shizuku is used for native navigation, **web fallbacks (e.g., www.rappi.com.mx/tiendas/...) ARE allowed and encouraged** specifically to extract full store catalogs and ensure 100% inventory coverage.
+- **Security**: Secrets NEVER passed to templates. Config Settings allowlist (`SAFE_EDITABLE`). CSRF required for POST. DB actions limited to safe read/backup.
 - **Location context**: Crawls require explicit `lat/lng` from CLI/profile/global config. Never restore a hardcoded city fallback. Persist provenance once per `runs` row; a significant change warns and preserves history until an explicit, backed-up decision.
-- **Rappi navigation**: Resolve `store_id` and type server-side, use the verified `gbrappi` exact-store contract through Shizuku, and keep `com.grability.rappi` fixed. Browser, website and Home fallbacks are forbidden. Unsupported types fail closed.
-- **UI/OCR boundary**: Android hierarchy, screenshots or OCR may support account/zone diagnostics and manual navigation verification only. They are not a normal product/price crawler and temporary sensitive artifacts must be discarded.
 
 ### 1. Local-first
 
@@ -70,17 +70,24 @@ It must not:
 
 ### 3. Privacy by design
 
-Never persist:
-
+Never persist without explicit user consent:
 - passwords;
-- authentication tokens;
 - cookies;
 - Authorization headers;
-- session secrets;
 - payment data;
 - addresses;
 - sensitive account identifiers;
 - unnecessary personal data.
+
+DealHunter MAY persist user-authorized Rappi session credentials locally when:
+1. the user explicitly requests it;
+2. the UI warns that a credential will be stored locally;
+3. it is protected using the project's secure secret-storage abstraction;
+4. it is never exposed after storage (templates, logs, database, backups);
+5. it can be easily deleted or replaced;
+6. it never enters Git, SQLite, config.toml, or general backups.
+
+Environment-only ephemeral sessions (RAPPI_BEARER_TOKEN) remain supported but are no longer mandatory.
 
 Account information may only be queried when explicitly useful for diagnostics/context.
 
@@ -91,7 +98,8 @@ query
 → display
 → discard
 
-Do not persist account data.
+Account diagnostic data follows query → sanitize → display → discard.
+Session credentials follow the secure secret-storage policy above.
 
 ### 4. Explainable results
 
@@ -434,7 +442,8 @@ Desired output may include:
 - membership status;
 - last successful run.
 
-Never persist sensitive account information.
+Account diagnostic data must not be persisted.
+Session credentials may be persisted through the secure secret-storage system with explicit user consent.
 
 ---
 
@@ -1101,7 +1110,11 @@ Never expose or persist:
 - device identifiers
 - sensitive account IDs
 
-Do not provide a web form for persistently saving a Rappi bearer token.
+The web interface MAY provide a form for importing a Rappi session when:
+- it uses POST + CSRF + input type=password;
+- the user sees an explicit consent warning before storage;
+- the token is discarded from memory immediately after processing;
+- it is never repopulated, cached in browser storage, or placed in URLs.
 
 Account network diagnostics must be explicit/opt-in.
 
@@ -1223,7 +1236,8 @@ CLI
 > Global config
 > Internal defaults
 
-Never allow secrets/tokens to be persisted through web configuration.
+Secrets/tokens must never be persisted through the general web configuration/settings system.
+Session credentials use a dedicated secure secret-storage abstraction separate from config.toml.
 
 ## View Preferences
 
@@ -1878,7 +1892,11 @@ Never expose or persist:
 - device identifiers
 - sensitive account IDs
 
-Do not provide a web form for persistently saving a Rappi bearer token.
+The web interface MAY provide a form for importing a Rappi session when:
+- it uses POST + CSRF + input type=password;
+- the user sees an explicit consent warning before storage;
+- the token is discarded from memory immediately after processing;
+- it is never repopulated, cached in browser storage, or placed in URLs.
 
 Account network diagnostics must be explicit/opt-in.
 
@@ -2000,7 +2018,8 @@ CLI
 > Global config
 > Internal defaults
 
-Never allow secrets/tokens to be persisted through web configuration.
+Secrets/tokens must never be persisted through the general web configuration/settings system.
+Session credentials use a dedicated secure secret-storage abstraction separate from config.toml.
 
 ## View Preferences
 
@@ -2652,7 +2671,11 @@ Never expose or persist:
 - device identifiers
 - sensitive account IDs
 
-Do not provide a web form for persistently saving a Rappi bearer token.
+The web interface MAY provide a form for importing a Rappi session when:
+- it uses POST + CSRF + input type=password;
+- the user sees an explicit consent warning before storage;
+- the token is discarded from memory immediately after processing;
+- it is never repopulated, cached in browser storage, or placed in URLs.
 
 Account network diagnostics must be explicit/opt-in.
 
@@ -2774,7 +2797,8 @@ CLI
 > Global config
 > Internal defaults
 
-Never allow secrets/tokens to be persisted through web configuration.
+Secrets/tokens must never be persisted through the general web configuration/settings system.
+Session credentials use a dedicated secure secret-storage abstraction separate from config.toml.
 
 ## View Preferences
 
