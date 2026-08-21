@@ -8,16 +8,18 @@ from .checkpoint import RunCheckpoint, save_checkpoint
 
 VERTICALS = {
     "supermercado": ["super", "mercado", "oferta", "descuento", "2x1", "soriana", "fresko", "calii", "costco", "chedraui", "city market", "abastos"],
-    "farmacia": ["farmacia", "medicamentos", "vitaminas", "suplementos", "pastillas", "jarabe", "similares", "condesa"],
+    "farmacia": ["farmacia", "medicamentos", "vitaminas", "suplementos", "pastillas", "jarabe", "similares", "condesa", "guadalajara", "farmatodo", "benavides"],
     "mascotas": ["mascotas", "perro", "gato", "croquetas", "petco", "maskota"],
     "bebe": ["bebe", "pañales", "formula", "biberon", "toallitas", "papilla"],
     "higiene": ["higiene", "jabon", "shampoo", "desodorante", "pasta dental", "crema", "bed bath", "lush", "l'occitane", "sally beauty"],
     "hogar": ["hogar", "limpieza", "detergente", "limpiador", "escoba", "suavizante"],
     "tecnologia": ["tecnologia", "cables", "audifonos", "usb", "electronica", "macstore", "lumen", "radioshack"],
     "express": ["miniso", "office depot", "officemax", "papeleria", "libreria", "gandhi", "sanborns", "fantasias miguel", "lego", "juguetron", "juguetes", "regalos"],
-    "especialidad": ["dulceria", "dulces", "chocolate", "panaderia", "pasteleria", "pescaderia", "carniceria", "gnc", "toyo foods", "naturista", "organica", "nespresso", "crepa", "snacks"],
+    "especialidad": ["dulceria", "dulces", "chocolate", "panaderia", "pasteleria", "pescaderia", "carniceria", "gnc", "toyo foods", "naturista", "organica", "nespresso", "crepa", "snacks", "erectus", "be loving", "de la rosa", "sirilo"],
     "turbo": ["turbo", "turbo fresh", "express", "despensa turbo"],
     "restaurants": ["hamburguesa", "pizza", "sushi", "tacos", "ensalada", "pollo"],
+    "conveniencia": ["oxxo", "7 eleven", "conveniencia"],
+    "licores": ["licores", "vinos", "cerveza", "tequila", "la playa"],
     "test_run": ["frutarindo"]
 }
 
