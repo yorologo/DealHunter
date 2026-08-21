@@ -3107,3 +3107,6 @@ Do not block the web implementation on:
 - AI/LLM matching
 
 These remain future work unless explicitly requested.
+
+
+- **Android Background**: DealHunter attempts to acquire `termux-wake-lock` automatically during web server initialization to prevent Android from pausing it. No intrusive AppOps changes should be made automatically.

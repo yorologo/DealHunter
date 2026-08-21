@@ -6,6 +6,7 @@ import sqlite3
 
 from .db import get_default_db_path, db_integrity
 from .config import load_config, get_config_path
+from .termux import is_termux, is_wake_lock_active
 
 
 def run_doctor(conn=None, db_path=None, check_network=False):
@@ -41,6 +42,7 @@ def run_doctor(conn=None, db_path=None, check_network=False):
 
     # 9. Providers
     checks.extend(_check_providers(check_network))
+    checks.extend(_check_background_runtime())
 
     return checks
 
@@ -285,4 +287,23 @@ def _check_session_storage():
             "reason": str(e),
             "action": "Check secret_store module"
         })
+
+
+def _check_background_runtime():
+    if not is_termux():
+        return [("Background Runtime", "N/A (Not Termux)", None)]
+        
+    status = "OK"
+    detail = None
+    
+    # We can't cleanly check Doze status without root/shizuku, so we rely on Wake Lock.
+    # Note: Doctor might be run from CLI where web isn't running, but for Admin -> Doctor, web IS running.
+    if is_wake_lock_active():
+        wake_status = "ACTIVE"
+    else:
+        wake_status = "INACTIVE"
+        status = "WARNING"
+        detail = "Android puede pausar DealHunter cuando Termux está en segundo plano. Usa: termux-wake-lock"
+        
+    return [("Background Runtime (Termux)", status, detail), ("Wake Lock", wake_status, None)]
 

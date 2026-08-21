@@ -99,3 +99,7 @@ El índice completo de documentación, cubriendo arquitectura, flujos de datos, 
 ## Licencia
 
 [MIT](LICENSE)
+
+
+### Ejecución en Segundo Plano (Android)
+Para mantener DealHunter Web activo en Android/Termux, DealHunter utiliza `termux-wake-lock` automáticamente cuando está disponible. Si Android sigue suspendiendo la aplicación, verifica la sección de troubleshooting.

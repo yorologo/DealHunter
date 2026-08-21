@@ -14,3 +14,6 @@ Es una acción explícita (opt-in) que verifica la conectividad hacia los servic
 - Desde la Web, requiere presionar un botón que dispara un `POST` con protección CSRF.
 - Respeta límites de Cloudflare (HTTP 429) y Timeout.
 - No incluye reintentos infinitos ni evasión de rate limits.
+
+
+- **Background Runtime (Termux)**: Verifica si Termux está activo y si `termux-wake-lock` está habilitado. Si se encuentra inactivo, advierte que Android puede pausar DealHunter.

@@ -22,3 +22,10 @@
 ### `SQLite Database Locked`
 **Causa:** Corriste `rappi-ofertas` o `rappi-historico` simultáneamente en varias terminales hacia el mismo archivo de base de datos.
 **Solución Real:** El script actual usa conectores que confían en writes secuenciales monohilo. Cancela los procesos concurrentes y mantén un solo cron.
+
+
+### DealHunter Web se congela en segundo plano (Android)
+Android puede pausar DealHunter cuando Termux pasa a segundo plano.
+DealHunter intenta usar `termux-wake-lock` de manera automática al iniciar `bin/rappi-historico web`.
+Si el problema persiste, puedes verificar el estado en **Admin -> Doctor**.
+Como alternativa manual, asegúrate de deshabilitar la optimización de batería para Termux (Doze).

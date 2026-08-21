@@ -4,6 +4,7 @@ from flask import Flask, session, request, abort, g, current_app
 from dealhunter.db import get_default_db_path
 from dealhunter.web.routes import register_routes
 from dealhunter.web.admin import admin_bp
+from dealhunter.termux import acquire_wake_lock, release_wake_lock, is_termux
 
 def create_app(test_config=None):
     app = Flask(__name__, instance_relative_config=True)
@@ -41,4 +42,17 @@ def create_app(test_config=None):
 
 def run_server(port=8765, debug=False):
     app = create_app()
-    app.run(host='127.0.0.1', port=port, debug=debug)
+    
+    # Termux background persistence
+    if is_termux():
+        if acquire_wake_lock():
+            print("[*] Acquired Termux Wake Lock for background runtime.")
+        else:
+            print("[!] Could not acquire Termux Wake Lock. App may be paused in background.")
+            
+    try:
+        app.run(host='127.0.0.1', port=port, debug=debug)
+    finally:
+        if is_termux():
+            release_wake_lock()
+            print("[*] Released Termux Wake Lock.")
