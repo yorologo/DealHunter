@@ -9,7 +9,7 @@ from .output import print_results
 from .doctor import run_doctor, format_doctor_output
 from datetime import datetime
 
-VERSION = "2.7.0"
+VERSION = "2.8.0"
 LOCATION_CHANGE_WARNING_METERS = 500.0
 
 

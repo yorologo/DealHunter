@@ -14,6 +14,37 @@
 - fix: Elimination of hardcoded 65% discount arbitrary limits
 - fix: Structured taxonomy enforcement and robust URL fallback resolution
 
+## [2.8.0] - 2026-08-21
+
+### Catalog Sync
+- authenticated catalog synchronization
+- Admin Web setup
+- status/onboarding
+- explicit network actions
+- Market and Turbo support
+- partial/error behavior
+
+### Session Management
+- temporary sessions
+- environment sessions
+- encrypted persistent sessions
+- replace/delete
+- expired status
+- explicit consent
+- SecretStore
+- FAIL CLOSED
+
+### Security
+- no plaintext fallback
+- secret isolation
+- test sandboxing
+- filesystem permissions (0600)
+
+### Reliability
+- auth CLI repair
+- expanded tests
+- clean CI dependency installation
+
 ## [2.7.0] - 2026-08-20
 - feat: DealHunter Administration Web Interface
 - feat: Admin Home with live metrics and system health
