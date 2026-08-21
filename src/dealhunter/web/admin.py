@@ -133,6 +133,38 @@ def runs():
                            current_path='/admin/runs')
 
 
+@admin_bp.route('/runs/start', methods=['POST'])
+def runs_start():
+    """Manually start the crawler (discover general)."""
+    import subprocess
+    import sys
+    try:
+        db_path = current_app.config['DATABASE']
+        project_root = os.path.dirname(os.path.abspath(db_path))
+        
+        subprocess.run(
+            [sys.executable, "-m", "dealhunter", "discover", "--vertical", "general"],
+            cwd=project_root,
+            capture_output=True,
+            text=True,
+            check=False
+        )
+    except Exception as e:
+        print(f"Error starting crawler from web: {e}", file=sys.stderr)
+        
+    page = 1
+    per_page = 20
+    status_filter = request.args.get('status', None)
+    runs_data, total_pages, total = get_runs_paginated(
+        db_path, page, per_page, status_filter
+    )
+    return render_template('admin/partials/runs_table.html',
+                           runs=runs_data, page=page,
+                           total_pages=total_pages, total=total,
+                           status_filter=status_filter)
+
+
+
 @admin_bp.route('/runs/<run_id>')
 def run_detail(run_id):
     """Run detail view."""
@@ -345,3 +377,197 @@ def settings_update():
         return render_template('admin/partials/settings_result.html',
                                success=False,
                                message=f"Error al guardar: {e}")
+
+
+# ──────────────────────────────────
+#  Catalog Sync — Session Management
+# ──────────────────────────────────
+
+@admin_bp.route('/catalog-sync')
+def catalog_sync():
+    """Catalog Sync dashboard with session status."""
+    from dealhunter.secret_store import SessionService
+    svc = SessionService()
+    status = svc.get_status()
+
+    # Format stored_at timestamp
+    stored_at_str = None
+    if status.get('stored_at'):
+        import datetime
+        stored_at_str = datetime.datetime.fromtimestamp(
+            status['stored_at']
+        ).strftime('%d %b %Y %H:%M')
+
+    return render_template('admin/catalog_sync.html',
+                           current_path='/admin/catalog-sync',
+                           mode=status['mode'],
+                           session_ready=status.get('configured', False),
+                           stored_at=stored_at_str,
+                           encryption_method=status.get('encryption_method'),
+                           valid=status.get('valid'),
+                           warnings=status.get('warnings', []))
+
+
+@admin_bp.route('/catalog-sync/session/store', methods=['POST'])
+def session_store():
+    """Store or update the Rappi session token."""
+    from dealhunter.secret_store import SessionService
+    token = request.form.get('token', '').strip()
+    mode = request.form.get('session_mode', 'persistent')
+
+    if not token:
+        return _session_status_response(
+            flash_message="No se proporcionó un token.",
+            flash_success=False
+        )
+
+    svc = SessionService()
+
+    if mode == 'persistent':
+        success = svc.store_persistent(token)
+        if not success:
+            return _session_status_response(
+                flash_message="Error al guardar la sesión cifrada.",
+                flash_success=False
+            )
+    else:
+        svc.store_temporary(token)
+
+    # Discard token from memory immediately
+    token = None  # noqa: F841
+
+    return _session_status_response(
+        flash_message="Sesión configurada correctamente.",
+        flash_success=True
+    )
+
+
+@admin_bp.route('/catalog-sync/session/delete', methods=['POST'])
+def session_delete():
+    """Delete the stored session."""
+    from dealhunter.secret_store import SessionService
+    svc = SessionService()
+    svc.delete()
+
+    # Also clean up legacy session.json if it exists
+    import os
+    legacy = os.path.expanduser('~/.config/dealhunter/session.json')
+    if os.path.exists(legacy):
+        try:
+            os.remove(legacy)
+        except Exception:
+            pass
+
+    return _session_status_response(
+        flash_message="Sesión eliminada.",
+        flash_success=True
+    )
+
+
+@admin_bp.route('/catalog-sync/session/check', methods=['POST'])
+def session_check():
+    """Validate the current session against Rappi API."""
+    from dealhunter.secret_store import SessionService
+    svc = SessionService()
+    token = svc.get_token()
+
+    if not token:
+        return _session_status_response(
+            flash_message="No hay sesión configurada para comprobar.",
+            flash_success=False
+        )
+
+    # Try a lightweight API call to validate
+    try:
+        from dealhunter.api import fetch_unified_search
+        result = fetch_unified_search("test", 19.4326, -99.1332, auth_token=token)
+        if result == "RATE_LIMIT":
+            return _session_status_response(
+                flash_message="Rate limit alcanzado. Intenta más tarde.",
+                flash_success=False
+            )
+        return _session_status_response(
+            flash_message="Sesión válida ✓",
+            flash_success=True,
+            valid=True
+        )
+    except Exception as e:
+        err = str(e)
+        if '401' in err or '403' in err:
+            svc.mark_expired()
+            return _session_status_response(
+                flash_message="La sesión no es válida o ha expirado.",
+                flash_success=False
+            )
+        if '429' in err:
+            return _session_status_response(
+                flash_message="Rate limit (HTTP 429). Intenta más tarde.",
+                flash_success=False
+            )
+        return _session_status_response(
+            flash_message=f"Error de conexión: {err}",
+            flash_success=False
+        )
+
+
+@admin_bp.route('/catalog-sync/run', methods=['POST'])
+def catalog_sync_run():
+    """Trigger a catalog sync run."""
+    from dealhunter.secret_store import SessionService
+    svc = SessionService()
+    token = svc.get_token()
+
+    if not token:
+        return '<div class="alert alert-danger">No hay sesión configurada.</div>'
+
+    try:
+        import asyncio
+        from dealhunter.catalog_sync import run_sync
+        import sqlite3
+        db_path = current_app.config['DATABASE']
+        conn = sqlite3.connect(db_path)
+
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        try:
+            status, report = loop.run_until_complete(
+                run_sync(None, 19.4326, -99.1332, conn, None)
+            )
+        finally:
+            loop.close()
+            conn.close()
+
+        return f'''<div class="alert alert-success">
+            <strong>Sincronización completada</strong><br>
+            Comercios procesados: {report.merchants_completed}/{report.merchants_attempted}<br>
+            Productos únicos extraídos: {report.items_unique}
+        </div>'''
+    except Exception as e:
+        return f'<div class="alert alert-danger">Error: {escape(str(e))}</div>'
+
+
+def _session_status_response(flash_message=None, flash_success=True, valid=None):
+    """Helper to render session status partial with flash message."""
+    from dealhunter.secret_store import SessionService
+    import datetime
+
+    svc = SessionService()
+    status = svc.get_status()
+
+    stored_at_str = None
+    if status.get('stored_at'):
+        stored_at_str = datetime.datetime.fromtimestamp(
+            status['stored_at']
+        ).strftime('%d %b %Y %H:%M')
+
+    if valid is not None:
+        status['valid'] = valid
+
+    return render_template('admin/partials/session_status.html',
+                           mode=status['mode'],
+                           stored_at=stored_at_str,
+                           encryption_method=status.get('encryption_method'),
+                           valid=status.get('valid'),
+                           warnings=status.get('warnings', []),
+                           flash_message=flash_message,
+                           flash_success=flash_success)

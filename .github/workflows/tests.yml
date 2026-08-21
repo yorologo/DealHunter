@@ -18,7 +18,7 @@ jobs:
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install flask pytest
+        pip install flask pytest cryptography
     - name: Run offline tests
       run: |
         PYTHONPATH=src pytest

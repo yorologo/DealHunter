@@ -1,0 +1,134 @@
+{# Session status partial — loaded via HTMX into #session-status #}
+
+{% if mode == 'NOT_CONFIGURED' %}
+<div class="card shadow-sm border-warning">
+    <div class="card-body">
+        <div class="d-flex align-items-center mb-3">
+            <span class="fs-4 me-2">⚠</span>
+            <h5 class="card-title mb-0">Sesión Rappi no configurada</h5>
+        </div>
+        <p class="text-muted">Catalog Sync necesita una sesión válida de Rappi para consultar los catálogos disponibles para tu cuenta.</p>
+        <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#sessionModal">
+            Configurar sesión
+        </button>
+    </div>
+</div>
+
+{% elif mode == 'EXPIRED' %}
+<div class="card shadow-sm border-danger">
+    <div class="card-body">
+        <div class="d-flex align-items-center mb-3">
+            <span class="fs-4 me-2">⚠</span>
+            <h5 class="card-title mb-0 text-danger">Tu sesión de Rappi parece haber expirado</h5>
+        </div>
+        <p class="text-muted">La sesión guardada ya no es válida. Necesitas actualizarla para continuar usando Catalog Sync.</p>
+        <button class="btn btn-warning" data-bs-toggle="modal" data-bs-target="#sessionModal">
+            Actualizar sesión
+        </button>
+        <button class="btn btn-outline-danger ms-2" data-bs-toggle="modal" data-bs-target="#deleteModal">
+            Eliminar sesión
+        </button>
+    </div>
+</div>
+
+{% elif mode == 'CORRUPTED' %}
+<div class="card shadow-sm border-danger">
+    <div class="card-body">
+        <div class="d-flex align-items-center mb-3">
+            <span class="fs-4 me-2">❌</span>
+            <h5 class="card-title mb-0 text-danger">Almacenamiento de sesión corrupto</h5>
+        </div>
+        <p class="text-muted">El archivo de sesión cifrado no se pudo leer. Puedes configurar una nueva sesión.</p>
+        <button class="btn btn-warning" data-bs-toggle="modal" data-bs-target="#sessionModal">
+            Configurar nueva sesión
+        </button>
+        <button class="btn btn-outline-danger ms-2" data-bs-toggle="modal" data-bs-target="#deleteModal">
+            Limpiar almacenamiento
+        </button>
+    </div>
+</div>
+
+{% elif mode in ('PERSISTENT', 'TEMPORARY', 'EPHEMERAL') %}
+<div class="card shadow-sm border-success">
+    <div class="card-body">
+        <div class="d-flex align-items-center mb-3">
+            <span class="fs-4 me-2">✅</span>
+            <h5 class="card-title mb-0">Catalog Sync listo</h5>
+        </div>
+        <table class="table table-sm mb-3" style="max-width: 400px;">
+            <tr>
+                <td class="text-muted">Sesión</td>
+                <td><span class="badge bg-success">Configurada</span></td>
+            </tr>
+            <tr>
+                <td class="text-muted">Modo</td>
+                <td>
+                    {% if mode == 'PERSISTENT' %}
+                        <span class="badge bg-primary">Guardada localmente</span>
+                    {% elif mode == 'TEMPORARY' %}
+                        <span class="badge bg-info">Temporal (solo esta sesión)</span>
+                    {% elif mode == 'EPHEMERAL' %}
+                        <span class="badge bg-secondary">Variable de entorno</span>
+                    {% endif %}
+                </td>
+            </tr>
+            {% if stored_at %}
+            <tr>
+                <td class="text-muted">Última actualización</td>
+                <td>{{ stored_at }}</td>
+            </tr>
+            {% endif %}
+            {% if encryption_method %}
+            <tr>
+                <td class="text-muted">Protección</td>
+                <td>{{ encryption_method }}</td>
+            </tr>
+            {% endif %}
+            <tr>
+                <td class="text-muted">Estado</td>
+                <td>
+                    {% if valid %}
+                        <span class="badge bg-success">VALID</span>
+                    {% elif valid is none %}
+                        <span class="badge bg-secondary">NO VERIFICADO</span>
+                    {% else %}
+                        <span class="badge bg-danger">INVÁLIDO</span>
+                    {% endif %}
+                </td>
+            </tr>
+        </table>
+
+        {% if warnings %}
+        <div class="alert alert-warning py-2 mb-3">
+            {% for w in warnings %}
+            <small>⚠ {{ w }}</small><br>
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        <div class="btn-group" role="group">
+            <button class="btn btn-outline-primary btn-sm"
+                    hx-post="/admin/catalog-sync/session/check"
+                    hx-target="#session-status"
+                    hx-headers='{"X-CSRF-Token": "{{ csrf_token }}"}'>
+                Comprobar sesión
+            </button>
+            <button class="btn btn-outline-secondary btn-sm" data-bs-toggle="modal" data-bs-target="#sessionModal">
+                Reemplazar
+            </button>
+            {% if mode != 'EPHEMERAL' %}
+            <button class="btn btn-outline-danger btn-sm" data-bs-toggle="modal" data-bs-target="#deleteModal">
+                Eliminar
+            </button>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endif %}
+
+{% if flash_message %}
+<div class="alert {{ 'alert-success' if flash_success else 'alert-danger' }} alert-dismissible fade show mt-3" role="alert">
+    {{ flash_message }}
+    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+</div>
+{% endif %}

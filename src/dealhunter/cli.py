@@ -141,6 +141,11 @@ def build_parser():
     rest_p = subparsers.add_parser("restaurants", help="Discover deals in restaurants", parents=[base_parser])
     rest_p.add_argument("--restaurant", action="append", help="Filter by restaurant name (alias for --store)")
 
+
+    auth_parser = subparsers.add_parser("auth", help="Authentication utilities")
+    auth_parser.add_argument("provider", choices=["rappi"], help="Provider to authenticate")
+    auth_parser.add_argument("--mobile", action="store_true", help="Start mobile auth importer")
+    auth_parser.add_argument("--diagnose", action="store_true", help="Run auth diagnostic (mobile only)")
     acc_p = subparsers.add_parser("account", help="Read-only account diagnostics")
     acc_p.add_argument("action", choices=["status"])
 
@@ -227,6 +232,221 @@ def main(args_list=None):
 
     crawler_commands = ("discover", "update", "restaurants", None)
     location = None
+    if args.command == "auth":
+        if args.provider == "rappi":
+            from .auth import RappiSessionProvider, LocalAuthImporter
+
+            prov = RappiSessionProvider()
+            is_diagnose = getattr(args, "diagnose", False)
+            
+            if getattr(args, "mobile", False):
+                print(f"[*] Mobile authentication {'diagnostic' if is_diagnose else 'import'} started")
+                try:
+                    importer = LocalAuthImporter(prov, host="127.0.0.1", port=0, is_mobile=True, diagnose=is_diagnose)
+                    importer.start()
+                except Exception as e:
+                    print(f"[!] Failed to bind local server: {e}")
+                    return
+
+                print(f"[*] Local endpoint: http://127.0.0.1:{importer.port}/{'diagnose' if is_diagnose else 'import'}")
+                print("[*] Bookmarklet generated below")
+                
+                if is_diagnose:
+                    bookmarklet = """javascript:(async function(){
+  if (window.location.hostname !== 'www.rappi.com.mx' && window.location.hostname !== 'rappi.com.mx') {
+    alert('DealHunter: this diagnostic must be executed on rappi.com.mx');
+    return;
+  }
+  function isJWT(str) {
+    if (typeof str !== 'string') return false;
+    const parts = str.split('.');
+    if (parts.length !== 3) return false;
+    try {
+      JSON.parse(atob(parts[0].replace(/-/g, '+').replace(/_/g, '/')));
+      JSON.parse(atob(parts[1].replace(/-/g, '+').replace(/_/g, '/')));
+      return true;
+    } catch(e) { return false; }
+  }
+  function extractJWT(str) {
+    const parts = str.split('.');
+    try {
+      const header = JSON.parse(atob(parts[0].replace(/-/g, '+').replace(/_/g, '/')));
+      const payload = JSON.parse(atob(parts[1].replace(/-/g, '+').replace(/_/g, '/')));
+      return {header, payload};
+    } catch(e) { return null; }
+  }
+  function classifyValue(val) {
+    if (val === null || val === undefined || val === '') return {type: 'EMPTY'};
+    if (isJWT(val)) return {type: 'JWT', jwt: extractJWT(val)};
+    try {
+      const parsed = JSON.parse(val);
+      if (Array.isArray(parsed)) return {type: 'JSON_ARRAY', parsed};
+      if (typeof parsed === 'object' && parsed !== null) return {type: 'JSON_OBJECT', parsed};
+    } catch(e) {}
+    if (/^[A-Za-z0-9+/=]+$/.test(val) && val.length > 20) return {type: 'BASE64_LIKE'};
+    if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(val)) return {type: 'UUID_LIKE'};
+    return {type: 'TEXT'};
+  }
+  function findNestedJWTs(obj, path = "$") {
+    let found = [];
+    if (typeof obj === 'string') {
+      if (isJWT(obj)) found.push({path, type: 'JWT_EMBEDDED', jwt: extractJWT(obj), raw: obj});
+    } else if (Array.isArray(obj)) {
+      obj.forEach((v, i) => found.push(...findNestedJWTs(v, path + "[" + i + "]")));
+    } else if (typeof obj === 'object' && obj !== null) {
+      for (const [k, v] of Object.entries(obj)) {
+        found.push(...findNestedJWTs(v, path + "." + k));
+      }
+    }
+    return found;
+  }
+  const report = {
+    origin: location.origin, hostname: location.hostname, userAgent: navigator.userAgent,
+    localStorage: [], sessionStorage: [], cookies: [], indexedDB: []
+  };
+  for (let i = 0; i < localStorage.length; i++) {
+    const key = localStorage.key(i); const value = localStorage.getItem(key);
+    const classification = classifyValue(value);
+    const entry = {key, length: value ? value.length : 0, type: classification.type, raw: value};
+    if (classification.type === 'JWT') entry.jwt = classification.jwt;
+    else if (classification.type === 'JSON_OBJECT' || classification.type === 'JSON_ARRAY') entry.nested = findNestedJWTs(classification.parsed);
+    report.localStorage.push(entry);
+  }
+  for (let i = 0; i < sessionStorage.length; i++) {
+    const key = sessionStorage.key(i); const value = sessionStorage.getItem(key);
+    const classification = classifyValue(value);
+    const entry = {key, length: value ? value.length : 0, type: classification.type, raw: value};
+    if (classification.type === 'JWT') entry.jwt = classification.jwt;
+    else if (classification.type === 'JSON_OBJECT' || classification.type === 'JSON_ARRAY') entry.nested = findNestedJWTs(classification.parsed);
+    report.sessionStorage.push(entry);
+  }
+  const cookies = document.cookie.split(';');
+  for (const c of cookies) {
+    if (!c.trim()) continue;
+    const parts = c.split('='); const key = parts[0].trim(); const value = parts.slice(1).join('=').trim();
+    const classification = classifyValue(value);
+    const entry = {key, length: value ? value.length : 0, type: classification.type, raw: value};
+    if (classification.type === 'JWT') entry.jwt = classification.jwt;
+    report.cookies.push(entry);
+  }
+  try {
+    if (window.indexedDB && indexedDB.databases) {
+      const dbs = await indexedDB.databases();
+      for (const dbInfo of dbs) {
+        const dbMeta = {name: dbInfo.name, version: dbInfo.version, stores: []};
+        try {
+          const db = await new Promise((resolve, reject) => {
+            const req = indexedDB.open(dbInfo.name);
+            req.onsuccess = () => resolve(req.result); req.onerror = () => reject(req.error);
+          });
+          for (let i = 0; i < db.objectStoreNames.length; i++) dbMeta.stores.push(db.objectStoreNames[i]);
+          db.close();
+        } catch(e) { dbMeta.error = e.toString(); }
+        report.indexedDB.push(dbMeta);
+      }
+    } else { report.indexedDB = 'IndexedDB enumeration unavailable in this browser.'; }
+  } catch(e) { report.indexedDB = 'Error reading IndexedDB: ' + e; }
+  const payload = JSON.stringify(report);
+  window.location.href = 'http://127.0.0.1:__PORT__/diagnose#' + btoa(unescape(encodeURIComponent(payload)));
+})();""".replace('__PORT__', str(importer.port))
+                else:
+                    bookmarklet = """javascript:(function(){
+  if (window.location.hostname !== 'www.rappi.com.mx' && window.location.hostname !== 'rappi.com.mx') {
+    alert('DealHunter: this bookmarklet must be executed on rappi.com.mx');
+    return;
+  }
+  function isJWT(str) {
+    if (typeof str !== 'string') return false;
+    const p = str.split('.'); if (p.length !== 3) return false;
+    try { JSON.parse(atob(p[0].replace(/-/g, '+').replace(/_/g, '/'))); JSON.parse(atob(p[1].replace(/-/g, '+').replace(/_/g, '/'))); return true; } catch(e) { return false; }
+  }
+  function ext(str) {
+    try { return JSON.parse(atob(str.split('.')[1].replace(/-/g, '+').replace(/_/g, '/'))); } catch(e) { return null; }
+  }
+  function findJ(obj) {
+    let f = [];
+    if (typeof obj === 'string') { if (isJWT(obj)) f.push(obj); }
+    else if (Array.isArray(obj)) { obj.forEach(v => f.push(...findJ(v))); }
+    else if (typeof obj === 'object' && obj !== null) { for (const v of Object.values(obj)) f.push(...findJ(v)); }
+    return f;
+  }
+  let c = [];
+  function scan(s) {
+    for (let i = 0; i < s.length; i++) {
+      const v = s.getItem(s.key(i));
+      if (isJWT(v)) c.push(v);
+      else { try { c.push(...findJ(JSON.parse(v))); } catch(e) {} }
+    }
+  }
+  scan(localStorage); scan(sessionStorage);
+  document.cookie.split(';').forEach(ck => {
+    const v = ck.split('=').slice(1).join('=').trim();
+    if (isJWT(v)) c.push(v);
+  });
+  let valid = [];
+  Array.from(new Set(c)).forEach(t => {
+    const p = ext(t);
+    if (p && p.exp && (p.exp * 1000 > Date.now())) valid.push(t);
+  });
+  if (valid.length === 0) { alert('DealHunter: No active session found.'); return; }
+  valid.sort((a,b) => b.length - a.length);
+  var pay = JSON.stringify({nonce: '__NONCE__', token: valid[0]});
+  window.location.href = 'http://127.0.0.1:__PORT__/import#' + btoa(unescape(encodeURIComponent(pay)));
+})();""".replace('__NONCE__', importer.nonce).replace('__PORT__', str(importer.port))
+                
+                print("\n" + bookmarklet.replace("\n", "") + "\n")
+                
+                print("1. Open https://www.rappi.com.mx/ and sign in.")
+                print("2. Create a browser bookmark named \"DH Import\".")
+                print("3. Paste the bookmarklet above into the bookmark URL field.")
+                print("4. While viewing Rappi, type \"DH Import\" in the address bar and select the bookmark.")
+                print("5. Return to Termux.\n")
+                
+                print("[*] Waiting for local browser...")
+                
+                try:
+                    if importer.serve_with_timeout(300):
+                        print("[+] Local server stopped")
+                    else:
+                        print("\n[!] Authentication operation timed out")
+                except KeyboardInterrupt:
+                    importer.server.shutdown()
+                    importer.server.server_close()
+                    print("\nCancelled.")
+            else:
+                if is_diagnose:
+                    print("Diagnostics is currently only supported in mobile mode (--mobile --diagnose)")
+                    return
+                # Desktop flow
+                try:
+                    importer = LocalAuthImporter(prov, host="127.0.0.1", port=5050, is_mobile=False)
+                    importer.start()
+                except OSError as e:
+                    print(f"\n[!] Could not bind to port 5050. Ensure no other instances are running.")
+                    return
+                    
+                print("To securely authenticate without exposing your tokens:")
+                print("1. Open www.rappi.com.mx in your browser and login.")
+                print("2. Open Developer Tools (F12) -> Console")
+                print("3. Paste this code to send the session securely to DealHunter:")
+                print("\nfetch('http://127.0.0.1:5050/commit', {")
+                print("  method: 'POST',")
+                print("  headers: {'Content-Type': 'application/json'},")
+                print("  body: JSON.stringify({nonce: '__NONCE__', token: localStorage.getItem('access_token')})".replace('__NONCE__', importer.nonce))
+                print("}).then(() => console.log('DealHunter Auth OK!')).catch(e => console.error(e));\n")
+                
+                print(f"[*] Waiting for session data on port 5050...")
+                try:
+                    if importer.serve_with_timeout(300):
+                        print("[+] Local server stopped")
+                    else:
+                        print("\n[!] Authentication operation timed out")
+                except KeyboardInterrupt:
+                    importer.server.shutdown()
+                    importer.server.server_close()
+                    print("\nCancelled.")
+        return
+
     if args.command in crawler_commands:
         location = _require_location(parser, config)
         

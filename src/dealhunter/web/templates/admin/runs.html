@@ -8,7 +8,15 @@
         </ol>
     </nav>
 
-    <h2 class="mb-1">🔄 Ejecuciones (Runs)</h2>
+    <div class="d-flex justify-content-between align-items-center mb-1">
+        <h2 class="m-0">🔄 Ejecuciones (Runs)</h2>
+        <div>
+            <span id="run-loading" class="htmx-indicator spinner-border spinner-border-sm text-primary me-2" role="status"></span>
+            <button hx-post="/admin/runs/start" hx-target="#runs-container" hx-indicator="#run-loading" class="btn btn-primary btn-sm" hx-disabled-elt="this">
+                🚀 Iniciar Crawler
+            </button>
+        </div>
+    </div>
     <p class="text-muted">Historial de crawleo y progreso.</p>
 
     <!-- Status Filters -->

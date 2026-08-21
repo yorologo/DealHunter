@@ -225,7 +225,7 @@ def _check_partial_runs(db_path):
 
 
 def _check_providers(check_network=False):
-    """Check providers status including account."""
+    """Check providers status including account and session storage."""
     from .account import get_account_token, get_account_status
     
     acc_status = "NOT_CONFIGURED"
@@ -243,10 +243,46 @@ def _check_providers(check_network=False):
                 acc_status = "UNVERIFIED (use --network)"
     except:
         pass
+
+    # Session storage check
+    session_check = _check_session_storage()
         
     return [
         ("Rappi catalog", "NOT_CHECKED", None),
         ("Turbo", "AVAILABLE", None),
         ("Restaurants", "AVAILABLE", None),
         ("Account context", acc_status, None),
+        session_check,
     ]
+
+
+def _check_session_storage():
+    """Check Catalog Sync session storage health."""
+    try:
+        from .secret_store import SessionService, SESSION_NOT_CONFIGURED, SESSION_CORRUPTED, SESSION_PERSISTENT, SESSION_TEMPORARY, SESSION_EPHEMERAL
+        svc = SessionService()
+        mode = svc.get_mode()
+        
+        if mode == SESSION_NOT_CONFIGURED:
+            return ("Catalog Sync session", "NOT_CONFIGURED", None)
+        elif mode == SESSION_CORRUPTED:
+            return ("Catalog Sync session", "WARNING", {
+                "info": "Encrypted session file is corrupted"
+            })
+        elif mode in (SESSION_PERSISTENT, SESSION_TEMPORARY, SESSION_EPHEMERAL):
+            warnings = svc.store.check_permissions()
+            if warnings:
+                return ("Catalog Sync session", "WARNING", {
+                    "info": "; ".join(warnings)
+                })
+            return ("Catalog Sync session", "CONFIGURED", {
+                "info": f"Mode: {mode}"
+            })
+        else:
+            return ("Catalog Sync session", mode, None)
+    except Exception as e:
+        return ("Catalog Sync session", "ERROR", {
+            "reason": str(e),
+            "action": "Check secret_store module"
+        })
+

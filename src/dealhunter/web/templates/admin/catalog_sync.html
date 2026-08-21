@@ -1,0 +1,141 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container-fluid">
+    <nav aria-label="breadcrumb" class="mb-3">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="/admin">Administración</a></li>
+            <li class="breadcrumb-item active">Catalog Sync</li>
+        </ol>
+    </nav>
+
+    <h2 class="mb-1">🔄 Catalog Sync</h2>
+    <p class="text-muted">Sincronización autenticada de catálogos completos de Rappi.</p>
+
+    {# ── Session Status Section ── #}
+    <div id="session-status" class="mb-4">
+        {% include 'admin/partials/session_status.html' %}
+    </div>
+
+    {# ── Session Setup Modal ── #}
+    <div class="modal fade" id="sessionModal" tabindex="-1" aria-labelledby="sessionModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="sessionModalLabel">🔐 Guardar sesión de Rappi</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="alert alert-warning">
+                        <strong>⚠ Información importante</strong>
+                        <p class="mt-2 mb-2">DealHunter puede guardar localmente tu sesión para que Catalog Sync funcione sin pedirla cada vez.</p>
+                        <p class="mb-2">Esta información permite acceder a servicios asociados con tu sesión de Rappi.</p>
+                        <ul class="mb-0">
+                            <li>✓ Se almacenará <strong>únicamente en este dispositivo</strong></li>
+                            <li>✓ Se protegerá mediante <strong>almacenamiento cifrado</strong></li>
+                            <li>✓ <strong>Nunca</strong> se mostrará el valor después de guardarlo</li>
+                            <li>✓ <strong>No</strong> se incluirá en logs ni Git</li>
+                            <li>✓ Podrás <strong>eliminarla cuando quieras</strong></li>
+                        </ul>
+                    </div>
+
+                    <form id="session-form" method="POST">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                        <div class="mb-3">
+                            <label for="session-token" class="form-label">Sesión de Rappi</label>
+                            <input type="password" class="form-control" id="session-token" name="token"
+                                   placeholder="Pega tu token aquí" autocomplete="off" required>
+                            <div class="form-text">
+                                Usa <code>bin/rappi-ofertas auth rappi --mobile</code> para obtener el token.
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" name="session_mode" id="mode-persistent" value="persistent" checked>
+                                <label class="form-check-label" for="mode-persistent">
+                                    <strong>Guardar localmente</strong>
+                                    <span class="text-muted d-block small">La sesión se almacenará cifrada en este dispositivo. Persistirá entre reinicios.</span>
+                                </label>
+                            </div>
+                            <div class="form-check mt-2">
+                                <input class="form-check-input" type="radio" name="session_mode" id="mode-temporary" value="temporary">
+                                <label class="form-check-label" for="mode-temporary">
+                                    <strong>Usar sólo esta vez</strong>
+                                    <span class="text-muted d-block small">La sesión se conservará únicamente en memoria. Se perderá al reiniciar DealHunter.</span>
+                                </label>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="button" class="btn btn-primary" id="btn-save-session"
+                            hx-post="/admin/catalog-sync/session/store"
+                            hx-include="#session-form"
+                            hx-target="#session-status"
+                            hx-indicator="#save-spinner"
+                            onclick="this.disabled=true; setTimeout(() => this.disabled=false, 3000);">
+                        <span id="save-spinner" class="htmx-indicator spinner-border spinner-border-sm me-1" role="status"></span>
+                        Guardar y comprobar
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {# ── Delete Confirmation Modal ── #}
+    <div class="modal fade" id="deleteModal" tabindex="-1" aria-labelledby="deleteModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="deleteModalLabel">🗑 Eliminar sesión guardada</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p>DealHunter dejará de poder usar Catalog Sync automáticamente hasta que configures otra sesión.</p>
+                    <p class="text-muted small">Tus productos, observaciones, historial y configuración <strong>no</strong> se verán afectados.</p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="button" class="btn btn-danger"
+                            hx-post="/admin/catalog-sync/session/delete"
+                            hx-target="#session-status"
+                            hx-headers='{"X-CSRF-Token": "{{ csrf_token }}"}'
+                            data-bs-dismiss="modal">
+                        Eliminar sesión
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {# ── Sync Controls (only visible when session is ready) ── #}
+    {% if session_ready %}
+    <div class="card shadow-sm mb-4">
+        <div class="card-body">
+            <h5 class="card-title">📡 Sincronizar catálogos</h5>
+            <p class="text-muted small">Descarga los catálogos completos de las tiendas cercanas usando tu sesión autenticada.</p>
+            <div id="sync-result"></div>
+            <button class="btn btn-success"
+                    hx-post="/admin/catalog-sync/run"
+                    hx-target="#sync-result"
+                    hx-headers='{"X-CSRF-Token": "{{ csrf_token }}"}'
+                    hx-indicator="#sync-spinner">
+                <span id="sync-spinner" class="htmx-indicator spinner-border spinner-border-sm me-1" role="status"></span>
+                Sincronizar catálogos ahora
+            </button>
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<script>
+document.addEventListener('htmx:afterSwap', function(evt) {
+    if (evt.detail.target.id === 'session-status') {
+        var modal = bootstrap.Modal.getInstance(document.getElementById('sessionModal'));
+        if (modal) modal.hide();
+        document.getElementById('session-token').value = '';
+    }
+});
+</script>
+{% endblock %}
