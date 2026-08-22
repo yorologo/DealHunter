@@ -10,22 +10,6 @@ class SessionStatus:
     def __init__(self, db_path=None):
         self.db_path = db_path
         
-    def _get_last_run_mode(self):
-        if not self.db_path or not os.path.exists(self.db_path):
-            return None, None
-            
-        try:
-            conn = sqlite3.connect(self.db_path)
-            c = conn.cursor()
-            c.execute("SELECT crawler_mode, status FROM runs ORDER BY started_at DESC LIMIT 1")
-            row = c.fetchone()
-            conn.close()
-            if row:
-                return row[0], row[1]
-        except Exception:
-            pass
-        return None, None
-
     def get_current(self, check_network=False):
         svc = SessionService()
         mode = svc.get_mode()
@@ -78,20 +62,6 @@ class SessionStatus:
                     result["status"] = "EXPIRED"
                     svc.mark_expired()
             except Exception:
-                pass
-        else:
-            # 3. Infer from DB (last run)
-            last_mode, last_status = self._get_last_run_mode()
-            if last_mode == "ZONE_INVENTORY" and last_status == "COMPLETED":
-                result["status"] = "VALID"
-            elif last_mode == "SEARCH_DISCOVERY" and status == "CONFIGURED":
-                # If it's configured but we are running in SEARCH_DISCOVERY, it means it's expired or falling back
-                # But wait, SEARCH_DISCOVERY could be the user's manual choice? No, the CLI always prefers ZONE if auth.
-                result["status"] = "EXPIRED"
-            elif last_status == "PARTIAL":
-                # A partial run might have been interrupted by 401
-                # But we can't be 100% sure unless we know the error code.
-                # Let's assume CONFIGURED for now.
                 pass
                 
         if result["status"] == "EXPIRED":

@@ -55,26 +55,34 @@ flowchart LR
 
 Todos los servicios acceden a una misma base de datos `SQLite`, minimizando dependencias externas y permitiendo portabilidad.
 
-### Crawler Fallback Architecture
+### Crawler Architecture & Session Flow
 
-DealHunter dynamically chooses its strategy based on the availability of a valid session:
+DealHunter implements a dual-mode crawling strategy routed by the **Session Resolver** which determines the **Effective Session**:
 
 ```mermaid
 flowchart TD
-    START[Crawler Run]
-    SESSION{Sesión válida?}
+    CONFIG[Local Storage / Env] --> RESOLVER
+    NETWORK[Rappi API] -. Validation .-> RESOLVER
+    
+    RESOLVER[Session Resolver] --> EFFECTIVE{Effective Session?}
+    
+    EFFECTIVE -- "VALID / CONFIGURED" --> ZONE[Zone Inventory]
+    EFFECTIVE -- "EXPIRED / NOT_CONFIGURED" --> SEARCH[Search Discovery]
 
-    START --> SESSION
+    ZONE -.->|401 Unauthorized| FALLBACK[Partial Run & Fallback]
+    FALLBACK --> SEARCH
 
-    SESSION -- Sí --> ZONE[Zone Inventory]
-    SESSION -- No --> SEARCH[Search Discovery]
-
-    ZONE --> CORE[Normalization + SQLite]
+    ZONE --> CORE[Core Data Pipeline]
     SEARCH --> CORE
 
-    CORE --> PI[Price Intelligence]
-    CORE --> ALERTS[Alerts]
+    subgraph Core
+    CORE --> NORM[Normalization]
+    NORM --> DB[(SQLite)]
+    end
 ```
 
-- **SESSION VALID -> Zone Inventory**: Uses authenticated endpoints to get full store catalogs in the active zone.
-- **SESSION UNAVAILABLE -> Search Discovery**: Falls back to anonymous search queries to discover available deals.
+- **Session Resolver**: Unified single source of truth evaluating local session material (`SecretStore`) against network assertions.
+- **Zone Inventory**: Uses authenticated endpoints to get full store catalogs in the active zone. Reconciles availability (STALE/UNAVAILABLE) *only* upon full completion.
+- **Search Discovery**: Falls back to anonymous search queries to organically discover available deals. Does NOT perform destructive reconciliation.
+- **Same Core**: Both crawlers utilize the exact same normalization, product mapping, filtering, and database ingestion core.
+- **401 Fallback**: If a Zone Inventory run encounters an HTTP 401 mid-flight, the run is finalized as `PARTIAL` to prevent false deletion, and a new `SEARCH_DISCOVERY` run takes over automatically.

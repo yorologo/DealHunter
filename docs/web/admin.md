@@ -17,7 +17,7 @@ flowchart TD
 Al navegar por **cualquier** página `GET` de Admin, se producen `0 external requests`. La navegación local es estricta.
 
 ## Cuenta (Account Security)
-- El token de la cuenta (`RAPPI_BEARER_TOKEN`) reside de manera **efímera** en variables de entorno (environment only).
+- El token de la cuenta puede residir de manera **efímera** en variables de entorno o ser **persistido de forma cifrada** mediante SecretStore (opt-in).
 - No existe persistencia, logs, SQLite dumps o config text para este secreto.
 - La UI jamás expone el token (ni parcial ni ofuscado), sólo su estatus (`CONFIGURED` o `NOT_CONFIGURED`).
 - La validación contra los servidores del proveedor es estrictamente opt-in mediante POST.

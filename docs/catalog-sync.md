@@ -2,30 +2,53 @@
 
 Catalog Sync allows DealHunter to pull structural data (categories, products) from authenticated providers using a provided session token. Currently supported verticals include Market and Turbo. It allows persistent storage of credentials (opt-in) using SecretStore.
 
-### Crawler Fallback Architecture
-
-DealHunter dynamically chooses its strategy based on the availability of a valid session:
+### Admin / Session Flow
 
 ```mermaid
 flowchart TD
-    START[Crawler Run]
-    SESSION{Sesión válida?}
-
-    START --> SESSION
-
-    SESSION -- Sí --> ZONE[Zone Inventory]
-    SESSION -- No --> SEARCH[Search Discovery]
-
-    ZONE --> CORE[Normalization + SQLite]
-    SEARCH --> CORE
-
-    CORE --> PI[Price Intelligence]
-    CORE --> ALERTS[Alerts]
+    WIZARD[Catalog Sync Wizard] --> STORE[SecretStore]
+    STORE --> ENC[session.enc]
+    ENV[RAPPI_BEARER_TOKEN] -.-> ENV_SESS[Ephemeral Session]
+    
+    ENC --> RESOLVER
+    ENV_SESS --> RESOLVER
+    
+    RESOLVER[Session Resolver] --> ACCOUNT_UI[Account & Session UI]
+    RESOLVER --> SYNC_UI[Catalog Sync UI]
+    RESOLVER --> DOCTOR[Doctor Diagnostics]
+    
+    ACCOUNT_UI -.->|Network Check| VALIDATE[Rappi API]
+    VALIDATE -.-> RESOLVER
 ```
 
-- **SESSION VALID -> Zone Inventory**: Uses authenticated endpoints to get full store catalogs in the active zone.
-- **SESSION UNAVAILABLE -> Search Discovery**: Falls back to anonymous search queries to discover available deals.
+### Schema & Metadata Updates
 
+To support Zone Inventory routing and validation, the DealHunter SQLite Schema (v8) tracks:
+```mermaid
+erDiagram
+    RUNS {
+        TEXT run_id PK
+        DATETIME started_at
+        TEXT crawler_mode "ZONE_INVENTORY or SEARCH_DISCOVERY"
+        BOOLEAN coverage_complete
+        TEXT status "COMPLETED, PARTIAL, RUNNING"
+    }
+    STORES {
+        TEXT store_id PK
+        TEXT status "ACTIVE or STALE"
+        DATETIME last_seen_at
+    }
+    OBSERVATIONS {
+        INTEGER id PK
+        TEXT availability "AVAILABLE or UNAVAILABLE"
+    }
+    RUNS ||--o{ OBSERVATIONS : "generates"
+    STORES ||--o{ OBSERVATIONS : "hosts"
+```
+
+- **coverage_complete**: True only when `ZONE_INVENTORY` successfully retrieves all catalogs without partial errors.
+- **crawler_mode**: Tracks the specific crawler strategy used for a run.
+- **stores.status / stores.last_seen_at**: Tracks availability reconciliation across Zone Inventory runs.
 ## Zone Inventory
 
 Zone Inventory mantiene una representación local del inventario observable para la **sesión actual**, **zona actual** y **momento actual**. No extrae "todo Rappi", sino todo el inventario expuesto por el proveedor para tu ubicación.
