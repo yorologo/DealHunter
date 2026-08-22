@@ -39,7 +39,7 @@ def test_v1_to_current_migration():
     )
     c.execute("CREATE TABLE schema_version (version INTEGER PRIMARY KEY)")
     c.execute("INSERT INTO schema_version (version) VALUES (1)")
-    c.execute("INSERT INTO stores VALUES ('s1', 'Store 1', 'Brand 1', 'market')")
+    c.execute("INSERT INTO stores (store_id, name, brand, type) VALUES ('s1', 'Store 1', 'Brand 1', 'market')")
     c.execute("INSERT INTO products VALUES ('p1', 's1', 'Prod 1', 'Brand 1', 'img')")
     c.execute(
         "INSERT INTO observations (run_id, store_id, product_id, stock) "
@@ -99,7 +99,7 @@ def test_v2_to_current_migration():
     )
     c.execute("CREATE TABLE schema_version (version INTEGER PRIMARY KEY)")
     c.execute("INSERT INTO schema_version (version) VALUES (2)")
-    c.execute("INSERT INTO stores VALUES ('s1', 'Store 1', 'Brand 1', 'market')")
+    c.execute("INSERT INTO stores (store_id, name, brand, type) VALUES ('s1', 'Store 1', 'Brand 1', 'market')")
     c.execute("INSERT INTO products VALUES ('p1', 's1', 'Prod 1', 'Brand 1', 'img')")
     c.execute(
         "INSERT INTO observations (run_id, store_id, product_id, stock, availability) "

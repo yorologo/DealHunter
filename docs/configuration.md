@@ -29,3 +29,5 @@ bin/rappi-ofertas discover --vertical general
 ```
 
 El cron debe omitir `--lat/--lng` para consumir exactamente este `config.toml`. Un override CLI sigue teniendo prioridad para una ejecución deliberada. Cada run guarda su ubicación en `runs.lat/runs.lng`. Si el punto nuevo queda a 500 m o más del último run, DealHunter advierte el cambio y preserva el histórico; nunca borra filas automáticamente.
+
+- La sesión determina el modo del crawler de forma automática.

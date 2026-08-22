@@ -16,8 +16,8 @@ def test_alert_engine_types():
     
     conn = setup_db(db_path)
     c = conn.cursor()
-    c.execute("INSERT INTO stores VALUES ('s1', 'Soriana', '', 'market')")
-    c.execute("INSERT INTO stores VALUES ('s2', 'Chedraui', '', 'market')")
+    c.execute("INSERT INTO stores (store_id, name, brand, type) VALUES ('s1', 'Soriana', '', 'market')")
+    c.execute("INSERT INTO stores (store_id, name, brand, type) VALUES ('s2', 'Chedraui', '', 'market')")
     
     c.execute("INSERT INTO products (product_id, store_id, name) VALUES ('p1', 's1', 'Coca Cola 2 L')") # TARGET
     c.execute("INSERT INTO products (product_id, store_id, name) VALUES ('p2', 's1', 'Galletas')") # NEW_LOW

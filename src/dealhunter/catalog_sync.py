@@ -105,15 +105,9 @@ class CPGCatalogAdapter:
                                 name = p.get("name", "")
                                 price = p.get("price", 0)
                                 if pid and name:
-                                    items.append({
-                                        "store_id": str(store_id),
-                                        "product_id": pid,
-                                        "name": name,
-                                        "price": price,
-                                        "original_price": p.get("original_price") or price,
-                                        "image_url": p.get("image"),
-                                        "category_name": p.get("category", "")
-                                    })
+                                    p["store_id"] = str(store_id)
+                                    p["category"] = p.get("category", "")
+                                    items.append(p)
                         for v in d.values(): extract_products(v)
                     elif isinstance(d, list):
                         for v in d: extract_products(v)
@@ -121,7 +115,7 @@ class CPGCatalogAdapter:
                 extract_products(data)
                 
                 # Remove duplicates
-                unique = {i["product_id"]: i for i in items}
+                unique = {str(i.get("id") or i.get("product_id")): i for i in items}
                 res = list(unique.values())
                 
                 report.merchants_completed += 1
@@ -171,15 +165,9 @@ class RestaurantMenuAdapter:
                                     name = p.get("name", "")
                                     price = p.get("price", 0)
                                     if pid and name:
-                                        items.append({
-                                            "store_id": str(store_id),
-                                            "product_id": pid,
-                                            "name": name,
-                                            "price": price,
-                                            "original_price": p.get("original_price") or price,
-                                            "image_url": p.get("image"),
-                                            "category_name": cat_name
-                                        })
+                                        p["store_id"] = str(store_id)
+                                        p["category"] = cat_name
+                                        items.append(p)
                         for v in d.values(): extract_products(v)
                     elif isinstance(d, list):
                         for v in d: extract_products(v)
@@ -187,7 +175,7 @@ class RestaurantMenuAdapter:
                 extract_products(data)
                 
                 # Remove duplicates
-                unique = {i["product_id"]: i for i in items}
+                unique = {str(i.get("id") or i.get("product_id")): i for i in items}
                 res = list(unique.values())
                 
                 report.merchants_completed += 1

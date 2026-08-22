@@ -22,8 +22,8 @@ def app():
     c = conn.cursor()
 
     # Stores
-    c.execute("INSERT INTO stores VALUES ('s1', 'Soriana', 'Soriana', 'market')")
-    c.execute("INSERT INTO stores VALUES ('s2', 'Walmart', 'Walmart', 'market')")
+    c.execute("INSERT INTO stores (store_id, name, brand, type, status, last_seen_at) VALUES ('s1', 'Soriana', 'Soriana', 'market', 'ACTIVE', '2026-08-21T00:00:00')")
+    c.execute("INSERT INTO stores (store_id, name, brand, type) VALUES ('s2', 'Walmart', 'Walmart', 'market')")
 
     # Products
     c.execute("INSERT INTO products (product_id, store_id, name, brand, category) VALUES ('p1', 's1', 'Coca Cola 2L', 'Coca-Cola', 'Bebidas')")

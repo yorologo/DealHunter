@@ -523,10 +523,30 @@ def main(args_list=None):
         print(f"Running mode: {mode}", file=sys.stderr)
         
         try:
-            if mode == "discover":
-                state, reqs = run_discover(config, lat, lng, conn, run_id, dry_run=config.get("dry_run"))
+            import asyncio
+            from dealhunter.auth import RappiSessionProvider
+            provider = RappiSessionProvider()
+            is_auth = asyncio.run(provider.is_authenticated())
+            
+            if is_auth and config.get("catalog_sync", {}).get("enabled", True):
+                print("SESSION_VALID: Using ZONE_INVENTORY mode.", file=sys.stderr)
+                from dealhunter.crawler_zone import run_zone_inventory
+                state, reqs = run_zone_inventory(config, lat, lng, conn, run_id, dry_run=config.get("dry_run"))
+                if state == "SESSION_EXPIRED":
+                    print("SESSION_EXPIRED: Using SEARCH_DISCOVERY mode as fallback.", file=sys.stderr)
+                    from dealhunter.crawler import run_discover, run_update
+                    if mode == "discover":
+                        state, reqs = run_discover(config, lat, lng, conn, run_id, dry_run=config.get("dry_run"))
+                    else:
+                        state, reqs = run_update(config, lat, lng, conn, run_id, dry_run=config.get("dry_run"))
             else:
-                state, reqs = run_update(config, lat, lng, conn, run_id, dry_run=config.get("dry_run"))
+                print("NOT_CONFIGURED or disabled: Using SEARCH_DISCOVERY mode as fallback.", file=sys.stderr)
+                from dealhunter.crawler import run_discover, run_update
+                if mode == "discover":
+                    state, reqs = run_discover(config, lat, lng, conn, run_id, dry_run=config.get("dry_run"))
+                else:
+                    state, reqs = run_update(config, lat, lng, conn, run_id, dry_run=config.get("dry_run"))
+                    
         except Exception as exc:
             # Preserve already-committed observations; mark run as PARTIAL
             from .errors import classify_error

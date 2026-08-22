@@ -17,7 +17,7 @@ def app():
     # Setup dummy db
     conn = setup_db(db_path)
     c = conn.cursor()
-    c.execute("INSERT INTO stores VALUES ('s1', 'Soriana', '', 'market')")
+    c.execute("INSERT INTO stores (store_id, name, brand, type) VALUES ('s1', 'Soriana', '', 'market')")
     c.execute("INSERT INTO products (product_id, store_id, name) VALUES ('p1', 's1', 'Coca Cola 2 L')")
     c.execute("INSERT INTO runs (run_id, started_at) VALUES ('run1', '2026-08-19')")
     # Need at least 3 obs for NEW_LOW or REAL_DEAL, but let's leave it mostly empty

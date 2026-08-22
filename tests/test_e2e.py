@@ -17,7 +17,7 @@ def setup_db(db_path):
     real_setup(db_path)
     
     # insert dummy data
-    c.execute("INSERT INTO stores VALUES ('s1', 'Test Store', '', 'supermercado')")
+    c.execute("INSERT INTO stores (store_id, name, brand, type) VALUES ('s1', 'Test Store', '', 'supermercado')")
     c.execute("INSERT INTO products (product_id, store_id, name, brand, image) VALUES ('p1', 's1', 'Test Product', '', '')")
     c.execute("INSERT INTO observations (run_id, store_id, product_id, price, timestamp, discount_effective) VALUES ('r1', 's1', 'p1', 100, '2020-01-01T00:00:00', 0)")
     c.execute("INSERT INTO observations (run_id, store_id, product_id, price, timestamp, discount_effective) VALUES ('r2', 's1', 'p1', 50, '2020-01-02T00:00:00', 50)")

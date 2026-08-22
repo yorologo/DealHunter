@@ -3110,3 +3110,4 @@ These remain future work unless explicitly requested.
 
 
 - **Android Background**: DealHunter attempts to acquire `termux-wake-lock` automatically during web server initialization to prevent Android from pausing it. No intrusive AppOps changes should be made automatically.
+- Añadida lógica de fallback ZONE_INVENTORY / SEARCH_DISCOVERY en crawler.

@@ -15,9 +15,9 @@ def test_compare_stores_grouping():
     c = conn.cursor()
     
     # Insert test data
-    c.execute("INSERT INTO stores VALUES ('s1', 'Soriana', 'Soriana', 'market')")
-    c.execute("INSERT INTO stores VALUES ('s2', 'Chedraui', 'Chedraui', 'market')")
-    c.execute("INSERT INTO stores VALUES ('s3', 'Turbo', 'Turbo', 'turbo')")
+    c.execute("INSERT INTO stores (store_id, name, brand, type) VALUES ('s1', 'Soriana', 'Soriana', 'market')")
+    c.execute("INSERT INTO stores (store_id, name, brand, type) VALUES ('s2', 'Chedraui', 'Chedraui', 'market')")
+    c.execute("INSERT INTO stores (store_id, name, brand, type) VALUES ('s3', 'Turbo', 'Turbo', 'turbo')")
     
     c.execute("INSERT INTO products (product_id, store_id, name, brand, normalized_name, quantity, unit, normalized_quantity, normalized_unit, fingerprint, pack_count) VALUES ('p1', 's1', 'Coca Cola Original 2 L', 'Coca-Cola', 'original', 2, 'L', 2, 'L', 'coca cola|original|2|l', 1)")
     c.execute("INSERT INTO products (product_id, store_id, name, brand, normalized_name, quantity, unit, normalized_quantity, normalized_unit, fingerprint, pack_count) VALUES ('p2', 's2', 'Coca-Cola Refresco Original 2000 ml', 'Coca-Cola', 'refresco original', 2000, 'ml', 2, 'L', 'coca cola|refresco original|2|l', 1)")

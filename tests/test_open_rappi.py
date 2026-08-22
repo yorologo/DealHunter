@@ -19,7 +19,7 @@ def client(tmp_path):
     with sqlite3.connect(db_path) as conn:
         conn.execute("CREATE TABLE IF NOT EXISTS stores (store_id TEXT, name TEXT, type TEXT)")
         conn.executemany(
-            "INSERT INTO stores VALUES (?, ?, ?)",
+            "INSERT INTO stores (store_id, name, type) VALUES (?, ?, ?)",
             (
                 ("111", "Tacos Moy Santa Esther", "restaurants"),
                 ("222", "City Market", "market"),

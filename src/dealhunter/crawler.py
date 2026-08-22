@@ -3,6 +3,7 @@ import sys
 from datetime import datetime
 from .api import fetch_unified_search
 from .discounts import calculate_discount
+from .core import process_and_insert_product
 from .errors import DealHunterError, classify_error
 from .checkpoint import RunCheckpoint, save_checkpoint
 
@@ -198,126 +199,7 @@ def run_discover(config, lat, lng, conn, run_id, dry_run=False):
                     uid = f"{s_id}_{p_id}"
                     
 
-                    pname = p.get("name", "")
-                    cat = p.get("category_name", "")
-                    cat_source = "rappi" if cat else "unknown"
-                    
-                    if not cat and v_name == "restaurants":
-                        if s_id not in restaurant_category_cache:
-                            from .api import fetch_restaurant_categories
-                            restaurant_category_cache[s_id] = fetch_restaurant_categories(s_id)
-                            if not dry_run:
-                                time.sleep(0.3)
-                                
-                        mapped_cat = restaurant_category_cache[s_id].get(str(p_id))
-                        if mapped_cat:
-                            cat = mapped_cat
-                            cat_source = "rappi"
-                        else:
-                            name_lower = pname.lower()
-                            if "hamburguesa" in name_lower or "burger" in name_lower or "whopper" in name_lower:
-                                cat = "Hamburguesas"
-                                cat_source = "inferred"
-                            elif "pizza" in name_lower:
-                                cat = "Pizzas"
-                                cat_source = "inferred"
-                            elif "taco" in name_lower or "volcan" in name_lower or "quesadilla" in name_lower:
-                                cat = "Tacos"
-                                cat_source = "inferred"
-                            elif "sushi" in name_lower or "roll" in name_lower:
-                                cat = "Sushi"
-                                cat_source = "inferred"
-                            elif "pollo" in name_lower or "nugget" in name_lower or "kfc" in name_lower:
-                                cat = "Pollo"
-                                cat_source = "inferred"
-                            elif "helado" in name_lower or "postre" in name_lower or "frappuccino" in name_lower or "pastel" in name_lower or "pay" in name_lower:
-                                cat = "Postres"
-                                cat_source = "inferred"
-                            elif "bebida" in name_lower or "refresco" in name_lower or "coca" in name_lower or "pepsi" in name_lower or "agua" in name_lower or "jugo" in name_lower:
-                                cat = "Bebidas"
-                                cat_source = "inferred"
-                            elif "ensalada" in name_lower or "bowl" in name_lower:
-                                cat = "Saludable"
-                                cat_source = "inferred"
-                            elif "sándwich" in name_lower or "sandwich" in name_lower or "baguette" in name_lower or "sub" in name_lower:
-                                cat = "Sándwiches"
-                                cat_source = "inferred"
-                            elif "café" in name_lower or "cafe" in name_lower or "latte" in name_lower or "espresso" in name_lower:
-                                cat = "Café"
-                                cat_source = "inferred"
-                            elif "papas" in name_lower or "fries" in name_lower:
-                                cat = "Snacks"
-                                cat_source = "inferred"
-
-                    raw_toppings = p.get("has_toppings")
-                    has_toppings = None
-                    if raw_toppings is not None:
-                        has_toppings = 1 if raw_toppings else 0
-                    brand = p.get("trademark", "")
-                    if uid not in seen_in_run:
-                        seen_in_run.add(uid)
-                        new_in_query += 1
-                        
-                        is_in_stock = p.get("in_stock", False) or p.get("is_available", False)
-                        stock_val = p.get("stock")
-                        
-                        if stock_val is not None and stock_val <= 0:
-                            is_in_stock = False
-                            
-                        availability = "AVAILABLE" if is_in_stock else "UNAVAILABLE"
-                            
-                        d_price, d_promo, d_eff, d_src, p_type, p_label, eff_price, eff_real = calculate_discount(p)
-                        
-                        
-                        if not matches_filters(pname, brand, s_name, cat, config, d_eff, p_type, eff_price):
-                            continue
-                            
-                        img = p.get("image", "")
-                        if img and not img.startswith("http") and not img.startswith("data:"):
-                            img = "https://images.rappi.com.mx/products/" + img
-                            
-                        from .normalization import parse_product_name, generate_fingerprint
-                        norm = parse_product_name(pname, brand)
-                        fingerprint = generate_fingerprint(
-                            norm["brand"], norm["normalized_name"],
-                            norm["normalized_quantity"], norm["normalized_unit"],
-                            norm["pack_count"]
-                        )
-                            
-                        c.execute('''INSERT INTO products (product_id, store_id, name, brand, image, 
-                                     normalized_name, quantity, unit, normalized_quantity, normalized_unit,
-                                     fingerprint, pack_count, category, has_toppings, category_source)
-                                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                                     ON CONFLICT(product_id, store_id) DO UPDATE SET
-                                     brand = COALESCE(NULLIF(brand, ''), excluded.brand),
-                                     normalized_name = COALESCE(NULLIF(normalized_name, ''), excluded.normalized_name),
-                                     quantity = COALESCE(quantity, excluded.quantity),
-                                     unit = COALESCE(NULLIF(unit, ''), excluded.unit),
-                                     normalized_quantity = COALESCE(normalized_quantity, excluded.normalized_quantity),
-                                     normalized_unit = COALESCE(NULLIF(normalized_unit, ''), excluded.normalized_unit),
-                                     pack_count = COALESCE(pack_count, excluded.pack_count),
-                                     category = COALESCE(NULLIF(excluded.category, ''), category),
-                                     has_toppings = COALESCE(excluded.has_toppings, has_toppings),
-                                     category_source = COALESCE(NULLIF(excluded.category_source, 'unknown'), category_source),
-                                     image = COALESCE(NULLIF(image, ''), excluded.image),
-                                     name = COALESCE(NULLIF(name, ''), excluded.name),
-                                     fingerprint = CASE 
-                                        WHEN NULLIF(brand, '') IS NULL AND NULLIF(excluded.brand, '') IS NOT NULL THEN excluded.fingerprint
-                                        WHEN quantity IS NULL AND excluded.quantity IS NOT NULL THEN excluded.fingerprint
-                                        WHEN NULLIF(fingerprint, '') IS NULL THEN excluded.fingerprint
-                                        ELSE fingerprint
-                                     END
-                                     ''',
-                                  (p_id, s_id, pname, brand, img,
-                                   norm["normalized_name"], norm["quantity"], norm["unit"], 
-                                   norm["normalized_quantity"], norm["normalized_unit"], fingerprint,
-                                   norm["pack_count"], cat, has_toppings, cat_source))
-                        
-                        c.execute('''INSERT OR IGNORE INTO observations (run_id, store_id, product_id, price, original_price, stock, timestamp, 
-                                     discount_price, discount_promotion, discount_effective, discount_source, promotion_type, promotion_label, query_term, availability)
-                                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''', 
-                                     (run_id, s_id, p_id, eff_price, eff_real, stock_val, datetime.now().isoformat(), 
-                                      d_price, d_promo, d_eff, d_src, p_type, p_label, q, availability))
+                    process_and_insert_product(p, run_id, s_id, s_name, config, q, conn, seen_in_run)
                                       
             # Commit after each query to preserve partial data
             conn.commit()
@@ -343,6 +225,9 @@ def run_discover(config, lat, lng, conn, run_id, dry_run=False):
     checkpoint.error_code = error_code
     checkpoint.requests_made = requests_count
     save_checkpoint(conn, checkpoint)
+    
+    c.execute("UPDATE runs SET crawler_mode = ?, coverage_complete = ? WHERE run_id = ?", ("SEARCH_DISCOVERY", 0, run_id))
+    conn.commit()
             
     return global_state, requests_count
 

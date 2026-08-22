@@ -10,7 +10,7 @@ def test_determinism_ties(tmp_path):
     c.execute('''CREATE TABLE stores (store_id TEXT, name TEXT, type TEXT, brand TEXT)''')
     c.execute('''CREATE TABLE observations (run_id TEXT, store_id TEXT, product_id TEXT, price REAL, original_price REAL, stock INTEGER, timestamp DATETIME, discount_price REAL, discount_promotion REAL, discount_effective REAL, discount_source TEXT, promotion_type TEXT, promotion_label TEXT, availability TEXT)''')
     
-    c.execute("INSERT INTO stores VALUES ('s1', 'MyStore', 'market', 'Brand')")
+    c.execute("INSERT INTO stores (store_id, name, brand, type) VALUES ('s1', 'MyStore', 'market', 'Brand')")
     c.execute("INSERT INTO products VALUES ('p1', 's1', 'Prod', '', '', 1, '', 1, '', 1, '', 0)")
     
     # Insert two observations with exactly the same timestamp
@@ -37,8 +37,8 @@ def test_determinism_cross_store(tmp_path):
     c.execute('''CREATE TABLE stores (store_id TEXT, name TEXT, type TEXT, brand TEXT)''')
     c.execute('''CREATE TABLE observations (run_id TEXT, store_id TEXT, product_id TEXT, price REAL, original_price REAL, stock INTEGER, timestamp DATETIME, discount_price REAL, discount_promotion REAL, discount_effective REAL, discount_source TEXT, promotion_type TEXT, promotion_label TEXT, availability TEXT)''')
     
-    c.execute("INSERT INTO stores VALUES ('s1', 'Store A', 'market', 'A')")
-    c.execute("INSERT INTO stores VALUES ('s2', 'Store B', 'market', 'B')")
+    c.execute("INSERT INTO stores (store_id, name, brand, type) VALUES ('s1', 'Store A', 'market', 'A')")
+    c.execute("INSERT INTO stores (store_id, name, brand, type) VALUES ('s2', 'Store B', 'market', 'B')")
     
     # Same product_id '123' in both stores
     c.execute("INSERT INTO products VALUES ('123', 's1', 'Prod A', '', '', 1, '', 1, '', 1, '', 0)")

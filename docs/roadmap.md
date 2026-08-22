@@ -19,3 +19,5 @@
 *(Sólo funciones contempladas orgánicamente por diseño, no disponibles todavía)*
 - **Planned**: PWA / Saved Views / Since Last Visit.
 - **Experimental**: External retailers, Basket Optimization (calculadora combinada multicompra).
+
+- [x] Fallback ZONE_INVENTORY / SEARCH_DISCOVERY.

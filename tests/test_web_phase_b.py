@@ -17,8 +17,8 @@ def app():
     
     conn = setup_db(db_path)
     c = conn.cursor()
-    c.execute("INSERT INTO stores VALUES ('s1', 'Soriana', '', 'market')")
-    c.execute("INSERT INTO stores VALUES ('s2', 'Chedraui', '', 'market')")
+    c.execute("INSERT INTO stores (store_id, name, brand, type) VALUES ('s1', 'Soriana', '', 'market')")
+    c.execute("INSERT INTO stores (store_id, name, brand, type) VALUES ('s2', 'Chedraui', '', 'market')")
     c.execute("INSERT INTO products (product_id, store_id, name, normalized_quantity, normalized_unit, fingerprint) VALUES ('p1', 's1', 'Electrolit Mora Azul 625 ml', 625, 'ml', 'fp1')")
     c.execute("INSERT INTO products (product_id, store_id, name, normalized_quantity, normalized_unit, fingerprint) VALUES ('p1', 's2', 'Electrolit Mora Azul 625 ml', 625, 'ml', 'fp1')")
     
@@ -106,8 +106,8 @@ def test_compare_anchor_strict_rules(client):
     db = os.path.join(tmp, "strict.db")
     conn = setup_db(db)
     c = conn.cursor()
-    c.execute("INSERT INTO stores VALUES ('s1', 'T1', '', 'market')")
-    c.execute("INSERT INTO stores VALUES ('s2', 'T2', '', 'market')")
+    c.execute("INSERT INTO stores (store_id, name, brand, type) VALUES ('s1', 'T1', '', 'market')")
+    c.execute("INSERT INTO stores (store_id, name, brand, type) VALUES ('s2', 'T2', '', 'market')")
     
     # Anchor
     c.execute("INSERT INTO products (product_id, store_id, name, normalized_name, brand, quantity, unit, normalized_quantity, normalized_unit, fingerprint) VALUES ('p_anc', 's1', 'Coca Cola Original 2 L', 'coca cola original 2 l', 'Coca Cola', '2', 'L', 2000, 'ml', 'fp_coca2l')")

@@ -44,6 +44,31 @@ def run_doctor(conn=None, db_path=None, check_network=False):
     checks.extend(_check_providers(check_network))
     checks.extend(_check_background_runtime())
 
+    import asyncio
+    from .auth import RappiSessionProvider
+    provider = RappiSessionProvider()
+    is_auth = asyncio.run(provider.is_authenticated())
+    
+    # Let's get crawler mode from last run
+    import sqlite3
+    try:
+        tmp_conn = sqlite3.connect(db_path)
+        cur = tmp_conn.cursor()
+        cur.execute("SELECT crawler_mode FROM runs ORDER BY started_at DESC LIMIT 1")
+        row = cur.fetchone()
+        last_mode = row[0] if row else "UNKNOWN"
+        tmp_conn.close()
+    except Exception:
+        last_mode = "UNKNOWN"
+    
+    session_status = "VALID" if is_auth else "NOT_CONFIGURED"
+    
+    sync_status = "READY" if is_auth else "LIMITED"
+    
+    checks.append(("Session", session_status, "Estado de la sesión autenticada."))
+    checks.append(("Crawler Mode", last_mode, "Modo utilizado en la última ejecución."))
+    checks.append(("Catalog Sync", sync_status, "Disponibilidad del inventario de zona completo."))
+
     return checks
 
 

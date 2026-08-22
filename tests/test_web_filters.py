@@ -43,14 +43,14 @@ def test_db(tmp_path):
     conn.commit()
     
     # Store A: Café, Té
-    c.execute("INSERT INTO stores VALUES ('A', 'Store A', 'restaurants')")
+    c.execute("INSERT INTO stores (store_id, name, brand, type) VALUES ('A', 'Store A', 'restaurants')")
     c.execute("INSERT INTO products VALUES ('p1', 'A', 'Cafe 1', 'B', 'Café', 1, 'u', 1, 'u', 1)")
     c.execute("INSERT INTO products VALUES ('p2', 'A', 'Te 1', 'B', 'Té', 1, 'u', 1, 'u', 1)")
     c.execute("INSERT INTO observations VALUES ('p1', 'A', 50, 100, '2023-01-01', 50, '', '', 1, 0)")
     c.execute("INSERT INTO observations VALUES ('p2', 'A', 50, 100, '2023-01-01', 50, '', '', 1, 0)")
     
     # Store B: Hamburguesas, Postres
-    c.execute("INSERT INTO stores VALUES ('B', 'Store B', 'restaurants')")
+    c.execute("INSERT INTO stores (store_id, name, brand, type) VALUES ('B', 'Store B', 'restaurants')")
     c.execute("INSERT INTO products VALUES ('p3', 'B', 'Burger 1', 'B', 'Hamburguesas', 1, 'u', 1, 'u', 1)")
     c.execute("INSERT INTO products VALUES ('p4', 'B', 'Postre 1', 'B', 'Postres', 1, 'u', 1, 'u', 1)")
     c.execute("INSERT INTO observations VALUES ('p3', 'B', 50, 100, '2023-01-01', 50, '', '', 1, 0)")
