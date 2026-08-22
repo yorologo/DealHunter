@@ -149,7 +149,10 @@ class TestSessionService:
         service = SessionService(config_dir=str(tmp_path))
         service.store_persistent("token")
         service.mark_expired()
-        assert service.get_mode() == SESSION_EXPIRED
+        assert service.get_mode() == SESSION_PERSISTENT
+        assert service.get_token() is None
+        assert service.get_raw_token() == "token"
+
         assert service.get_token() is None  # Expired token not served
 
     def test_repr_redacted(self, tmp_path):

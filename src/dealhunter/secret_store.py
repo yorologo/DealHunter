@@ -171,7 +171,7 @@ class SecretStore:
             dk = hashlib.pbkdf2_hmac('sha256', entropy, salt, 100000)
             return base64.urlsafe_b64encode(dk)
 
-    def store(self, token: str) -> bool:
+    def store(self, token: str, is_expired: bool = False) -> bool:
         """Encrypt and persist token."""
         try:
             self._ensure_dir()
@@ -181,6 +181,7 @@ class SecretStore:
             data = {
                 'stored_at': time.time(),
                 'token': token,
+                'is_expired': is_expired,
                 'encryption': ENCRYPTION_METHOD
             }
             raw_data = json.dumps(data).encode('utf-8')
@@ -205,8 +206,8 @@ class SecretStore:
             logger.error(f"Failed to store secret: {e}")
             return False
 
-    def load(self) -> Optional[str]:
-        """Load and decrypt token."""
+    def load_with_metadata(self) -> dict:
+        """Load and decrypt full data dictionary."""
         if not os.path.exists(self.session_file):
             return None
             
@@ -215,7 +216,6 @@ class SecretStore:
                 encrypted = f.read()
                 
             if not os.path.exists(self.salt_file):
-                logger.error("Session file exists but salt file is missing.")
                 return None
                 
             with open(self.salt_file, 'rb') as f:
@@ -234,11 +234,17 @@ class SecretStore:
                 raw_data = base64.b64decode(encrypted)
                 data = json.loads(raw_data.decode('utf-8'))
                 
-            return data.get('token')
+            return data
             
-        except Exception as e:
-            logger.error(f"Failed to load secret: {e}")
+        except Exception:
             return None
+
+    def load(self) -> Optional[str]:
+        """Load and decrypt token."""
+        data = self.load_with_metadata()
+        if data:
+            return data.get('token')
+        return None
 
     def delete(self) -> bool:
         """Securely delete session and salt files."""
@@ -299,13 +305,24 @@ class SecretStore:
 class SessionService:
     """
     High-level abstraction for session management.
-    Handles ephemeral, temporary, and persistent sessions.
     """
-    
     def __init__(self, config_dir: Optional[str] = None):
         self.store = SecretStore(config_dir=config_dir)
         self._temp_token = None
-        self._is_expired = False
+        self._temp_is_expired = False
+        
+    @property
+    def _is_expired(self):
+        if getattr(self, '_temp_is_expired', False):
+            return True
+        data = self.store.load_with_metadata()
+        if data and data.get('is_expired'):
+            return True
+        return False
+        
+    @_is_expired.setter
+    def _is_expired(self, value):
+        self._temp_is_expired = value
 
     def __repr__(self) -> str:
         return '<SessionService (redacted)>'
@@ -325,10 +342,7 @@ class SessionService:
         return self.store.load()
 
     def get_mode(self) -> str:
-        """Returns current session mode constant."""
-        if self._is_expired:
-            return SESSION_EXPIRED
-            
+        """Returns actual session source mode constant."""
         if os.environ.get('RAPPI_BEARER_TOKEN'):
             return SESSION_EPHEMERAL
             
@@ -338,13 +352,38 @@ class SessionService:
         if self.store.exists():
             try:
                 # Quick load test to see if it's corrupted
-                if self.store.load() is None:
+                if self.store.load_with_metadata() is None:
                     return SESSION_CORRUPTED
                 return SESSION_PERSISTENT
             except Exception:
                 return SESSION_CORRUPTED
                 
         return SESSION_NOT_CONFIGURED
+
+    def get_token(self) -> Optional[str]:
+        """Get the current session token (Ephemeral > Temporary > Persistent)."""
+        if self._is_expired:
+            return None
+            
+        ephemeral = os.environ.get('RAPPI_BEARER_TOKEN')
+        if ephemeral:
+            return ephemeral
+            
+        if self._temp_token:
+            return self._temp_token
+            
+        return self.store.load()
+        
+    def get_raw_token(self) -> Optional[str]:
+        """Get the token even if marked as expired."""
+        ephemeral = os.environ.get('RAPPI_BEARER_TOKEN')
+        if ephemeral:
+            return ephemeral
+            
+        if self._temp_token:
+            return self._temp_token
+            
+        return self.store.load()
 
     def get_status(self) -> Dict[str, Any]:
         """Returns safe session status metadata."""
@@ -389,4 +428,7 @@ class SessionService:
 
     def mark_expired(self):
         """Mark session as expired without deleting."""
-        self._is_expired = True
+        self._temp_is_expired = True
+        data = self.store.load_with_metadata()
+        if data and data.get('token'):
+            self.store.store(data['token'], is_expired=True)
