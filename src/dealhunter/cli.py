@@ -534,11 +534,23 @@ def main(args_list=None):
                 state, reqs = run_zone_inventory(config, lat, lng, conn, run_id, dry_run=config.get("dry_run"))
                 if state == "SESSION_EXPIRED":
                     print("SESSION_EXPIRED: Using SEARCH_DISCOVERY mode as fallback.", file=sys.stderr)
+                    c.execute('''UPDATE runs SET crawler_mode = ?, coverage_complete = ?, status = ?, finished_at = CURRENT_TIMESTAMP WHERE run_id = ?''', 
+                              ("ZONE_INVENTORY", 0, "PARTIAL", run_id))
+                    conn.commit()
+                    
+                    import uuid
+                    fallback_run_id = str(uuid.uuid4())
+                    c.execute('INSERT INTO runs (run_id, started_at, status) VALUES (?, CURRENT_TIMESTAMP, "RUNNING")', (fallback_run_id,))
+                    conn.commit()
+                    
                     from dealhunter.crawler import run_discover, run_update
                     if mode == "discover":
-                        state, reqs = run_discover(config, lat, lng, conn, run_id, dry_run=config.get("dry_run"))
+                        state, reqs = run_discover(config, lat, lng, conn, fallback_run_id, dry_run=config.get("dry_run"))
                     else:
-                        state, reqs = run_update(config, lat, lng, conn, run_id, dry_run=config.get("dry_run"))
+                        state, reqs = run_update(config, lat, lng, conn, fallback_run_id, dry_run=config.get("dry_run"))
+                    
+                    # Update run_id variable so the final block uses the fallback run_id
+                    run_id = fallback_run_id
             else:
                 print("NOT_CONFIGURED or disabled: Using SEARCH_DISCOVERY mode as fallback.", file=sys.stderr)
                 from dealhunter.crawler import run_discover, run_update
