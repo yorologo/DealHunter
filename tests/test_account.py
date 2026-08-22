@@ -71,12 +71,12 @@ def test_account_status_unverified(mock_fetch):
 @patch('dealhunter.api.urllib.request.urlopen')
 def test_fetch_profile_waf_fallback_unverified(mock_urlopen):
     from unittest.mock import MagicMock
-    import urllib.error
-    # First call: 403 Forbidden
-    err_403 = urllib.error.HTTPError(url="", code=403, msg="Forbidden", hdrs=None, fp=None)
-    # Second call: 400 Bad Request (fallback)
-    err_400 = urllib.error.HTTPError(url="", code=400, msg="Bad Request", hdrs=None, fp=None)
-    mock_urlopen.side_effect = [err_403, err_400]
+    import json
+    mock_response = MagicMock()
+    mock_response.status = 200
+    mock_response.__enter__.return_value = mock_response
+    mock_response.read.return_value = json.dumps({"stores": [{"eta": ""}]}).encode('utf-8')
+    mock_urlopen.return_value = mock_response
     
     from dealhunter.api import fetch_account_profile
     res = fetch_account_profile("dummy")
@@ -85,16 +85,14 @@ def test_fetch_profile_waf_fallback_unverified(mock_urlopen):
 @patch('dealhunter.api.urllib.request.urlopen')
 def test_fetch_profile_waf_fallback_valid(mock_urlopen):
     from unittest.mock import MagicMock
-    import urllib.error
-    err_403 = urllib.error.HTTPError(url="", code=403, msg="Forbidden", hdrs=None, fp=None)
-    
+    import json
     mock_response = MagicMock()
-    mock_response.status = 200; mock_response.__enter__.return_value = mock_response
-    mock_response.read.return_value = b"{}"
-    
-    mock_urlopen.side_effect = [err_403, mock_response]
+    mock_response.status = 200
+    mock_response.__enter__.return_value = mock_response
+    mock_response.read.return_value = json.dumps({"stores": [{"eta": "8 - 11 min"}]}).encode('utf-8')
+    mock_urlopen.return_value = mock_response
     
     from dealhunter.api import fetch_account_profile
     res = fetch_account_profile("dummy")
     assert isinstance(res, dict)
-    assert res["note"] == "Validated via fallback (200)"
+    assert res["note"] == "Validated via unified-search (eta present)"

@@ -61,14 +61,18 @@ DealHunter implements a dual-mode crawling strategy routed by the **Session Reso
 
 ```mermaid
 flowchart TD
-    CONFIG[Local Storage / Env] --> RESOLVER
-    NETWORK[Rappi API] -. Validation .-> RESOLVER
+    CONFIG[Local Storage / SecretStore] --> RESOLVER
+    RESOLVER[Session Resolver] --> UNIFIED[Unified Search Validator]
     
-    RESOLVER[Session Resolver] --> EFFECTIVE{Effective Session?}
+    UNIFIED --> EVAL{Response Analysis}
+    EVAL -- "200 + eta (Positive Auth)" --> VALID[VALID]
+    EVAL -- "401" --> EXPIRED[EXPIRED]
+    EVAL -- "Ambiguous (WAF, 429, no eta)" --> UNVERIFIED[UNVERIFIED]
     
-    EFFECTIVE -- "VALID" --> ZONE[Zone Inventory]
-    EFFECTIVE -- "UNVERIFIED / EXPIRED / NOT_CONFIGURED" --> SEARCH[Search Discovery]
-
+    VALID --> ZONE[Zone Inventory]
+    EXPIRED --> SEARCH[Search Discovery]
+    UNVERIFIED --> SEARCH
+    
     ZONE -.->|401 Unauthorized| FALLBACK[Partial Run & Fallback]
     FALLBACK --> SEARCH
 

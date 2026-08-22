@@ -38,3 +38,11 @@ Para sortear la imposibilidad de usar DevTools (F12) en navegadores móviles (An
 4. **Nonce Criptográfico**: El servidor de importación requiere un `nonce` aleatorio de 16-bytes (32 hex chars) que se genera en memoria por ejecución. Se acepta un único payload correcto y el servidor se auto-destruye y se apaga inmediatamente tras la importación.
 5. **Por qué no se intercepta TLS o se usa Shizuku**: Las medidas defensivas de Rappi incluyen **Certificate Pinning**, por lo que montar un servidor MITM local está destinado a fallar o ser bloqueado. *Shizuku* falla en nuestro ambiente (Termux) por timeout del servicio o falta de privilegios del sistema para el directorio aislado. La exportación voluntaria vía bookmarklet esquiva toda ofuscación de la app nativa y utiliza la sesión autorizada de la web que el usuario controla.
 6. **No uso de Query Strings**: El payload nunca se pasa vía parámetros `?token=...` en la URL de navegación local, pues esto dejaría rastros en historiales y access logs. Se confina al URI fragment y al POST body.
+
+## 5. Evolución del Validator (v2.9.3)
+Debido a que el WAF de Cloudflare bloquea agresivamente el acceso automatizado a `/api/ms/users/profile` (`403 PATH_NOT_ALLOWED`), el endpoint original fue reemplazado por un validador alternativo: `unified-search`.
+DealHunter envía un payload canónico hacia `unified-search` y evalúa la presencia de evidencia positiva de autenticación.
+
+- **Evidencia Positiva (`VALID`)**: La respuesta estructuralmente contiene el campo `eta` (ej. `8 - 11 min`) u otras métricas que Rappi omite para consultas anónimas.
+- **Sesión Expirada (`EXPIRED`)**: Rappi responde con un código explícito `401 Unauthorized`.
+- **Sesión No Verificable (`UNVERIFIED`)**: Rappi responde de manera ambigua (`200 OK` pero sin `eta`, `400 Bad Request`, o bloqueos WAF temporales). No se asume invalidez, pero tampoco se garantiza operación normal.
