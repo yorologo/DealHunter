@@ -1,5 +1,20 @@
 # Changelog
 
+## v2.9.4 (Unreleased)
+
+Patch release enfocado en la estabilización de la interfaz de administración web y comportamiento del crawler asíncrono:
+
+- La página de detalle del run (Run Detail) muestra el modo del crawler de forma explícita y su nivel de cobertura.
+- Se implementó HTMX para refrescar la lista de ejecuciones y el detalle automáticamente cada 3 a 5 segundos mientras el crawler está activo.
+- Se previenen ejecuciones múltiples simultáneas del crawler web (`double-submit` a nivel servidor y JS).
+- El endpoint `/admin/runs` ya no muta la base de datos para intentar reconciliar ejecuciones, eliminando efectos secundarios de solo lectura.
+- El servidor web lanza el proceso del crawler como una sesión independiente, permitiendo que el crawler termine exitosamente incluso si el servidor web se reinicia.
+- Uso de `INSERT OR IGNORE` en la inicialización de ejecuciones mediante CLI para prevenir duplicaciones o conflictos con la Web UI.
+- Mejor manejo del token CSRF con un mensaje claro humano para errores CSRF genuinos (y preservando otros errores HTTP 400).
+- Fallback a redirección HTTP normal cuando las peticiones como la creación de runs o syncs provienen de clientes que no envían cabeceras de HTMX.
+- Procesamiento UTC estricto en el frontend (`main.js`) para evitar problemas con la zona horaria del navegador.
+- Corregida etiqueta de métricas a "Tiendas conocidas en inventario" para clarificar semántica vs tiendas descubiertas.
+
 ## v2.9.3
 
 Patch release enfocado en:

@@ -39,7 +39,7 @@ Para sortear la imposibilidad de usar DevTools (F12) en navegadores móviles (An
 5. **Por qué no se intercepta TLS o se usa Shizuku**: Las medidas defensivas de Rappi incluyen **Certificate Pinning**, por lo que montar un servidor MITM local está destinado a fallar o ser bloqueado. *Shizuku* falla en nuestro ambiente (Termux) por timeout del servicio o falta de privilegios del sistema para el directorio aislado. La exportación voluntaria vía bookmarklet esquiva toda ofuscación de la app nativa y utiliza la sesión autorizada de la web que el usuario controla.
 6. **No uso de Query Strings**: El payload nunca se pasa vía parámetros `?token=...` en la URL de navegación local, pues esto dejaría rastros en historiales y access logs. Se confina al URI fragment y al POST body.
 
-## 5. Evolución del Validator (v2.9.3)
+## 5. Evolución del Validator (v2.9.4)
 Debido a que el WAF de Cloudflare bloquea agresivamente el acceso automatizado a `/api/ms/users/profile` (`403 PATH_NOT_ALLOWED`), el endpoint original fue reemplazado por un validador alternativo: `unified-search`.
 DealHunter envía un payload canónico hacia `unified-search` y evalúa la presencia de evidencia positiva de autenticación.
 
