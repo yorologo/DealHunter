@@ -550,15 +550,22 @@ def main(args_list=None):
             provider = RappiSessionProvider()
             has_token = asyncio.run(provider.is_authenticated())
             status = SessionStatus().get_current(check_network=False)
-            is_auth = has_token and status.get("status") == "VALID"
+            is_auth = has_token and status.get("status") in ("VALID", "UNVERIFIED", "CONFIGURED")
             print(f"DEBUG: has_token={has_token}, status={status.get('status')}, is_auth={is_auth}", file=sys.stderr)
 
             if is_auth and config.get("catalog_sync", {}).get("enabled", True):
-                print("SESSION_VALID: Using ZONE_INVENTORY mode.", file=sys.stderr)
+                print(f"SESSION_{status.get('status')}: Using ZONE_INVENTORY mode.", file=sys.stderr)
                 from dealhunter.crawler_zone import run_zone_inventory
                 state, reqs = run_zone_inventory(config, lat, lng, conn, run_id, dry_run=config.get("dry_run"))
                 if state == "SESSION_EXPIRED":
                     print("SESSION_EXPIRED: Using SEARCH_DISCOVERY mode as fallback.", file=sys.stderr)
+                    
+                    from dealhunter.secret_store import SessionService
+                    from datetime import timezone
+                    svc = SessionService()
+                    if svc.get_mode() == "PERSISTENT":
+                        svc.update_validation("EXPIRED", datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ'))
+                        
                     c.execute('''UPDATE runs SET crawler_mode = ?, coverage_complete = ?, status = ?, finished_at = CURRENT_TIMESTAMP WHERE run_id = ?''',
                               ("ZONE_INVENTORY", 0, "PARTIAL", run_id))
                     conn.commit()
@@ -576,6 +583,14 @@ def main(args_list=None):
 
                     # Update run_id variable so the final block uses the fallback run_id
                     run_id = fallback_run_id
+                else:
+                    # If it succeeded without EXPIRED, and it was UNVERIFIED or CONFIGURED, mark as VALID
+                    if status.get("status") in ("UNVERIFIED", "CONFIGURED"):
+                        from dealhunter.secret_store import SessionService
+                        from datetime import timezone
+                        svc = SessionService()
+                        if svc.get_mode() == "PERSISTENT":
+                            svc.update_validation("VALID", datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ'))
             else:
                 print("NOT_CONFIGURED or disabled: Using SEARCH_DISCOVERY mode as fallback.", file=sys.stderr)
                 from dealhunter.crawler import run_discover, run_update

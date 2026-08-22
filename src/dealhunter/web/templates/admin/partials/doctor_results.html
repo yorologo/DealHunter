@@ -28,6 +28,9 @@
                         {% if detail.info %}
                             <span class="text-muted">{{ detail.info }}</span>
                         {% endif %}
+                        {% if detail.timestamp %}
+                            <span class="text-muted small local-time ms-1">{{ detail.timestamp }}</span>
+                        {% endif %}
                         {% if detail.reason %}
                             <strong class="text-danger">{{ detail.reason }}</strong>
                         {% endif %}

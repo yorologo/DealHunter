@@ -91,8 +91,12 @@ def format_doctor_output(checks):
                 lines.append(f"    Reason             {detail.get('reason', 'Unknown')}")
                 lines.append(f"    Action             {detail.get('action', '')}")
         elif status not in ("OK", "NOT_IMPLEMENTED", "NOT_CHECKED") and detail:
-            if isinstance(detail, dict) and "info" in detail:
-                lines.append(f"    Info               {detail['info']}")
+            if isinstance(detail, dict):
+                info_text = detail.get('info', '')
+                if 'timestamp' in detail:
+                    info_text = f"{info_text} {detail['timestamp']}".strip()
+                if info_text:
+                    lines.append(f"    Info               {info_text}")
 
     lines.append("")
     overall = "ERROR" if has_error else "HEALTHY"
@@ -233,7 +237,7 @@ def _check_last_run(db_path):
         conn.close()
         if not row:
             return ("Last run", "OK", {"info": "No runs yet"})
-        return ("Last run", "OK", {"info": f"{row[2]} at {row[1]}"})
+        return ("Last run", "OK", {"info": f"{row[2]} at", "timestamp": row[1]})
     except Exception:
         return ("Last run", "OK", {"info": "Could not query runs"})
 

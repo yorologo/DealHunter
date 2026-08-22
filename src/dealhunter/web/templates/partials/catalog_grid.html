@@ -1,3 +1,7 @@
+<div id="catalog-count-header" hx-swap-oob="true" class="text-secondary small">
+    {{ data.total }} {% if filters and (filters.get('store') or filters.get('category') or filters.get('only_deals')) %}resultados{% else %}productos{% endif %}
+</div>
+
 {% if data['items'] %}
     {% if view_mode == 'rows' %}
         <div class="list-group shadow-sm">
@@ -42,10 +46,15 @@
         <div class="fs-1 mb-3">🤷</div>
         {% set has_user_filters = (filters and (filters.get('store') or filters.get('category') or filters.get('only_deals') or filters.get('min_discount'))) %}
         {% if has_user_filters %}
-            <h4>No se encontraron resultados</h4>
-            <p class="text-secondary mb-0">Tus filtros no encontraron resultados. Intenta ajustarlos.</p>
+            <h4>No hay productos que coincidan con los filtros seleccionados.</h4>
+            <p class="text-secondary mb-4">Tus filtros no encontraron resultados. Intenta ajustarlos o limpiarlos.</p>
+            {% set clear_url = current_path|default(request.path) ~ '?sort=' ~ (sort|default('opportunity')) %}
+            {% if filters and filters.get('vertical') %}
+                {% set clear_url = clear_url ~ '&vertical=' ~ filters.get('vertical') %}
+            {% endif %}
+            <a href="{{ clear_url }}" class="btn btn-outline-primary">Limpiar filtros</a>
         {% else %}
-            <h4>No hay productos almacenados aquí</h4>
+            <h4>Aún no hay productos capturados.</h4>
             <p class="text-secondary mb-0">No existen datos capturados para esta sección actualmente. Ejecuta una captura para obtener datos.</p>
         {% endif %}
     </div>

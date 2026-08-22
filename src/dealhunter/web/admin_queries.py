@@ -28,7 +28,7 @@ def get_runs_paginated(db_path, page=1, per_page=20, status_filter=None):
 
     # Get paginated runs
     c.execute(
-        f"SELECT run_id, started_at, finished_at, status, vertical "
+        f"SELECT run_id, started_at, finished_at, status, vertical, crawler_mode, coverage_complete "
         f"FROM runs {where} ORDER BY started_at DESC LIMIT ? OFFSET ?",
         params + [per_page, offset]
     )
@@ -107,7 +107,7 @@ def get_events(db_path, page=1, per_page=50):
     offset = (page - 1) * per_page
 
     c.execute(
-        "SELECT run_id, started_at, finished_at, status, vertical "
+        "SELECT run_id, started_at, finished_at, status, vertical, crawler_mode, coverage_complete "
         "FROM runs WHERE status IN ('FAILED', 'PARTIAL', 'PARTIAL_RUN') "
         "ORDER BY started_at DESC LIMIT ? OFFSET ?",
         (per_page, offset)

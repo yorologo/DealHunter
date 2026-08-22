@@ -63,6 +63,9 @@
                             {% elif status == 'CONFIGURED' %}
                                 No verificada recientemente
                             {% elif status == 'VALID' %}
+                                {% if action_required == 'NETWORK_UNVERIFIED_WARNING' %}
+                                    <span class="text-warning"><i class="bi bi-exclamation-triangle"></i> Falló comprobación temporal (WAF/Rate Limit), pero se mantiene válida por historial.</span><br>
+                                {% endif %}
                                 {% if market and market != 'UNKNOWN' %}
                                 {{ region }} ({{ market }})
                                 {% if has_prime %}<br><i class="bi bi-star-fill text-warning"></i> Prime ({{ prime_type }}){% endif %}
@@ -85,7 +88,7 @@
                 <div class="col-md-5 d-flex flex-column justify-content-center align-items-end border-start">
                     <div class="d-grid gap-2 w-100 px-3">
                         {% if configured %}
-                            <button class="btn btn-outline-primary"
+                            <button class="btn {% if status == 'UNVERIFIED' %}btn-primary{% else %}btn-outline-primary{% endif %}"
                                     hx-post="/admin/account/check"
                                     hx-target="#account-status-card"
                                     hx-swap="outerHTML" hx-select="#account-status-card"

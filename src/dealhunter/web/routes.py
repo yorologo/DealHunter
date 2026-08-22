@@ -81,7 +81,7 @@ def register_routes(app):
         data = get_best_buys(db_path, filters, sort, page)
         
         if request.headers.get('HX-Request') and not request.headers.get('HX-Boosted'):
-            return render_template('partials/catalog_grid.html', data=data, view_mode=request.cookies.get('view_mode', 'cards'), is_best_buys=True)
+            return render_template('partials/catalog_grid.html', data=data, filters=filters, sort=sort, view_mode=request.cookies.get('view_mode', 'cards'), is_best_buys=True)
             
         av_cats = get_available_categories(db_path, store_type if store_type else None)
         return render_template('best.html', data=data, sort=sort, filters={"category": category, "store_type": store_type}, av_cats=av_cats, current_path='/best', is_best_buys=True)
@@ -95,7 +95,7 @@ def register_routes(app):
         tab = request.args.get('tab', 'Todo')
         data = get_deals(db_path, {"tab": tab}, sort, page)
         if request.headers.get('HX-Request') and not request.headers.get('HX-Boosted'):
-            return render_template('partials/catalog_grid.html', data=data, view_mode=request.cookies.get('view_mode', 'cards'))
+            return render_template('partials/catalog_grid.html', data=data, filters=filters, sort=sort, view_mode=request.cookies.get('view_mode', 'cards'))
         return render_template('deals.html', data=data, tab=tab, sort=sort, current_path='/deals')
         
     @app.route('/market')
@@ -111,7 +111,7 @@ def register_routes(app):
         if request.args.get('only_deals'): filters['only_deals'] = True
         data = get_catalog(db_path, filters, sort, page)
         if request.headers.get('HX-Request') and not request.headers.get('HX-Boosted'):
-            return render_template('partials/catalog_grid.html', data=data, view_mode=request.cookies.get('view_mode', 'cards'))
+            return render_template('partials/catalog_grid.html', data=data, filters=filters, sort=sort, view_mode=request.cookies.get('view_mode', 'cards'))
         av_stores = get_available_stores(db_path, "market")
         av_cats = get_available_categories(db_path, "market", store)
         return render_template('catalog.html', data=data, sort=sort, filters=filters, av_stores=av_stores, av_cats=av_cats, title="Supermercados", current_path='/market', emoji="🛒")
@@ -129,7 +129,7 @@ def register_routes(app):
         if request.args.get('only_deals'): filters['only_deals'] = True
         data = get_catalog(db_path, filters, sort, page)
         if request.headers.get('HX-Request') and not request.headers.get('HX-Boosted'):
-            return render_template('partials/catalog_grid.html', data=data, view_mode=request.cookies.get('view_mode', 'cards'))
+            return render_template('partials/catalog_grid.html', data=data, filters=filters, sort=sort, view_mode=request.cookies.get('view_mode', 'cards'))
         av_stores = get_available_stores(db_path, "turbo")
         av_cats = get_available_categories(db_path, "turbo", store)
         return render_template('catalog.html', data=data, sort=sort, filters=filters, av_stores=av_stores, av_cats=av_cats, title="Rappi Turbo", current_path='/turbo', emoji="⚡")
@@ -162,7 +162,7 @@ def register_routes(app):
         if request.args.get('only_deals'): filters['only_deals'] = True
         data = get_catalog(db_path, filters, sort, page)
         if request.headers.get('HX-Request') and not request.headers.get('HX-Boosted'):
-            return render_template('partials/catalog_grid.html', data=data, view_mode=request.cookies.get('view_mode', 'cards'))
+            return render_template('partials/catalog_grid.html', data=data, filters=filters, sort=sort, view_mode=request.cookies.get('view_mode', 'cards'))
         av_stores = get_available_stores(db_path)
         av_cats = get_available_categories(db_path, None, store)
         return render_template('catalog.html', data=data, sort=sort, filters=filters, av_stores=av_stores, av_cats=av_cats, title=f"Categoría: {category}", current_path='/categories', emoji="📦")
@@ -184,7 +184,7 @@ def register_routes(app):
         filters = {"store": store_id}
         data = get_catalog(db_path, filters, sort, page)
         if request.headers.get('HX-Request') and not request.headers.get('HX-Boosted'):
-            return render_template('partials/catalog_grid.html', data=data, view_mode=request.cookies.get('view_mode', 'cards'))
+            return render_template('partials/catalog_grid.html', data=data, filters=filters, sort=sort, view_mode=request.cookies.get('view_mode', 'cards'))
         return render_template('store_detail.html', detail=detail, data=data, sort=sort, filters=filters, current_path='/stores')
 
 
@@ -206,7 +206,7 @@ def register_routes(app):
         data = get_catalog(db_path, filters, sort, page)
         
         if request.headers.get('HX-Request'):
-            return render_template('partials/catalog_grid.html', data=data, current_path='/restaurants')
+            return render_template('partials/catalog_grid.html', data=data, filters=filters, sort=sort, current_path='/restaurants')
             
         av_stores = get_available_stores(db_path, "restaurants")
         av_cats = get_available_categories(db_path, "restaurants", store)

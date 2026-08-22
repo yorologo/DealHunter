@@ -9,7 +9,7 @@ import json
 import base64
 import hashlib
 import platform
-from datetime import datetime
+from datetime import datetime, timezone
 import getpass
 import logging
 import time
@@ -434,7 +434,7 @@ class SessionService:
         self._temp_is_expired = True
         data = self.store.load_with_metadata()
         if data and data.get('token'):
-            self.store.store(data['token'], is_expired=True, last_validation_status="EXPIRED", last_validated_at=datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%SZ') if 'datetime' in globals() else None)
+            self.store.store(data['token'], is_expired=True, last_validation_status="EXPIRED", last_validated_at=datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ') if 'datetime' in globals() else None)
 
     def update_validation(self, status: str, timestamp: str):
         """Update the last validation status and timestamp."""

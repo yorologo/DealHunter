@@ -61,14 +61,23 @@ class SessionStatus:
 
         # 2. Check network if explicitly requested and not already expired
         if check_network and status != "EXPIRED" and token:
-            try:
-                data = fetch_account_profile(token)
-                now_str = datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%SZ')
-                if data in ("RATE_LIMIT", "UNVERIFIED"):
-                    result["status"] = "UNVERIFIED"
-                    result["last_validated_at"] = now_str
+            from datetime import timezone
+            now_str = datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')
+            
+            def _handle_ambiguous(res_dict, current_status):
+                if current_status == "VALID":
+                    res_dict["status"] = "VALID"
+                    res_dict["action_required"] = "NETWORK_UNVERIFIED_WARNING"
+                else:
+                    res_dict["status"] = "UNVERIFIED"
+                    res_dict["last_validated_at"] = now_str
                     if hasattr(svc, 'update_validation'):
                         svc.update_validation("UNVERIFIED", now_str)
+
+            try:
+                data = fetch_account_profile(token)
+                if data in ("RATE_LIMIT", "UNVERIFIED"):
+                    _handle_ambiguous(result, status)
                 elif not data:
                     result["status"] = "EXPIRED"
                     svc.mark_expired()
@@ -86,19 +95,11 @@ class SessionStatus:
                 if e.code == "ACCOUNT_SESSION_UNAVAILABLE":
                     result["status"] = "EXPIRED"
                     svc.mark_expired()
-                    result["last_validated_at"] = datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%SZ')
-                else:
-                    now_str = datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%SZ')
-                    result["status"] = "UNVERIFIED"
                     result["last_validated_at"] = now_str
-                    if hasattr(svc, 'update_validation'):
-                        svc.update_validation("UNVERIFIED", now_str)
+                else:
+                    _handle_ambiguous(result, status)
             except Exception:
-                now_str = datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%SZ')
-                result["status"] = "UNVERIFIED"
-                result["last_validated_at"] = now_str
-                if hasattr(svc, 'update_validation'):
-                    svc.update_validation("UNVERIFIED", now_str)
+                _handle_ambiguous(result, status)
 
         if result["status"] == "EXPIRED":
             result["action_required"] = "UPDATE_SESSION"
