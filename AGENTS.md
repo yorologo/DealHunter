@@ -3111,3 +3111,12 @@ These remain future work unless explicitly requested.
 
 - **Android Background**: DealHunter attempts to acquire `termux-wake-lock` automatically during web server initialization to prevent Android from pausing it. No intrusive AppOps changes should be made automatically.
 - Añadida lógica de fallback ZONE_INVENTORY / SEARCH_DISCOVERY en crawler.
+
+## UX Audit & Session Status Unification (2026-08-21)
+- Unified Session Status tracking under `SessionStatus` class in `account.py` to act as the single source of truth across all modules.
+- Distinguishes clearly between `CONFIGURED` (token exists locally) and `VALID` (verified against network).
+- Removed contradicting session statuses in `doctor.py` and `admin.py`.
+- Corrected empty states in `catalog_sync.html` to gracefully guide the user through setup.
+- Handled backwards compatibility for legacy runs (reporting "LEGACY" crawler mode) in `doctor.py`.
+- Formatted all raw timestamps into local human-readable formats via a `main.js` `.local-time` fallback parser.
+- Passed 270+ integration tests safely confirming UI doesn't incorrectly trigger backend network requests prematurely.

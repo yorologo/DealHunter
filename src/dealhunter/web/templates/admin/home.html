@@ -16,7 +16,7 @@
         <div>
             <strong>Estado del sistema:</strong> {{ health }}
             {% if stats.last_run %}
-            <span class="ms-3 text-muted small">Último run: {{ stats.last_run }}</span>
+            <span class="ms-3 text-muted small">Último run: <span class="local-time">{{ stats.last_run }}</span></span>
             {% endif %}
         </div>
     </div>
@@ -84,11 +84,11 @@
     <!-- Navigation Cards -->
     <div class="row g-3">
         <div class="col-md-4 col-sm-6">
-            <a href="/admin/account" class="text-decoration-none">
+            <a href="/admin/catalog-sync" class="text-decoration-none">
                 <div class="card shadow-sm h-100 border-start border-4 border-info">
                     <div class="card-body">
-                        <h5 class="card-title">👤 Cuenta & Sesión</h5>
-                        <p class="card-text text-muted small">Estado del token. Diagnóstico read-only.</p>
+                        <h5 class="card-title">👤 Catalog Sync 👤 Cuenta & Sesión Sesión</h5>
+                        <p class="card-text text-muted small">Gestión de sesión y sincronización de zona.</p>
                     </div>
                 </div>
             </a>

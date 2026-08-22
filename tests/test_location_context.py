@@ -10,6 +10,7 @@ def _isolated_environment(monkeypatch, tmp_path):
     monkeypatch.setenv("RAPPI_DB_PATH", str(db_path))
     monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "config"))
     monkeypatch.setattr(cli, "run_discover", lambda *args, **kwargs: ("COMPLETED", 0))
+    monkeypatch.setattr('dealhunter.auth.RappiSessionProvider.is_authenticated', __import__('unittest.mock').mock.AsyncMock(return_value=False))
     return db_path
 
 

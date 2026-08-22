@@ -105,7 +105,7 @@ class TestAdminAccount:
         rv = client.get('/admin/account')
         assert rv.status_code == 200
         # Page shows token status but does NOT call get_account_status
-        assert b'Token' in rv.data or b'token' in rv.data
+        assert b'Sesi' in rv.data or b'sesi' in rv.data
 
     def test_account_never_shows_token(self, client):
         """Token value must never appear in output."""

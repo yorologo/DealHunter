@@ -44,11 +44,7 @@ def run_doctor(conn=None, db_path=None, check_network=False):
     checks.extend(_check_providers(check_network))
     checks.extend(_check_background_runtime())
 
-    import asyncio
-    from .auth import RappiSessionProvider
-    provider = RappiSessionProvider()
-    is_auth = asyncio.run(provider.is_authenticated())
-    
+
     # Let's get crawler mode from last run
     import sqlite3
     try:
@@ -56,18 +52,26 @@ def run_doctor(conn=None, db_path=None, check_network=False):
         cur = tmp_conn.cursor()
         cur.execute("SELECT crawler_mode FROM runs ORDER BY started_at DESC LIMIT 1")
         row = cur.fetchone()
-        last_mode = row[0] if row else "UNKNOWN"
+        last_mode = row[0]
+        if last_mode is None:
+            last_mode = "LEGACY (Pre-Zone Inventory)"
+        elif not last_mode:
+            last_mode = "UNKNOWN"
         tmp_conn.close()
     except Exception:
-        last_mode = "UNKNOWN"
+        last_mode = "Aún no determinado"
+        
+    from .account import get_account_status
+    cfg = load_config()
+    session_res = get_account_status(cfg, check_network=False)
     
-    session_status = "VALID" if is_auth else "NOT_CONFIGURED"
+    if session_res["effective"]:
+        sync_status = "READY (Zone Inventory)"
+    else:
+        sync_status = "LIMITED (Search Discovery)"
     
-    sync_status = "READY" if is_auth else "LIMITED"
-    
-    checks.append(("Session", session_status, "Estado de la sesión autenticada."))
-    checks.append(("Crawler Mode", last_mode, "Modo utilizado en la última ejecución."))
-    checks.append(("Catalog Sync", sync_status, "Disponibilidad del inventario de zona completo."))
+    checks.append(("Crawler Mode", last_mode, {"info": "Modo utilizado en la última ejecución"}))
+    checks.append(("Catalog Sync", sync_status, {"info": "Cobertura actual"}))
 
     return checks
 
@@ -251,67 +255,28 @@ def _check_partial_runs(db_path):
         return ("Partial runs", "OK", {"info": "0"})
 
 
+
 def _check_providers(check_network=False):
     """Check providers status including account and session storage."""
-    from .account import get_account_token, get_account_status
+    from .account import get_account_status
     
-    acc_status = "NOT_CONFIGURED"
-    try:
-        cfg = load_config()
-        token = get_account_token(cfg)
-        if token:
-            if check_network:
-                try:
-                    res = get_account_status(cfg)
-                    acc_status = res.get("status", "UNAVAILABLE")
-                except:
-                    acc_status = "UNAVAILABLE"
-            else:
-                acc_status = "UNVERIFIED (use --network)"
-    except:
-        pass
-
-    # Session storage check
-    session_check = _check_session_storage()
+    cfg = load_config()
+    res = get_account_status(cfg, check_network=check_network)
+    
+    acc_status = res["status"]
+    if not check_network and acc_status == "CONFIGURED":
+        acc_status = "CONFIGURED (use --network)"
+        
+    detail = None
+    if res["source"] != "SESSION_NOT_CONFIGURED":
+        detail = f"Source: {res['source']}"
         
     return [
-        ("Rappi catalog", "NOT_CHECKED", None),
+        ("Rappi catalog", "AVAILABLE", None),
         ("Turbo", "AVAILABLE", None),
-        ("Restaurants", "AVAILABLE", None),
-        ("Account context", acc_status, None),
-        session_check,
+        ("Restaurants", "AVAILABLE", {"info": "Requires matching keyword"}),
+        ("Rappi Session", acc_status, {"info": detail} if detail else None),
     ]
-
-
-def _check_session_storage():
-    """Check Catalog Sync session storage health."""
-    try:
-        from .secret_store import SessionService, SESSION_NOT_CONFIGURED, SESSION_CORRUPTED, SESSION_PERSISTENT, SESSION_TEMPORARY, SESSION_EPHEMERAL
-        svc = SessionService()
-        mode = svc.get_mode()
-        
-        if mode == SESSION_NOT_CONFIGURED:
-            return ("Catalog Sync session", "NOT_CONFIGURED", None)
-        elif mode == SESSION_CORRUPTED:
-            return ("Catalog Sync session", "WARNING", {
-                "info": "Encrypted session file is corrupted"
-            })
-        elif mode in (SESSION_PERSISTENT, SESSION_TEMPORARY, SESSION_EPHEMERAL):
-            warnings = svc.store.check_permissions()
-            if warnings:
-                return ("Catalog Sync session", "WARNING", {
-                    "info": "; ".join(warnings)
-                })
-            return ("Catalog Sync session", "CONFIGURED", {
-                "info": f"Mode: {mode}"
-            })
-        else:
-            return ("Catalog Sync session", mode, None)
-    except Exception as e:
-        return ("Catalog Sync session", "ERROR", {
-            "reason": str(e),
-            "action": "Check secret_store module"
-        })
 
 
 def _check_background_runtime():
