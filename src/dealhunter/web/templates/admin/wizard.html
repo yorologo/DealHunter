@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% block title %}Asistente de Configuración - DealHunter{% endblock %}
+
+{% block content %}
+<div class="container-fluid max-w-md mx-auto" style="max-width: 600px;">
+    <nav aria-label="breadcrumb" class="mb-3">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="/admin">Administración</a></li>
+            <li class="breadcrumb-item"><a href="{{ current_path }}">{{ 'Cuenta' if current_path == '/admin/account' else 'Catalog Sync' }}</a></li>
+            <li class="breadcrumb-item active">Wizard</li>
+        </ol>
+    </nav>
+
+    <h2 class="mb-4">Asistente de Importación de Sesión</h2>
+
+    <div class="card shadow-sm mb-4">
+        <div class="card-body">
+            <h5 class="card-title">1. Obtén tu token de Rappi</h5>
+            <p class="text-muted">Para que DealHunter pueda descargar los catálogos de los supermercados de tu zona, necesitas proveer un token de sesión de tu cuenta de Rappi. <strong>Puedes obtenerlo fácilmente utilizando este script en tu navegador.</strong></p>
+            
+            <div class="mb-3">
+                <label class="form-label fw-bold">Instrucciones</label>
+                <ol class="small text-muted">
+                    <li>Abre <a href="https://www.rappi.com.mx/" target="_blank">www.rappi.com.mx</a> y asegúrate de haber iniciado sesión.</li>
+                    <li>Abre las herramientas de desarrollo de tu navegador (F12 o Ctrl+Shift+I).</li>
+                    <li>Ve a la pestaña <strong>Consola (Console)</strong>.</li>
+                    <li>Pega y ejecuta el siguiente código:</li>
+                </ol>
+            </div>
+            
+            <div class="position-relative mb-3">
+                <textarea class="form-control font-monospace text-muted small bg-light" rows="1" readonly>localStorage.getItem('access_token');</textarea>
+            </div>
+        </div>
+    </div>
+
+    <div class="card shadow-sm">
+        <div class="card-body">
+            <h5 class="card-title">2. Guarda el Token</h5>
+            <p class="text-muted">Pega el token (sin comillas) en el campo de abajo. Será cifrado localmente mediante <code>cryptography/Fernet</code>.</p>
+            
+            <form action="/admin/catalog-sync/wizard/store" method="POST">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                <input type="hidden" name="return_path" value="{{ current_path }}">
+                
+                <div class="mb-3">
+                    <label for="tokenInput" class="form-label fw-bold">RAPPI_BEARER_TOKEN</label>
+                    <input type="password" class="form-control" id="tokenInput" name="token" placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI..." required>
+                </div>
+                
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Modo de almacenamiento</label>
+                    <select class="form-select" name="session_mode">
+                        <option value="persistent">Persistente (Recomendado - cifrado localmente)</option>
+                        <option value="temporary">Temporal (Se elimina al reiniciar DealHunter)</option>
+                    </select>
+                </div>
+                
+                <div class="d-grid gap-2 d-md-flex justify-content-md-end mt-4">
+                    <a href="{{ current_path }}" class="btn btn-outline-secondary me-md-2">Cancelar</a>
+                    <button type="submit" class="btn btn-primary">Guardar y Continuar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

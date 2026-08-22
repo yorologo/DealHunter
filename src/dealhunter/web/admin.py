@@ -397,6 +397,46 @@ def settings_update():
 # ──────────────────────────────────
 
 
+
+@admin_bp.route('/catalog-sync/wizard')
+def catalog_sync_wizard():
+    """Wizard to import a Rappi session."""
+    from dealhunter.account import get_account_status
+    cfg = load_config()
+    acc = get_account_status(cfg, check_network=False)
+    
+    return render_template('admin/wizard.html', 
+                           current_path='/admin/catalog-sync',
+                           status=acc['status'],
+                           mode=acc['mode'])
+
+
+@admin_bp.route('/catalog-sync/wizard/store', methods=['POST'])
+def catalog_sync_wizard_store():
+    """Store session from wizard and redirect back."""
+    from dealhunter.secret_store import SessionService
+    from flask import redirect, request, flash
+    
+    token = request.form.get('token', '').strip()
+    mode = request.form.get('session_mode', 'persistent')
+    return_path = request.form.get('return_path', '/admin/account')
+    
+    if not token:
+        flash("No se proporcionó un token.", "error")
+        return redirect('/admin/catalog-sync/wizard')
+        
+    svc = SessionService()
+    if mode == 'persistent':
+        success = svc.store_persistent(token)
+        if not success:
+            flash("Error al guardar la sesión cifrada.", "error")
+            return redirect('/admin/catalog-sync/wizard')
+    else:
+        svc.store_temporary(token)
+        
+    flash("Sesión importada correctamente.", "success")
+    return redirect(return_path)
+
 @admin_bp.route('/catalog-sync')
 def catalog_sync():
     """Catalog Sync dashboard with session status."""
@@ -550,6 +590,7 @@ def session_check():
 def catalog_sync_run():
     """Trigger a catalog sync run."""
     from dealhunter.secret_store import SessionService
+    from dealhunter.config import load_config
     svc = SessionService()
     token = svc.get_token()
 
@@ -560,14 +601,16 @@ def catalog_sync_run():
         import asyncio
         from dealhunter.catalog_sync import run_sync
         import sqlite3
+        import uuid
         db_path = current_app.config['DATABASE']
         conn = sqlite3.connect(db_path)
+        cfg = load_config()
 
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
         try:
             status, report = loop.run_until_complete(
-                run_sync(None, 19.4326, -99.1332, conn, None)
+                run_sync(cfg, 19.4326, -99.1332, conn, str(uuid.uuid4()))
             )
         finally:
             loop.close()
@@ -575,9 +618,11 @@ def catalog_sync_run():
 
         return f'''<div class="alert alert-success">
             <strong>Sincronización completada</strong><br>
+            Estado: {status}<br>
             Comercios procesados: {report.merchants_completed}/{report.merchants_attempted}<br>
             Productos únicos extraídos: {report.items_unique}
         </div>'''
+
     except Exception as e:
         return f'<div class="alert alert-danger">Error: {escape(str(e))}</div>'
 

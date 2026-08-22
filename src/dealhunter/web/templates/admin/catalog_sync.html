@@ -17,17 +17,30 @@
         <div class="col-lg-7">
             <div class="card shadow-sm h-100">
                 <div class="card-body">
-                    {% if valid %}
+                    
+                    {% if status == 'VALID' and stores_count > 0 %}
                     <div class="alert alert-success">
                         <h4 class="alert-heading mb-2">✅ Inventario de zona activo</h4>
                         <p class="mb-0">Usa tu sesión para consultar los catálogos disponibles en tu zona y mantener tiendas, productos, precios y disponibilidad actualizados de forma automática.</p>
                     </div>
-                    {% elif session_ready %}
+                    {% elif status == 'VALID' %}
+                    <div class="alert alert-success">
+                        <h4 class="alert-heading mb-2">✅ Sesión validada</h4>
+                        <p class="mb-0">Tu sesión es válida pero no has ejecutado una sincronización de Zone Inventory aún. <a href="#" onclick="document.getElementById('sync-form').submit(); return false;" class="alert-link">Sincroniza ahora</a> para descubrir tiendas.</p>
+                        <form id="sync-form" action="/admin/catalog-sync/run" method="POST" style="display: none;"></form>
+                    </div>
+                    {% elif status == 'EXPIRED' %}
+                    <div class="alert alert-danger">
+                        <h4 class="alert-heading mb-2">❌ Sesión expirada o inválida</h4>
+                        <p class="mb-0">El token actual ha sido rechazado por el servidor. Por favor, <a href="/admin/catalog-sync/wizard" class="alert-link">importa uno nuevo</a>.</p>
+                    </div>
+                    {% elif status == 'CONFIGURED' %}
                     <div class="alert alert-info">
                         <h4 class="alert-heading mb-2">ℹ️ Sesión configurada pero no comprobada</h4>
                         <p class="mb-0">Tienes una sesión configurada, pero necesitas comprobarla en la sección Cuenta & Sesión antes de asegurar que Catalog Sync funcione correctamente.</p>
                     </div>
                     {% else %}
+
                     <div class="alert alert-warning">
                         <h4 class="alert-heading mb-2">⚠ Cobertura limitada (Search Discovery)</h4>
                         <p>DealHunter funciona sin sesión mediante "descubrimiento por búsquedas", pero la cobertura es parcial y la disponibilidad no se reconcilia completamente.</p>
