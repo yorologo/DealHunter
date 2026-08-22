@@ -8,63 +8,92 @@
         </ol>
     </nav>
 
-    <h2 class="mb-1">👤 Estado de Cuenta</h2>
-    <p class="text-muted">Diagnóstico read-only. DealHunter nunca almacena tokens de sesión.</p>
+    <h2 class="mb-1">👤 Sesión Rappi</h2>
+    <p class="text-muted mb-4">Gestión de sesión para sincronización de catálogo e inventario de zona.</p>
 
-    <!-- Status: Token Configuration -->
-    <div class="card shadow-sm mb-4">
+    <!-- Session Status Card -->
+    <div class="card shadow-sm mb-4" id="account-status-card">
         <div class="card-body">
-            <h5 class="card-title">Configuración del Token</h5>
-            <div class="d-flex align-items-center gap-3 mt-3">
-                {% if has_token %}
-                <span class="badge bg-success fs-6 px-3 py-2">✅ Token configurado</span>
-                <span class="text-muted small">Disponible vía variable de entorno <code>RAPPI_BEARER_TOKEN</code></span>
-                {% else %}
-                <span class="badge bg-warning text-dark fs-6 px-3 py-2">⚠️ Sin token</span>
-                <span class="text-muted small">Configura <code>RAPPI_BEARER_TOKEN</code> en tu entorno</span>
-                {% endif %}
+            <div class="row">
+                <div class="col-md-7">
+                    <h5 class="card-title mb-3">Estado de la Sesión</h5>
+                    <dl class="row mb-0">
+                        <dt class="col-sm-4 text-muted fw-normal">Estado:</dt>
+                        <dd class="col-sm-8">
+                            {% if status == 'VALID' %}
+                                <span class="badge bg-success fs-6"><i class="bi bi-check-circle"></i> Válida</span>
+                            {% elif status == 'EXPIRED' %}
+                                <span class="badge bg-danger fs-6"><i class="bi bi-x-circle"></i> Expirada</span>
+                            {% elif status == 'CONFIGURED' %}
+                                <span class="badge bg-info text-dark fs-6"><i class="bi bi-info-circle"></i> Configurada, sin comprobar</span>
+                            {% elif status == 'INVALID' %}
+                                <span class="badge bg-warning text-dark fs-6"><i class="bi bi-exclamation-triangle"></i> Inválida (Corrupta)</span>
+                            {% else %}
+                                <span class="badge bg-secondary fs-6">No configurada</span>
+                            {% endif %}
+                        </dd>
+
+                        <dt class="col-sm-4 text-muted fw-normal">Origen:</dt>
+                        <dd class="col-sm-8">
+                            {% if source == 'SESSION_PERSISTENT' %}
+                                <i class="bi bi-shield-lock text-success"></i> Almacenamiento local cifrado
+                            {% elif source == 'SESSION_EPHEMERAL' %}
+                                <i class="bi bi-terminal"></i> Variable de entorno <code>RAPPI_BEARER_TOKEN</code> (Temporal)
+                            {% elif source == 'SESSION_TEMPORARY' %}
+                                <i class="bi bi-clock-history"></i> Memoria RAM (Temporal)
+                            {% else %}
+                                -
+                            {% endif %}
+                        </dd>
+                        
+                        <dt class="col-sm-4 text-muted fw-normal">Detalles:</dt>
+                        <dd class="col-sm-8 text-muted small mb-0">
+                            {% if market and market != 'UNKNOWN' %}
+                                {{ region }} ({{ market }})
+                                {% if has_prime %}<br><i class="bi bi-star-fill text-warning"></i> Prime ({{ prime_type }}){% endif %}
+                            {% else %}
+                                No verificada recientemente
+                            {% endif %}
+                        </dd>
+                    </dl>
+                </div>
+                <div class="col-md-5 d-flex flex-column justify-content-center align-items-end border-start">
+                    <div class="d-grid gap-2 w-100 px-3">
+                        {% if configured %}
+                            <button class="btn btn-outline-primary"
+                                    hx-post="/admin/account/check"
+                                    hx-target="#account-status-card"
+                                    hx-swap="outerHTML" hx-select="#account-status-card"
+                                    hx-headers='{"X-CSRF-Token": "{{ csrf_token }}"}'
+                                    hx-indicator="#account-spinner">
+                                <span id="account-spinner" class="htmx-indicator spinner-border spinner-border-sm me-2" role="status"></span>
+                                Comprobar sesión
+                            </button>
+                            <a href="/admin/catalog-sync/wizard" class="btn btn-outline-secondary">
+                                Reemplazar sesión
+                            </a>
+                            {% if source == 'SESSION_PERSISTENT' or source == 'SESSION_TEMPORARY' %}
+                            <button class="btn btn-outline-danger"
+                                    hx-post="/admin/account/delete"
+                                    hx-confirm="¿Seguro que deseas eliminar la sesión actual?"
+                                    hx-headers='{"X-CSRF-Token": "{{ csrf_token }}"}'>
+                                Eliminar sesión
+                            </button>
+                            {% endif %}
+                        {% else %}
+                            <a href="/admin/catalog-sync/wizard" class="btn btn-primary">
+                                Configurar sesión
+                            </a>
+                        {% endif %}
+                    </div>
+                </div>
             </div>
-
-            <div class="alert alert-info mt-3 small" role="alert">
-                <strong>Privacidad:</strong> El token es efímero (solo en memoria desde la variable de entorno).
-                DealHunter nunca persiste tokens, cookies, emails, teléfonos, direcciones ni datos de pago.
-            </div>
         </div>
     </div>
-
-    <!-- Explanation -->
-    <div class="card shadow-sm mb-4">
-        <div class="card-body">
-            <h5 class="card-title">¿Qué muestra la verificación?</h5>
-            <p class="text-muted">Al comprobar conectividad, DealHunter solo muestra información sanitizada:</p>
-            <ul class="list-unstyled">
-                <li>✅ Sesión válida / inválida</li>
-                <li>✅ Región / mercado</li>
-                <li>✅ Estado de membresía</li>
-                <li>✅ Conteo de promociones disponibles</li>
-            </ul>
-            <p class="text-muted small">Nunca se muestra: nombre, email, teléfono, dirección, datos de pago, IDs de cuenta.</p>
-        </div>
+    
+    <div class="alert alert-info mt-3 small" role="alert">
+        <strong>Privacidad:</strong> DealHunter nunca guarda emails, teléfonos, direcciones ni datos de pago. La sesión se utiliza estrictamente para consultar catálogos de tiendas e inventario de zona en nombre del usuario local.
     </div>
 
-    <!-- Action: Explicit Network Check -->
-    <div class="card shadow-sm mb-4">
-        <div class="card-body">
-            <h5 class="card-title">Comprobar Conectividad</h5>
-            <p class="text-muted small">Esta acción realiza una solicitud de red a la API de Rappi.</p>
-            <button class="btn btn-primary"
-                    hx-post="/admin/account/check"
-                    hx-target="#account-results"
-                    hx-headers='{"X-CSRF-Token": "{{ csrf_token }}"}'
-                    hx-indicator="#account-spinner">
-                🌐 Comprobar cuenta
-            </button>
-            <span id="account-spinner" class="htmx-indicator ms-2">
-                <span class="spinner-border spinner-border-sm" role="status"></span> Verificando...
-            </span>
-        </div>
-    </div>
-
-    <div id="account-results"></div>
 </div>
 {% endblock %}

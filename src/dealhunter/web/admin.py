@@ -82,27 +82,40 @@ def admin_home():
                            health=health)
 
 
+
 @admin_bp.route('/account')
 def account():
-    """Account diagnostics — read-only, no network on load."""
+    """Account management and diagnostics."""
     cfg = load_config()
-    token = get_account_token(cfg)
+    db_path = current_app.config.get('DB_PATH')
+    from dealhunter.account import get_account_status
+    # Do NOT hit network on load
+    status = get_account_status(cfg, check_network=False)
+    
     return render_template('admin/account.html',
                            current_path='/admin/account',
-                           has_token=bool(token))
-
+                           **status)
 
 @admin_bp.route('/account/check', methods=['POST'])
 def account_check():
-    """Explicit account check — opt-in network request."""
-    try:
-        cfg = load_config()
-        status = get_account_status(cfg)
-        return render_template('admin/partials/account_status.html', status=status)
-    except Exception as e:
-        return render_template('admin/partials/account_status.html',
-                               status={"status": "ERROR", "error": str(e)})
+    """Explicit account check - hits network."""
+    cfg = load_config()
+    db_path = current_app.config.get('DB_PATH')
+    from dealhunter.account import get_account_status
+    status = get_account_status(cfg, check_network=True)
+    
+    return render_template('admin/account.html',
+                           current_path='/admin/account',
+                           **status)
 
+@admin_bp.route('/account/delete', methods=['POST'])
+def account_delete():
+    from dealhunter.secret_store import SessionService
+    svc = SessionService()
+    svc.invalidate()
+    # Redirect to account page
+    from flask import redirect
+    return redirect('/admin/account')
 
 @admin_bp.route('/runs')
 def runs():
@@ -383,29 +396,52 @@ def settings_update():
 #  Catalog Sync — Session Management
 # ──────────────────────────────────
 
+
 @admin_bp.route('/catalog-sync')
 def catalog_sync():
     """Catalog Sync dashboard with session status."""
     from dealhunter.secret_store import SessionService
+    from dealhunter.account import get_account_status
+    
     svc = SessionService()
-    status = svc.get_status()
+    store_meta = svc.store.metadata() if svc.get_mode() == 'SESSION_PERSISTENT' else {}
+    
+    cfg = load_config()
+    acc = get_account_status(cfg, check_network=False)
 
-    # Format stored_at timestamp
     stored_at_str = None
-    if status.get('stored_at'):
+    if store_meta.get('stored_at'):
         import datetime
         stored_at_str = datetime.datetime.fromtimestamp(
-            status['stored_at']
+            store_meta['stored_at']
         ).strftime('%d %b %Y %H:%M')
+        
+    db_path = current_app.config.get('DB_PATH')
+    import sqlite3
+    try:
+        conn = sqlite3.connect(db_path)
+        cur = conn.cursor()
+        cur.execute("SELECT COUNT(*) FROM stores")
+        stores_count = cur.fetchone()[0]
+        cur.execute("SELECT MAX(started_at) FROM runs WHERE crawler_mode='ZONE_INVENTORY'")
+        last_zone = cur.fetchone()[0]
+        conn.close()
+    except Exception:
+        stores_count = 0
+        last_zone = None
 
     return render_template('admin/catalog_sync.html',
                            current_path='/admin/catalog-sync',
-                           mode=status['mode'],
-                           session_ready=status.get('configured', False),
+                           mode=acc['mode'],
+                           session_ready=acc['configured'],
                            stored_at=stored_at_str,
-                           encryption_method=status.get('encryption_method'),
-                           valid=status.get('valid'),
-                           warnings=status.get('warnings', []))
+                           encryption_method="Fernet",
+                           valid=acc['effective'],
+                           warnings=svc.store.check_permissions(),
+                           status=acc['status'],
+                           stores_count=stores_count,
+                           last_zone=last_zone)
+
 
 
 @admin_bp.route('/catalog-sync/session/store', methods=['POST'])

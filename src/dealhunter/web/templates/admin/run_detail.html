@@ -70,11 +70,11 @@
                 <tbody>
                     <tr>
                         <th class="text-muted" style="width: 150px;">Iniciado</th>
-                        <td>{{ run.started_at or '-' }}</td>
+                        <td class="local-time">{{ run.started_at or '-' }}</td>
                     </tr>
                     <tr>
                         <th class="text-muted">Finalizado</th>
-                        <td>{{ run.finished_at or '-' }}</td>
+                        <td class="local-time">{{ run.finished_at or '-' }}</td>
                     </tr>
                     <tr>
                         <th class="text-muted">Duración</th>

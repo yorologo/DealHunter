@@ -12,7 +12,7 @@ def test_get_product_detail_mapping(tmp_path):
     c.execute('''CREATE TABLE watchlist (query TEXT, enabled INTEGER, target_price REAL)''')
     c.execute('''CREATE TABLE observations (run_id TEXT, store_id TEXT, product_id TEXT, price REAL, original_price REAL, stock INTEGER, timestamp DATETIME, discount_price REAL, discount_promotion REAL, discount_effective REAL, discount_source TEXT, promotion_type TEXT, promotion_label TEXT, availability TEXT)''')
     
-    c.execute("INSERT INTO stores (store_id, name, brand, type) VALUES ('s1', 'MyStore', 'market', 'BrandStore')")
+    c.execute("INSERT INTO stores (store_id, name, brand, type) VALUES ('s1', 'MyStore', 'BrandStore', 'market')")
     c.execute("INSERT INTO products VALUES ('p1', 's1', 'Test Product', 'MyBrand', 'MyCat', 500, 'g', 0.5, 'kg', 1, 'fp', 0)")
     c.execute("INSERT INTO observations VALUES ('r1', 's1', 'p1', 100.0, 150.0, 10, '2023-01-01T12:00:00Z', 0, 0, 0, '', '', '', 'AVAILABLE')")
     conn.commit()
@@ -38,7 +38,7 @@ def test_get_catalog_sorting(tmp_path):
     c.execute('''CREATE TABLE stores (store_id TEXT, name TEXT, type TEXT, brand TEXT)''')
     c.execute('''CREATE TABLE observations (run_id TEXT, store_id TEXT, product_id TEXT, price REAL, original_price REAL, stock INTEGER, timestamp DATETIME, discount_price REAL, discount_promotion REAL, discount_effective REAL, discount_source TEXT, promotion_type TEXT, promotion_label TEXT, availability TEXT)''')
     
-    c.execute("INSERT INTO stores (store_id, name, brand, type) VALUES ('s1', 'MyStore', 'market', 'BrandStore')")
+    c.execute("INSERT INTO stores (store_id, name, brand, type) VALUES ('s1', 'MyStore', 'BrandStore', 'market')")
     c.execute("INSERT INTO products VALUES ('p1', 's1', 'P1', '', '', 1, '', 1, '', 1, '', 0)")
     c.execute("INSERT INTO observations VALUES ('r1', 's1', 'p1', 90.0, 100.0, 10, '2023-01-01T12:00:00Z', 0, 0, 0, '', '', '', 'AVAILABLE')")
     c.execute("INSERT INTO products VALUES ('p2', 's1', 'P2', '', '', 1, '', 1, '', 1, '', 0)")

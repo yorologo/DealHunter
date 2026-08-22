@@ -27,7 +27,7 @@ def test_valid_session_zone_inventory(db_conn):
     with patch("dealhunter.crawler_zone.RappiSessionProvider.is_authenticated", return_value=True):
         with patch("dealhunter.crawler_zone.MerchantDiscovery.discover_merchants", return_value=[{"store_id": "1", "name": "Store A"}]):
             with patch("dealhunter.crawler_zone.CPGCatalogAdapter.fetch_full_catalog", return_value=[{"id": "p1", "name": "Prod 1"}]):
-                db_conn.cursor().execute('INSERT INTO runs (run_id) VALUES ("run1")'); db_conn.cursor().execute('INSERT INTO runs (run_id) VALUES ("run1")'); state, reqs = asyncio.run(_run_zone_inventory_async(config, 0, 0, db_conn, "run1"))
+                db_conn.cursor().execute('INSERT INTO runs (run_id) VALUES ("run1")'); state, reqs = asyncio.run(_run_zone_inventory_async(config, 0, 0, db_conn, "run1"))
                 assert state == "COMPLETED"
                 c = db_conn.cursor()
                 c.execute("SELECT crawler_mode, coverage_complete FROM runs WHERE run_id='run1'")

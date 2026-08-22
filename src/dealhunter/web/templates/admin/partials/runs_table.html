@@ -14,7 +14,7 @@
             {% for run in runs %}
             <tr>
                 <td><code class="small">{{ run.run_id[:12] }}…</code></td>
-                <td class="small">{{ run.started_at }}</td>
+                <td class="small local-time">{{ run.started_at }}</td>
                 <td class="small">{{ run.duration or '-' }}</td>
                 <td class="d-none d-md-table-cell small">{{ run.vertical_name or '-' }}</td>
                 <td>

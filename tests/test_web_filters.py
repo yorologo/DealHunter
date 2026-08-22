@@ -13,6 +13,7 @@ def test_db(tmp_path):
     c.execute('''CREATE TABLE stores (
         store_id TEXT PRIMARY KEY,
         name TEXT,
+        brand TEXT,
         type TEXT
     )''')
     c.execute('''CREATE TABLE products (

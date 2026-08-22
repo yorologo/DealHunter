@@ -78,3 +78,37 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
 });
+
+function formatLocalTimes() {
+    document.querySelectorAll('.local-time').forEach(el => {
+        if (!el.dataset.utc) {
+            let val = el.textContent.trim();
+            if (!val || val === '-') return;
+            
+            // SQLite CURRENT_TIMESTAMP "YYYY-MM-DD HH:MM:SS" is UTC.
+            if (val.match(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/)) {
+                val = val.replace(' ', 'T') + 'Z';
+            } else if (val.match(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}$/)) {
+                val = val + 'Z';
+            }
+            
+            el.dataset.utc = val;
+            try {
+                const d = new Date(val);
+                if (!isNaN(d)) {
+                    const now = new Date();
+                    // Prevent showing future dates due to clock skew
+                    if (d > now) {
+                        el.textContent = now.toLocaleString();
+                    } else {
+                        el.textContent = d.toLocaleString();
+                    }
+                }
+            } catch(e) {}
+        }
+    });
+}
+document.addEventListener('DOMContentLoaded', formatLocalTimes);
+if (typeof htmx !== 'undefined') {
+    document.body.addEventListener('htmx:afterSwap', formatLocalTimes);
+}
