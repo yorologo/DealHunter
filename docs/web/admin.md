@@ -44,4 +44,4 @@ Diferencia el valor efectivo del valor guardado y aplica una lista estricta (`al
 - `SAFE_EDITABLE`
 - `READ_ONLY`
 - `SECRET_FORBIDDEN` (Token jamas es enviado en HTML, UI recibe solo un boolean).
-- **Background Runtime**: Inspección de `termux-wake-lock` para evitar que Android ponga en pausa el servidor web.
+- **Background Runtime**: Inspección de `termux-wake-lock` (shared, app-wide lock) para evitar que Android ponga en pausa el servidor web.

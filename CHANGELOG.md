@@ -14,6 +14,13 @@
 - fix: Elimination of hardcoded 65% discount arbitrary limits
 - fix: Structured taxonomy enforcement and robust URL fallback resolution
 
+## [2.8.2] - 2026-08-21
+
+### Reliability (Background Runtime)
+- fix: DealHunter ya no libera `termux-wake-lock` automáticamente al salir, previniendo la terminación no intencionada de otros procesos Termux de fondo (ej. sshd).
+- feat: Doctor informa correctamente que el Wake Lock es compartido a nivel de aplicación Termux.
+- docs: documentada la necesidad de `termux-wake-unlock` manual.
+
 ## [2.8.1] - 2026-08-21
 
 ### Background Runtime

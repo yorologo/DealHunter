@@ -25,19 +25,6 @@ def acquire_wake_lock():
     except (subprocess.CalledProcessError, FileNotFoundError):
         return False
 
-def release_wake_lock():
-    """Attempt to release Termux wake lock."""
-    global _wake_lock_active
-    if not _wake_lock_active:
-        return False
-        
-    try:
-        subprocess.run(["termux-wake-unlock"], check=False, capture_output=True)
-        _wake_lock_active = False
-        return True
-    except (subprocess.CalledProcessError, FileNotFoundError):
-        return False
-
 def is_wake_lock_active():
     """Check if wake lock was acquired successfully by this process."""
     return _wake_lock_active

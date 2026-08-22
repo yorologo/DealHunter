@@ -300,6 +300,7 @@ def _check_background_runtime():
     # Note: Doctor might be run from CLI where web isn't running, but for Admin -> Doctor, web IS running.
     if is_wake_lock_active():
         wake_status = "ACTIVE"
+        detail = "El Wake Lock pertenece globalmente a Termux y puede estar siendo utilizado por otros procesos."
     else:
         wake_status = "INACTIVE"
         status = "WARNING"

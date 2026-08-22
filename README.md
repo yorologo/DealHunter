@@ -102,4 +102,4 @@ El índice completo de documentación, cubriendo arquitectura, flujos de datos, 
 
 
 ### Ejecución en Segundo Plano (Android)
-Para mantener DealHunter Web activo en Android/Termux, DealHunter utiliza `termux-wake-lock` automáticamente cuando está disponible. Si Android sigue suspendiendo la aplicación, verifica la sección de troubleshooting.
+Para mantener DealHunter Web activo en Android/Termux, DealHunter adquiere el `termux-wake-lock` automáticamente al iniciar. Nota: dado que el Wake Lock es compartido (app-wide) en Termux, DealHunter NO lo libera automáticamente al salir para no interrumpir otros procesos. Utiliza `termux-wake-unlock` manualmente cuando desees liberarlo.

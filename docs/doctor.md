@@ -16,4 +16,4 @@ Es una acción explícita (opt-in) que verifica la conectividad hacia los servic
 - No incluye reintentos infinitos ni evasión de rate limits.
 
 
-- **Background Runtime (Termux)**: Verifica si Termux está activo y si `termux-wake-lock` está habilitado. Si se encuentra inactivo, advierte que Android puede pausar DealHunter.
+- **Background Runtime (Termux)**: Verifica si Termux está activo y si `termux-wake-lock` está habilitado. Si está ACTIVO, advierte que el lock pertenece globalmente a Termux y no será liberado automáticamente.

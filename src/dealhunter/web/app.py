@@ -4,7 +4,7 @@ from flask import Flask, session, request, abort, g, current_app
 from dealhunter.db import get_default_db_path
 from dealhunter.web.routes import register_routes
 from dealhunter.web.admin import admin_bp
-from dealhunter.termux import acquire_wake_lock, release_wake_lock, is_termux
+from dealhunter.termux import acquire_wake_lock, is_termux
 
 def create_app(test_config=None):
     app = Flask(__name__, instance_relative_config=True)
@@ -46,7 +46,7 @@ def run_server(port=8765, debug=False):
     # Termux background persistence
     if is_termux():
         if acquire_wake_lock():
-            print("[*] Acquired Termux Wake Lock for background runtime.")
+            print("[*] Termux Wake Lock activo para mantener DealHunter disponible en segundo plano.")
         else:
             print("[!] Could not acquire Termux Wake Lock. App may be paused in background.")
             
@@ -54,5 +54,5 @@ def run_server(port=8765, debug=False):
         app.run(host='127.0.0.1', port=port, debug=debug)
     finally:
         if is_termux():
-            release_wake_lock()
-            print("[*] Released Termux Wake Lock.")
+            print("[*] El Termux Wake Lock permanece activo porque es compartido por la aplicación Termux.")
+            print("    Usa `termux-wake-unlock` manualmente cuando ya no necesites ningún servicio Termux en segundo plano.")

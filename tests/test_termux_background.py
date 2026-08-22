@@ -15,7 +15,6 @@ def test_desktop_unaffected():
     with patch.dict(os.environ, {"PREFIX": "/usr"}):
         assert not termux.is_termux()
         assert termux.acquire_wake_lock() is False
-        assert termux.release_wake_lock() is False
         assert not termux.is_wake_lock_active()
         
         checks = _check_background_runtime()
@@ -44,6 +43,8 @@ def test_wake_lock_success():
                 names = {c[0]: c[1] for c in checks}
                 assert names["Background Runtime (Termux)"] == "OK"
                 assert names["Wake Lock"] == "ACTIVE"
+                # Check the detail message
+                assert "pertenece globalmente" in checks[0][2]
 
 def test_wake_lock_failure():
     with patch.dict(os.environ, {"PREFIX": "/data/data/com.termux/files/usr"}):
@@ -58,12 +59,3 @@ def test_wake_lock_failure():
                 assert names["Background Runtime (Termux)"] == "WARNING"
                 assert names["Wake Lock"] == "INACTIVE"
                 assert "termux-wake-lock" in checks[0][2]
-
-def test_release_wake_lock():
-    with patch.dict(os.environ, {"PREFIX": "/data/data/com.termux/files/usr"}):
-        with patch("shutil.which", return_value="/bin/termux-wake-lock"):
-            with patch("subprocess.run"):
-                termux.acquire_wake_lock()
-                assert termux.is_wake_lock_active()
-                termux.release_wake_lock()
-                assert not termux.is_wake_lock_active()

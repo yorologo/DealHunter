@@ -26,6 +26,6 @@
 
 ### DealHunter Web se congela en segundo plano (Android)
 Android puede pausar DealHunter cuando Termux pasa a segundo plano.
-DealHunter intenta usar `termux-wake-lock` de manera automática al iniciar `bin/rappi-historico web`.
-Si el problema persiste, puedes verificar el estado en **Admin -> Doctor**.
-Como alternativa manual, asegúrate de deshabilitar la optimización de batería para Termux (Doze).
+DealHunter adquiere `termux-wake-lock` de manera automática al iniciar `bin/rappi-historico web`.
+Al salir de la Web, el lock no se libera automáticamente (ya que podría ser utilizado por procesos como sshd). Usa `termux-wake-unlock` manualmente si deseas ahorrar batería y no dependes de otros procesos en segundo plano. Mantenerlo activo aumenta el consumo de batería y aún así, Android LMK/OOM podría matar Termux bajo presión de memoria.
+Si el problema persiste, verifica **Admin -> Doctor** y asegúrate de deshabilitar la optimización de batería (Doze) para Termux.
