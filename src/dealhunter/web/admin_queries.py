@@ -7,7 +7,7 @@ from datetime import datetime, timezone
 
 
 def get_runs_paginated(db_path, page=1, per_page=20, status_filter=None):
-    """Get paginated runs with optional status filter."""
+    """Get paginated runs from the database."""
     conn = sqlite3.connect(db_path)
     conn.row_factory = sqlite3.Row
     c = conn.cursor()
@@ -43,7 +43,7 @@ def get_runs_paginated(db_path, page=1, per_page=20, status_filter=None):
         # Parse vertical for summary info
         run['vertical_name'] = _parse_vertical_name(run.get('vertical'))
         # Convert to local time for display
-        run['started_at'] = _utc_to_local_str(run.get('started_at'))
+        # (Handled by frontend)
         runs.append(run)
 
     return runs, total_pages, total
@@ -79,9 +79,7 @@ def get_run_detail(db_path, run_id):
     run['store_count'] = c.fetchone()[0]
 
     # Convert times to local for display
-    run['started_at'] = _utc_to_local_str(run.get('started_at'))
-    if run.get('finished_at'):
-        run['finished_at'] = _utc_to_local_str(run.get('finished_at'))
+    # (Handled by frontend)
 
     # Parse vertical data
     if run.get('vertical'):
@@ -141,7 +139,7 @@ def get_events(db_path, page=1, per_page=50):
 
         events.append({
             "run_id": run_id,
-            "started_at": _utc_to_local_str(started_at),
+            "started_at": started_at,
             "status": status,
             "severity": severity,
             "error_code": error_code,
@@ -256,13 +254,5 @@ def _parse_vertical_name(vertical_json):
 
 
 def _utc_to_local_str(timestamp_str):
-    """Convert UTC timestamp string to local timezone string."""
-    if not timestamp_str:
-        return None
-    try:
-        dt = datetime.fromisoformat(str(timestamp_str).replace("Z", ""))
-        # Assume naive strings from DB are UTC
-        dt = dt.replace(tzinfo=timezone.utc)
-        return dt.astimezone().strftime("%Y-%m-%d %H:%M:%S")
-    except (ValueError, TypeError):
-        return timestamp_str
+    """Pass through timestamp string for frontend to parse as UTC."""
+    return timestamp_str

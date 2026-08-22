@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container-fluid d-flex justify-content-center mt-5">
+    <div class="alert alert-warning shadow-sm" style="max-width: 500px;">
+        <h4 class="alert-heading">⚠ Sesión expirada</h4>
+        <p>Tu sesión Web ha expirado o el formulario quedó obsoleto por inactividad.</p>
+        <hr>
+        <a href="javascript:history.back()" class="btn btn-primary">Volver atrás e intentar de nuevo</a>
+    </div>
+</div>
+{% endblock %}

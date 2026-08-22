@@ -1,3 +1,4 @@
+from flask import render_template
 import os
 import secrets
 from flask import Flask, session, request, abort, g, current_app
@@ -36,6 +37,13 @@ def create_app(test_config=None):
         return dict(csrf_token=session.get('csrf_token'))
 
     register_routes(app)
+    @app.errorhandler(400)
+    def handle_400(e):
+        description = getattr(e, 'description', str(e))
+        if "CSRF token missing or invalid" in description:
+            return render_template("errors/400_csrf.html"), 400
+        return str(e), 400
+
     app.register_blueprint(admin_bp)
 
     return app

@@ -88,7 +88,7 @@ function formatLocalTimes() {
             // SQLite CURRENT_TIMESTAMP "YYYY-MM-DD HH:MM:SS" is UTC.
             if (val.match(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/)) {
                 val = val.replace(' ', 'T') + 'Z';
-            } else if (val.match(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}$/)) {
+            } else if (val.match(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?$/)) {
                 val = val + 'Z';
             }
             

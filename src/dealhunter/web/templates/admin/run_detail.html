@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% block content %}
-<div class="container-fluid">
+<div id="run-detail-content" class="container-fluid" {% if run.status == 'RUNNING' %}hx-get="/admin/runs/{{ run.run_id }}" hx-trigger="every 3s" hx-select="#run-detail-content" hx-swap="outerHTML"{% endif %}>
     <nav aria-label="breadcrumb" class="mb-3">
         <ol class="breadcrumb">
             <li class="breadcrumb-item"><a href="/admin">Administración</a></li>
@@ -79,6 +79,55 @@
                     <tr>
                         <th class="text-muted">Duración</th>
                         <td>{{ run.duration or '-' }}</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Execution Config -->
+    <div class="card shadow-sm mb-4">
+        <div class="card-body">
+            <h5 class="card-title">Configuración de Ejecución</h5>
+            <table class="table table-sm mt-2 mb-0">
+                <tbody>
+                    <tr>
+                        <th class="text-muted" style="width: 150px;">Modo</th>
+                        <td>
+                            {% if run.crawler_mode == 'ZONE_INVENTORY' %}
+                                Inventario de zona
+                            {% elif run.crawler_mode == 'SEARCH_DISCOVERY' %}
+                                Search Discovery
+                            {% else %}
+                                {{ run.crawler_mode or 'Legacy' }}
+                            {% endif %}
+                        </td>
+                    </tr>
+                    <tr>
+                        <th class="text-muted">Sesión</th>
+                        <td>
+                            {% if run.crawler_mode == 'ZONE_INVENTORY' %}
+                                ✅ Utilizó sesión Rappi
+                            {% else %}
+                                ❌ Anónima / Sin sesión
+                            {% endif %}
+                        </td>
+                    </tr>
+                    <tr>
+                        <th class="text-muted">Cobertura</th>
+                        <td>
+                            {% if run.crawler_mode == 'ZONE_INVENTORY' %}
+                                {% if run.coverage_complete == 1 %}
+                                    <span class="badge bg-success">Completa</span>
+                                {% else %}
+                                    <span class="badge bg-warning text-dark">Parcial</span>
+                                {% endif %}
+                            {% elif run.crawler_mode == 'SEARCH_DISCOVERY' %}
+                                <span class="badge bg-secondary">Limitada</span>
+                            {% else %}
+                                <span class="badge bg-light text-dark border">No registrada</span>
+                            {% endif %}
+                        </td>
                     </tr>
                 </tbody>
             </table>

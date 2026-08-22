@@ -60,6 +60,14 @@ def admin_home():
     except Exception:
         pass
 
+    import sqlite3
+    conn = sqlite3.connect(db_path)
+    c = conn.cursor()
+    c.execute("SELECT run_id, crawler_mode, started_at FROM runs WHERE status = 'RUNNING' ORDER BY started_at DESC LIMIT 1")
+    active_row = c.fetchone()
+    active_run = {'run_id': active_row[0], 'crawler_mode': active_row[1], 'started_at': active_row[2]} if active_row else None
+    conn.close()
+
     stats = {}
     try:
         stats = db_status(db_path)
@@ -87,11 +95,11 @@ def admin_home():
 def account():
     """Account management and diagnostics."""
     cfg = load_config()
-    db_path = current_app.config.get('DB_PATH')
+    db_path = current_app.config.get('DATABASE')
     from dealhunter.account import get_account_status
     # Do NOT hit network on load
     status = get_account_status(cfg, check_network=False)
-    
+
     return render_template('admin/account.html',
                            current_path='/admin/account',
                            **status)
@@ -100,10 +108,10 @@ def account():
 def account_check():
     """Explicit account check - hits network."""
     cfg = load_config()
-    db_path = current_app.config.get('DB_PATH')
+    db_path = current_app.config.get('DATABASE')
     from dealhunter.account import get_account_status
     status = get_account_status(cfg, check_network=True)
-    
+
     return render_template('admin/account.html',
                            current_path='/admin/account',
                            **status)
@@ -134,12 +142,20 @@ def runs():
     except Exception:
         pass
 
+    import sqlite3
+    conn = sqlite3.connect(db_path)
+    c = conn.cursor()
+    c.execute("SELECT run_id, crawler_mode, started_at FROM runs WHERE status = 'RUNNING' ORDER BY started_at DESC LIMIT 1")
+    active_row = c.fetchone()
+    active_run = {'run_id': active_row[0], 'crawler_mode': active_row[1], 'started_at': active_row[2]} if active_row else None
+    conn.close()
+
     if request.headers.get('HX-Request'):
         return render_template('admin/partials/runs_table.html',
                                runs=runs_data, page=page,
                                total_pages=total_pages, total=total,
                                status_filter=status_filter)
-    return render_template('admin/runs.html',
+    return render_template('admin/runs.html', active_run=active_run,
                            runs=runs_data, page=page,
                            total_pages=total_pages, total=total,
                            summary=summary, status_filter=status_filter,
@@ -151,37 +167,58 @@ def runs_start():
     """Manually start the crawler (discover general)."""
     import subprocess
     import sys
+    import uuid
+    from dealhunter.config import load_config
+
     try:
         db_path = current_app.config['DATABASE']
         project_root = os.path.dirname(os.path.abspath(db_path))
-        
+
+        # 6. SERVER-SIDE DOUBLE SUBMIT & 7. ACTIVE RUN POLICY
+        conn = sqlite3.connect(db_path)
+        c = conn.cursor()
+        c.execute("SELECT run_id FROM runs WHERE status = 'RUNNING' AND datetime(started_at) >= datetime('now', '-2 hours')")
+        if c.fetchone():
+            conn.close()
+            return "Ya hay un crawler activo recientemente.", 400
+
+        run_id = f"run_{uuid.uuid4().hex[:12]}"
+
+        cfg = load_config()
+        lat, lng = cfg.get("location", (19.4326, -99.1332))
+
+        c.execute('''INSERT INTO runs (run_id, started_at, lat, lng, radius, status)
+                     VALUES (?, CURRENT_TIMESTAMP, ?, ?, ?, 'RUNNING')''',
+                  (run_id, lat, lng, cfg.get("radius", 5.0)))
+        conn.commit()
+        conn.close()
+
         env = os.environ.copy()
         if "PYTHONPATH" not in env:
             env["PYTHONPATH"] = os.path.join(project_root, "src")
-            
-        res = subprocess.run(
-            [sys.executable, "-m", "dealhunter", "discover", "--vertical", "general"],
+
+        subprocess.Popen(
+            [sys.executable, "-m", "dealhunter", "discover", "--vertical", "general", "--run-id", run_id],
             cwd=project_root,
             env=env,
-            capture_output=True,
-            text=True,
-            check=False
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            start_new_session=True
         )
-        print("Crawler output:", res.stdout, file=sys.stderr)
-        print("Crawler error:", res.stderr, file=sys.stderr)
+
+        # 11. HX-REDIRECT FALLBACK
+        if request.headers.get('HX-Request'):
+            from flask import make_response
+            response = make_response()
+            response.headers['HX-Redirect'] = url_for('admin_bp.run_detail', run_id=run_id)
+            return response
+        else:
+            return redirect(url_for('admin_bp.run_detail', run_id=run_id))
+
     except Exception as e:
+        import sys
         print(f"Error starting crawler from web: {e}", file=sys.stderr)
-        
-    page = 1
-    per_page = 20
-    status_filter = request.args.get('status', None)
-    runs_data, total_pages, total = get_runs_paginated(
-        db_path, page, per_page, status_filter
-    )
-    return render_template('admin/partials/runs_table.html',
-                           runs=runs_data, page=page,
-                           total_pages=total_pages, total=total,
-                           status_filter=status_filter)
+        return "Error interno", 500
 
 
 
@@ -411,8 +448,8 @@ def catalog_sync_wizard():
     from dealhunter.account import get_account_status
     cfg = load_config()
     acc = get_account_status(cfg, check_network=False)
-    
-    return render_template('admin/wizard.html', 
+
+    return render_template('admin/wizard.html',
                            current_path='/admin/catalog-sync',
                            status=acc['status'],
                            mode=acc['mode'])
@@ -423,15 +460,15 @@ def catalog_sync_wizard_store():
     """Store session from wizard and redirect back."""
     from dealhunter.secret_store import SessionService
     from flask import redirect, request, flash
-    
+
     token = request.form.get('token', '').strip()
     mode = request.form.get('session_mode', 'persistent')
     return_path = request.form.get('return_path', '/admin/account')
-    
+
     if not token:
         flash("No se proporcionó un token.", "error")
         return redirect('/admin/catalog-sync/wizard')
-        
+
     svc = SessionService()
     if mode == 'persistent':
         success = svc.store_persistent(token)
@@ -440,20 +477,20 @@ def catalog_sync_wizard_store():
             return redirect('/admin/catalog-sync/wizard')
     else:
         svc.store_temporary(token)
-        
+
     # Guardar y comprobar
     from dealhunter.account import get_account_status
     cfg = load_config()
     status_res = get_account_status(cfg, check_network=True)
     status_str = status_res.get('status', 'UNVERIFIED')
-    
+
     if status_str == 'VALID':
         flash("Sesión guardada y verificada exitosamente.", "success")
     elif status_str == 'UNVERIFIED':
         flash("Sesión guardada, pero no pudimos verificarla en este momento (WAF/Red).", "warning")
     elif status_str == 'EXPIRED':
         flash("La sesión guardada ya está expirada o es inválida.", "error")
-        
+
     return redirect(return_path)
 
 @admin_bp.route('/catalog-sync')
@@ -461,10 +498,10 @@ def catalog_sync():
     """Catalog Sync dashboard with session status."""
     from dealhunter.secret_store import SessionService
     from dealhunter.account import get_account_status
-    
+
     svc = SessionService()
     store_meta = svc.store.metadata() if svc.get_mode() == 'SESSION_PERSISTENT' else {}
-    
+
     cfg = load_config()
     acc = get_account_status(cfg, check_network=False)
 
@@ -474,25 +511,30 @@ def catalog_sync():
         stored_at_str = datetime.datetime.fromtimestamp(
             store_meta['stored_at']
         ).strftime('%d %b %Y %H:%M')
-        
-    db_path = current_app.config.get('DB_PATH')
+
+    db_path = current_app.config.get('DATABASE')
     import sqlite3
     try:
         conn = sqlite3.connect(db_path)
         cur = conn.cursor()
         cur.execute("SELECT COUNT(*) FROM stores")
         stores_count = cur.fetchone()[0]
-        cur.execute("SELECT started_at, status, coverage_complete FROM runs WHERE crawler_mode='ZONE_INVENTORY' ORDER BY started_at DESC LIMIT 1")
+
+        cur.execute("SELECT started_at, status FROM runs WHERE crawler_mode='ZONE_INVENTORY' ORDER BY started_at DESC LIMIT 1")
         row = cur.fetchone()
-        if row:
-            last_zone = row[0]
-            last_zone_status = row[1]
-            last_zone_coverage = row[2]
-        else:
-            last_zone = None
-            last_zone_status = None
-            last_zone_coverage = 0
+        last_zone_attempt = row[0] if row else None
+        last_zone_status = row[1] if row else None
+
+        cur.execute("SELECT started_at FROM runs WHERE crawler_mode='ZONE_INVENTORY' AND status='COMPLETED' AND coverage_complete=1 ORDER BY started_at DESC LIMIT 1")
+        row2 = cur.fetchone()
+        last_zone_complete = row2[0] if row2 else None
+
         conn.close()
+    except Exception:
+        stores_count = 0
+        last_zone_attempt = None
+        last_zone_status = None
+        last_zone_complete = None
     except Exception:
         stores_count = 0
         last_zone = None
@@ -509,9 +551,9 @@ def catalog_sync():
                            warnings=svc.store.check_permissions(),
                            status=acc['status'],
                            stores_count=stores_count,
-                           last_zone=last_zone,
-                           last_zone_status=last_zone_status,
-                           last_zone_coverage=last_zone_coverage)
+                           last_zone_attempt=last_zone_attempt, last_zone_complete=last_zone_complete,
+                           last_zone_status=last_zone_status
+                           )
 
 
 
@@ -626,13 +668,19 @@ def catalog_sync_run():
     token = svc.get_token()
 
     if not token:
-        return '<div class="alert alert-danger">No hay sesión configurada.</div>'
+        from flask import flash, redirect, request
+        if request.headers.get('HX-Request'):
+            return '<div class="alert alert-danger">No hay sesión configurada.</div>'
+        else:
+            flash("No hay sesión configurada.", "error")
+            return redirect('/admin/catalog-sync')
 
     try:
         import asyncio
         from dealhunter.catalog_sync import run_sync
         import sqlite3
         import uuid
+        from flask import flash, redirect, request
         db_path = current_app.config['DATABASE']
         conn = sqlite3.connect(db_path)
         cfg = load_config()
@@ -647,15 +695,26 @@ def catalog_sync_run():
             loop.close()
             conn.close()
 
-        return f'''<div class="alert alert-success">
-            <strong>Sincronización completada</strong><br>
-            Estado: {status}<br>
-            Comercios procesados: {report.merchants_completed}/{report.merchants_attempted}<br>
-            Productos únicos extraídos: {report.items_unique}
-        </div>'''
+        msg = f"Sincronización completada. Estado: {status}. Comercios: {report.merchants_completed}/{report.merchants_attempted}. Productos: {report.items_unique}"
+
+        if request.headers.get('HX-Request'):
+            return f'''<div class="alert alert-success">
+                <strong>Sincronización completada</strong><br>
+                Estado: {status}<br>
+                Comercios procesados: {report.merchants_completed}/{report.merchants_attempted}<br>
+                Productos únicos extraídos: {report.items_unique}
+            </div>'''
+        else:
+            flash(msg, "success")
+            return redirect('/admin/catalog-sync')
 
     except Exception as e:
-        return f'<div class="alert alert-danger">Error: {escape(str(e))}</div>'
+        from flask import flash, redirect, request
+        if request.headers.get('HX-Request'):
+            return f'<div class="alert alert-danger">Error: {escape(str(e))}</div>'
+        else:
+            flash(f"Error: {e}", "error")
+            return redirect('/admin/catalog-sync')
 
 
 def _session_status_response(flash_message=None, flash_success=True, valid=None):

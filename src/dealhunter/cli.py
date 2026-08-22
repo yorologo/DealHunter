@@ -66,23 +66,23 @@ def _warn_on_location_change(conn, lat, lng):
 def build_parser():
     # Base parser for shared arguments
     base_parser = argparse.ArgumentParser(add_help=False)
-    
+
     # Configuration
     group_config = base_parser.add_argument_group("Configuration")
     group_config.add_argument('--profile', type=str, help="Use specific configuration profile")
     group_config.add_argument('--show-config', action='store_true', help="Show merged config and exit")
-    
+
     # Location
     group_loc = base_parser.add_argument_group("Location")
     group_loc.add_argument('--lat', type=float, help="Latitude")
     group_loc.add_argument('--lng', type=float, help="Longitude")
-    
+
     # Search
     group_search = base_parser.add_argument_group("Search")
     group_search.add_argument('--query', action='append', help="Specific product query")
     group_search.add_argument('--vertical', action='append', help="Specific vertical to search")
     group_search.add_argument('--exclude-vertical', action='append', help="Exclude vertical")
-    
+
     # Filters
     group_filters = base_parser.add_argument_group("Filters")
     group_filters.add_argument('--min-discount', type=float, help="Minimum effective discount")
@@ -92,13 +92,13 @@ def build_parser():
     group_filters.add_argument('--store', action='append', help="Include only specific stores")
     group_filters.add_argument('--exclude-store', action='append', help="Exclude specific stores")
     group_filters.add_argument('--exclude', action='append', help="Exclude queries/brands")
-    
+
     # Promotions
     group_promo = base_parser.add_argument_group("Promotions")
     group_promo.add_argument('--promo', action='append', help="Filter by promo type (price, bundle, NxM)")
     group_promo.add_argument('--only-nxm', action='store_true', help="Only show NxM promos")
     group_promo.add_argument('--min-promo-discount', type=float, help="Min discount only for promos")
-    
+
     # Historical
     group_hist = base_parser.add_argument_group("Historical")
     group_hist.add_argument('--status', action='append', help="Filter by status (GOOD_DEAL, NEW_LOW...)")
@@ -109,13 +109,14 @@ def build_parser():
     group_hist.add_argument('--price-drop', type=float, help="Minimum price drop vs last observation")
     group_hist.add_argument('--new-deals', action='store_true', help="Products that became deals recently")
     group_hist.add_argument('--price-changes', action='store_true', help="Only products with changed price")
-    
+
     # Crawler Control
     group_crawler = base_parser.add_argument_group("Crawler Control")
     group_crawler.add_argument('--dry-run', action='store_true', help="Do not execute requests")
     group_crawler.add_argument('--max-requests', type=int, help="Stop after N requests")
     group_crawler.add_argument('--max-runtime', type=int, help="Stop after N seconds")
-    
+    group_crawler.add_argument('--run-id', type=str, help="Specific run ID to use")
+
     # Output
     group_out = base_parser.add_argument_group("Output")
     group_out.add_argument('--top', type=int, help="Limit number of results")
@@ -125,10 +126,10 @@ def build_parser():
     group_out.add_argument('--format', choices=['table', 'json', 'csv', 'markdown'], help="Output format")
     group_out.add_argument('--output', type=str, help="Output file")
     group_out.add_argument('--compact', action='store_true', help="Compact output format")
-    
+
     parser = argparse.ArgumentParser(description=f"DealHunter CLI v{VERSION}", parents=[base_parser])
     subparsers = parser.add_subparsers(dest="command", title="Subcommands", description="Available commands")
-    
+
     # Subcommands
     config_p = subparsers.add_parser("config", help="Manage configuration")
     config_p.add_argument("action", choices=["show", "get", "set", "unset", "reset"])
@@ -137,7 +138,7 @@ def build_parser():
 
     discover_p = subparsers.add_parser("discover", help="Discover new deals via crawler", parents=[base_parser])
     update_p = subparsers.add_parser("update", help="Update known deals quickly", parents=[base_parser])
-    
+
     rest_p = subparsers.add_parser("restaurants", help="Discover deals in restaurants", parents=[base_parser])
     rest_p.add_argument("--restaurant", action="append", help="Filter by restaurant name (alias for --store)")
 
@@ -198,14 +199,14 @@ def handle_config_command(args):
 def main(args_list=None):
     parser = build_parser()
     args = parser.parse_args(args_list)
-    
+
     config = get_merged_config(args, args.profile)
-    
+
     if args.show_config:
         import json
         print(json.dumps(config, indent=2))
         return
-        
+
     if args.command == "config":
         handle_config_command(args)
         return
@@ -238,7 +239,7 @@ def main(args_list=None):
 
             prov = RappiSessionProvider()
             is_diagnose = getattr(args, "diagnose", False)
-            
+
             if getattr(args, "mobile", False):
                 print(f"[*] Mobile authentication {'diagnostic' if is_diagnose else 'import'} started")
                 try:
@@ -250,7 +251,7 @@ def main(args_list=None):
 
                 print(f"[*] Local endpoint: http://127.0.0.1:{importer.port}/{'diagnose' if is_diagnose else 'import'}")
                 print("[*] Bookmarklet generated below")
-                
+
                 if is_diagnose:
                     bookmarklet = """javascript:(async function(){
   if (window.location.hostname !== 'www.rappi.com.mx' && window.location.hostname !== 'rappi.com.mx') {
@@ -382,17 +383,17 @@ def main(args_list=None):
   XMLHttpRequest.prototype.setRequestHeader = function(h, v) { if (h.toLowerCase() === 'authorization') onToken(v); return oS.apply(this, arguments); };
   alert('DealHunter Interceptor activo. Haz una búsqueda en la página (ej: "coca cola") para capturar la sesión.');
 })();""".replace('__NONCE__', importer.nonce).replace('__PORT__', str(importer.port))
-                
+
                 print("\n" + bookmarklet.replace("\n", "") + "\n")
-                
+
                 print("1. Open https://www.rappi.com.mx/ and sign in.")
                 print("2. Create a browser bookmark named \"DH Import\".")
                 print("3. Paste the bookmarklet above into the bookmark URL field.")
                 print("4. While viewing Rappi, type \"DH Import\" in the address bar and select the bookmark.")
                 print("5. Return to Termux.\n")
-                
+
                 print("[*] Waiting for local browser...")
-                
+
                 try:
                     if importer.serve_with_timeout(300):
                         print("[+] Local server stopped")
@@ -413,7 +414,7 @@ def main(args_list=None):
                 except OSError as e:
                     print(f"\n[!] Could not bind to port 5050. Ensure no other instances are running.")
                     return
-                    
+
                 print("To securely authenticate without exposing your tokens:")
                 print("1. Open www.rappi.com.mx in your browser and login.")
                 print("2. Open Developer Tools (F12) -> Console")
@@ -453,7 +454,7 @@ def main(args_list=None):
   console.log('DealHunter Interceptor activo. Haz una búsqueda en la página.');
 })();
 """.replace('__NONCE__', importer.nonce))
-                
+
                 print(f"[*] Waiting for session data on port 5050...")
                 try:
                     if importer.serve_with_timeout(300):
@@ -468,13 +469,13 @@ def main(args_list=None):
 
     if args.command in crawler_commands:
         location = _require_location(parser, config)
-        
+
     conn = setup_db()
-    
+
     if args.command == "db":
         import os
         db_path = os.environ.get("RAPPI_DB_PATH", os.path.expanduser("~/rappi-deal-hunter/rappi-deals.db"))
-        
+
         if args.action == "status":
             import json
             print(json.dumps(db_status(db_path), indent=2))
@@ -487,21 +488,21 @@ def main(args_list=None):
             db_vacuum(db_path)
             print("Vacuum complete")
         return
-        
+
     elif args.command == "runs":
         c = conn.cursor()
         c.execute("SELECT run_id, started_at, finished_at, status FROM runs ORDER BY started_at DESC LIMIT ?", (args.last,))
         results = [{"run_id": r[0], "started_at": r[1], "finished_at": r[2], "status": r[3]} for r in c.fetchall()]
         print_results(results, format="table")
         return
-        
+
     elif args.command == "stats":
         import json
         import os
         db_path = os.environ.get("RAPPI_DB_PATH", os.path.expanduser("~/rappi-deal-hunter/rappi-deals.db"))
         print(json.dumps(db_status(db_path), indent=2))
         return
-        
+
     elif args.command in ("watch"):
         c = conn.cursor()
         if args.action == "add":
@@ -521,7 +522,7 @@ def main(args_list=None):
             c.execute("UPDATE watchlist SET enabled = ? WHERE id = ?", (val, args.query_or_id))
             conn.commit()
         return
-        
+
     # Crawler commands
     if args.command in crawler_commands:
         if args.command == "restaurants":
@@ -529,50 +530,50 @@ def main(args_list=None):
             if getattr(args, "restaurant", None):
                 config["store"] = args.restaurant
 
-        run_id = f"run_{datetime.now().strftime('%Y%m%d_%H%M%S_%f')}"
+        run_id = args.run_id or f"run_{datetime.now().strftime('%Y%m%d_%H%M%S_%f')}"
         c = conn.cursor()
         lat, lng = location
         _warn_on_location_change(conn, lat, lng)
-        c.execute('''INSERT INTO runs (run_id, started_at, lat, lng, radius, status) 
-                     VALUES (?, CURRENT_TIMESTAMP, ?, ?, ?, 'RUNNING')''', 
+        c.execute('''INSERT OR IGNORE INTO runs (run_id, started_at, lat, lng, radius, status)
+                     VALUES (?, CURRENT_TIMESTAMP, ?, ?, ?, 'RUNNING')''',
                   (run_id, lat, lng, config.get("radius", 5.0)))
         conn.commit()
-        
+
         mode = args.command if args.command else "discover"
         print(f"Running mode: {mode}", file=sys.stderr)
-        
+
         try:
             import asyncio
             from dealhunter.auth import RappiSessionProvider
             from dealhunter.account import SessionStatus
-            
+
             provider = RappiSessionProvider()
             has_token = asyncio.run(provider.is_authenticated())
             status = SessionStatus().get_current(check_network=False)
             is_auth = has_token and status.get("status") == "VALID"
             print(f"DEBUG: has_token={has_token}, status={status.get('status')}, is_auth={is_auth}", file=sys.stderr)
-            
+
             if is_auth and config.get("catalog_sync", {}).get("enabled", True):
                 print("SESSION_VALID: Using ZONE_INVENTORY mode.", file=sys.stderr)
                 from dealhunter.crawler_zone import run_zone_inventory
                 state, reqs = run_zone_inventory(config, lat, lng, conn, run_id, dry_run=config.get("dry_run"))
                 if state == "SESSION_EXPIRED":
                     print("SESSION_EXPIRED: Using SEARCH_DISCOVERY mode as fallback.", file=sys.stderr)
-                    c.execute('''UPDATE runs SET crawler_mode = ?, coverage_complete = ?, status = ?, finished_at = CURRENT_TIMESTAMP WHERE run_id = ?''', 
+                    c.execute('''UPDATE runs SET crawler_mode = ?, coverage_complete = ?, status = ?, finished_at = CURRENT_TIMESTAMP WHERE run_id = ?''',
                               ("ZONE_INVENTORY", 0, "PARTIAL", run_id))
                     conn.commit()
-                    
+
                     import uuid
                     fallback_run_id = str(uuid.uuid4())
                     c.execute('INSERT INTO runs (run_id, started_at, status) VALUES (?, CURRENT_TIMESTAMP, "RUNNING")', (fallback_run_id,))
                     conn.commit()
-                    
+
                     from dealhunter.crawler import run_discover, run_update
                     if mode == "discover":
                         state, reqs = run_discover(config, lat, lng, conn, fallback_run_id, dry_run=config.get("dry_run"))
                     else:
                         state, reqs = run_update(config, lat, lng, conn, fallback_run_id, dry_run=config.get("dry_run"))
-                    
+
                     # Update run_id variable so the final block uses the fallback run_id
                     run_id = fallback_run_id
             else:
@@ -582,19 +583,19 @@ def main(args_list=None):
                     state, reqs = run_discover(config, lat, lng, conn, run_id, dry_run=config.get("dry_run"))
                 else:
                     state, reqs = run_update(config, lat, lng, conn, run_id, dry_run=config.get("dry_run"))
-                    
+
         except Exception as exc:
             # Preserve already-committed observations; mark run as PARTIAL
             from .errors import classify_error
             err = classify_error(exc)
             state = "PARTIAL"
             print(f"Run interrupted: {err}", file=sys.stderr)
-            
+
         c.execute('''UPDATE runs SET status = ?, finished_at = CURRENT_TIMESTAMP WHERE run_id = ?''', (state, run_id))
         conn.commit()
-        
+
         if config.get("dry_run"):
             print("Dry run completed successfully.", file=sys.stderr)
-            
+
 if __name__ == "__main__":
     main()

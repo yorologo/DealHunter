@@ -4,6 +4,8 @@
             <tr>
                 <th>Run ID</th>
                 <th>Iniciado</th>
+                <th>Modo</th>
+                <th>Cobertura</th>
                 <th>Duración</th>
                 <th class="d-none d-md-table-cell">Vertical</th>
                 <th>Estado</th>
@@ -15,6 +17,28 @@
             <tr>
                 <td><code class="small">{{ run.run_id[:12] }}…</code></td>
                 <td class="small local-time">{{ run.started_at }}</td>
+                <td class="small">
+                    {% if run.crawler_mode == 'ZONE_INVENTORY' %}
+                    <span title="ZONE_INVENTORY">🌐 Inventario de zona</span>
+                    {% elif run.crawler_mode == 'SEARCH_DISCOVERY' %}
+                    <span title="SEARCH_DISCOVERY">🔎 Descubrimiento por búsquedas</span>
+                    {% else %}
+                    <span class="text-muted">Legacy</span>
+                    {% endif %}
+                </td>
+                <td class="small">
+                    {% if run.crawler_mode == 'ZONE_INVENTORY' %}
+                        {% if run.status == 'COMPLETED' and run.coverage_complete == 1 %}
+                        <span class="badge bg-success">Completa</span>
+                        {% else %}
+                        <span class="badge bg-warning text-dark">Parcial</span>
+                        {% endif %}
+                    {% elif run.crawler_mode == 'SEARCH_DISCOVERY' %}
+                        <span class="badge bg-secondary">Limitada</span>
+                    {% else %}
+                        <span class="badge bg-light text-muted border">No registrada</span>
+                    {% endif %}
+                </td>
                 <td class="small">{{ run.duration or '-' }}</td>
                 <td class="d-none d-md-table-cell small">{{ run.vertical_name or '-' }}</td>
                 <td>

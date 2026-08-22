@@ -17,25 +17,29 @@
         <div class="col-lg-7">
             <div class="card shadow-sm h-100">
                 <div class="card-body">
-                    
-                    
+
+
                     {% if status == 'VALID' %}
                         {% if last_zone_status == 'COMPLETED' and last_zone_coverage == 1 %}
                         <div class="alert alert-success">
                             <h4 class="alert-heading mb-2">✅ Inventario de zona actualizado</h4>
                             <p class="mb-0">Usa tu sesión para consultar los catálogos disponibles en tu zona y mantener tiendas, productos, precios y disponibilidad actualizados de forma automática.</p>
                         </div>
-                        {% elif last_zone_status == 'PARTIAL' or last_zone_coverage == 0 %}
+                        {% elif last_zone_status != 'COMPLETED' %}
                         <div class="alert alert-warning">
                             <h4 class="alert-heading mb-2">⚠ Inventario parcialmente actualizado</h4>
                             <p class="mb-0">La última sincronización no se completó en su totalidad. No toda la cobertura está garantizada. <a href="#" onclick="document.getElementById('sync-form').submit(); return false;" class="alert-link">Reintentar sincronización</a>.</p>
-                            <form id="sync-form" action="/admin/catalog-sync/run" method="POST" style="display: none;"></form>
+                            <form id="sync-form" action="/admin/catalog-sync/run" method="POST" style="display: none;">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token }}"/>
+                            </form>
                         </div>
                         {% else %}
                         <div class="alert alert-success">
                             <h4 class="alert-heading mb-2">✅ Sesión válida <br><span class="text-warning fs-5">🟡 Inventario de zona preparado</span></h4>
                             <p class="mb-0">Ejecuta una sincronización para actualizar el inventario de tu zona. <a href="#" onclick="document.getElementById('sync-form').submit(); return false;" class="alert-link">Sincronizar zona</a>.</p>
-                            <form id="sync-form" action="/admin/catalog-sync/run" method="POST" style="display: none;"></form>
+                            <form id="sync-form" action="/admin/catalog-sync/run" method="POST" style="display: none;">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token }}"/>
+                            </form>
                         </div>
                         {% endif %}
                     {% elif status == 'EXPIRED' %}
@@ -71,31 +75,46 @@
                         </ol>
                     </div>
                     {% endif %}
-                    
+
                     <h5 class="mt-4">Métricas de Sincronización</h5>
                     <dl class="row mb-0 mt-3">
                         <dt class="col-sm-5 text-muted fw-normal">Estado de Sesión:</dt>
                         <dd class="col-sm-7 fw-bold">{{ status }}</dd>
 
-                        <dt class="col-sm-5 text-muted fw-normal">Tiendas locales conocidas:</dt>
+                        <dt class="col-sm-5 text-muted fw-normal">Tiendas conocidas en inventario:</dt>
                         <dd class="col-sm-7">{{ stores_count }}</dd>
 
-                        <dt class="col-sm-5 text-muted fw-normal">Último Zone Inventory:</dt>
-                        <dd class="col-sm-7">{% if last_zone %}<span class="local-time">{{ last_zone }}</span>{% else %}Nunca{% endif %}</dd>
-                        
+                        <dt class="col-sm-5 text-muted fw-normal">Último intento de Zone Inventory:</dt>
+                        <dd class="col-sm-7">
+                            {% if last_zone_attempt %}
+                                <span class="local-time">{{ last_zone_attempt }}</span> <span class="badge {% if last_zone_status == 'COMPLETED' %}bg-success{% elif last_zone_status in ('PARTIAL', 'RUNNING') %}bg-warning text-dark{% else %}bg-danger{% endif %} ms-1">{{ last_zone_status }}</span>
+                            {% else %}
+                                Nunca
+                            {% endif %}
+                        </dd>
+
+                        <dt class="col-sm-5 text-muted fw-normal">Última sincronización completa:</dt>
+                        <dd class="col-sm-7">
+                            {% if last_zone_complete %}
+                                <span class="local-time">{{ last_zone_complete }}</span>
+                            {% else %}
+                                Nunca
+                            {% endif %}
+                        </dd>
+
                         <dt class="col-sm-5 text-muted fw-normal">Token local creado:</dt>
-                        <dd class="col-sm-7">{% if stored_at %}{{ stored_at }}{% else %}-{% endif %}</dd>
+                        <dd class="col-sm-7">{{ stored_at_str or '-' }}</dd>
                     </dl>
                 </div>
             </div>
         </div>
-        
+
         <div class="col-lg-5">
             <div class="card shadow-sm h-100 border-start border-4 border-primary">
                 <div class="card-body d-flex flex-column">
                     <h5 class="card-title">Acciones Rápidas</h5>
                     <p class="text-muted small">Gestiona tu experiencia Catalog Sync.</p>
-                    
+
                     <div class="d-grid gap-3 mt-3">
                         <a href="/admin/account" class="btn btn-outline-primary text-start">
                             <i class="bi bi-person-badge me-2"></i> Ir a Cuenta & Sesión

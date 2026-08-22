@@ -63,7 +63,7 @@ class SessionStatus:
         if check_network and status != "EXPIRED" and token:
             try:
                 data = fetch_account_profile(token)
-                now_str = datetime.now().isoformat()
+                now_str = datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%SZ')
                 if data in ("RATE_LIMIT", "UNVERIFIED"):
                     result["status"] = "UNVERIFIED"
                     result["last_validated_at"] = now_str
@@ -86,15 +86,15 @@ class SessionStatus:
                 if e.code == "ACCOUNT_SESSION_UNAVAILABLE":
                     result["status"] = "EXPIRED"
                     svc.mark_expired()
-                    result["last_validated_at"] = datetime.now().isoformat()
+                    result["last_validated_at"] = datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%SZ')
                 else:
-                    now_str = datetime.now().isoformat()
+                    now_str = datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%SZ')
                     result["status"] = "UNVERIFIED"
                     result["last_validated_at"] = now_str
                     if hasattr(svc, 'update_validation'):
                         svc.update_validation("UNVERIFIED", now_str)
             except Exception:
-                now_str = datetime.now().isoformat()
+                now_str = datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%SZ')
                 result["status"] = "UNVERIFIED"
                 result["last_validated_at"] = now_str
                 if hasattr(svc, 'update_validation'):
