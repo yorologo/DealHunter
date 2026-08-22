@@ -83,7 +83,7 @@ async def _run_zone_inventory_async(config, lat, lng, conn, run_id, dry_run=Fals
                   (s_id, s_name, m.get("brand", ""), m.get("type", "supermercado"), "ACTIVE", datetime.now().isoformat()))
         conn.commit()
         
-        if m.get("type") == "restaurant":
+        if m.get("type") and "restaurant" in m.get("type").lower():
             if not config.get("restaurants", True):
                 continue
             try:

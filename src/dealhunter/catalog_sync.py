@@ -219,7 +219,7 @@ async def run_sync(config, lat, lng, conn, run_id):
             break
             
         print(f"[*] Extracting full catalog for: {m.get('name')} ({m.get('type')})")
-        if m.get("type") == "restaurant":
+        if m.get("type") and "restaurant" in m.get("type").lower():
             items = await rest_adapter.fetch_menu(m["store_id"], report)
         else:
             items = await cpg_adapter.fetch_full_catalog(m["store_id"], report)
