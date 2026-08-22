@@ -1,5 +1,17 @@
 # Changelog
 
+## v2.9.3
+
+Patch release enfocado en:
+
+- autenticación positiva usando Unified Search;
+- eliminación del falso UNVERIFIED causado por `/profile` WAF;
+- semántica segura 401 / 403 / 429 / timeout;
+- payload canónico;
+- `eta` como evidencia positiva, no negativa;
+- crawler_mode persistido al inicio;
+- metadata correcta en runs parciales/abortados.
+
 ## v2.9.2
 Patch release.
 - persistencia del estado de validación;
