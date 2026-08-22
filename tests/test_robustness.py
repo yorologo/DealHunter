@@ -295,8 +295,8 @@ def test_doctor_providers_placeholder():
     names = {c[0]: c[1] for c in checks}
     assert names.get("Turbo") == "AVAILABLE"
     assert names.get("Restaurants") == "AVAILABLE"
-    assert names.get("Account context") == "NOT_CONFIGURED"
-    assert names.get("Rappi catalog") == "NOT_CHECKED"
+    assert names.get("Rappi Session") == "NOT_CONFIGURED"
+    assert names.get("Rappi catalog") == "AVAILABLE"
 
 def test_doctor_output_format():
     """Doctor output should have expected format."""
