@@ -91,7 +91,7 @@ Si ZONE_INVENTORY inicia y en medio del proceso recibe un HTTP 401, el run abort
    - `NOT_CONFIGURED`: No token.
    - `CONFIGURED`: Token exists locally (e.g., in `session.enc`), but its validity is `UNVERIFIED`.
    - `VALID`: Token successfully verified. If the profile API gets a WAF 403, we fall back to a dummy search. An HTTP 400 (Bad Request due to payload) or 200 proves authenticity.
-   - `EXPIRED`: Only a true `HTTP 401 Unauthorized` destroys the session and marks it expired. Timeouts or 429s result in `CONFIGURED (Unverified)`.
+   - `EXPIRED`: Only a true `HTTP 401 Unauthorized` marks the session as EXPIRED (the encrypted session file is preserved for recovery). Timeouts or 429s result in `CONFIGURED (Unverified)`.
 
 2. **Zone Inventory Lifecycle**:
    - `READY`: The session is `VALID` but no inventory has been run.
