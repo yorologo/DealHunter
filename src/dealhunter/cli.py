@@ -550,6 +550,7 @@ def main(args_list=None):
             has_token = asyncio.run(provider.is_authenticated())
             status = SessionStatus().get_current(check_network=False)
             is_auth = has_token and status.get("status") == "VALID"
+            print(f"DEBUG: has_token={has_token}, status={status.get('status')}, is_auth={is_auth}", file=sys.stderr)
             
             if is_auth and config.get("catalog_sync", {}).get("enabled", True):
                 print("SESSION_VALID: Using ZONE_INVENTORY mode.", file=sys.stderr)

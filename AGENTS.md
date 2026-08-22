@@ -28,7 +28,7 @@ The project must prioritize demonstrable value, not the largest advertised disco
 
 ## CURRENT STABLE
 
-- **Version**: v2.9.1
+- **Version**: v2.9.2
 - **Schema**: 7
 
 ### Web Modules Status:

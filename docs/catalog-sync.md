@@ -58,6 +58,8 @@ Zone Inventory mantiene una representación local del inventario observable para
 | Sesión | Modo |
 | --- | --- |
 | VALID | ZONE_INVENTORY |
+| UNVERIFIED | SEARCH_DISCOVERY |
+| CONFIGURED | SEARCH_DISCOVERY |
 | NOT_CONFIGURED | SEARCH_DISCOVERY |
 | EXPIRED | SEARCH_DISCOVERY |
 | INVALID | SEARCH_DISCOVERY |

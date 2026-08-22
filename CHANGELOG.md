@@ -1,5 +1,16 @@
 # Changelog
 
+## v2.9.2
+Patch release.
+- persistencia del estado de validación;
+- source de sesión consistente;
+- Account Check observable;
+- wizard Save and Check real;
+- estados UNVERIFIED / VALID / EXPIRED;
+- coherencia cross-page;
+- Web crawler action fix (PYTHONPATH propagado correctamente);
+- corrección de runs silenciosos (0s) al usar botón Web.
+
 ## [Unreleased]
 - feat: Deal Score V1 stabilization and Deal/Market Advantage isolation
 - feat: Advanced Restaurant Taxonomy extraction directly from NextJS metadata

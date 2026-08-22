@@ -66,8 +66,8 @@ flowchart TD
     
     RESOLVER[Session Resolver] --> EFFECTIVE{Effective Session?}
     
-    EFFECTIVE -- "VALID / CONFIGURED" --> ZONE[Zone Inventory]
-    EFFECTIVE -- "EXPIRED / NOT_CONFIGURED" --> SEARCH[Search Discovery]
+    EFFECTIVE -- "VALID" --> ZONE[Zone Inventory]
+    EFFECTIVE -- "UNVERIFIED / EXPIRED / NOT_CONFIGURED" --> SEARCH[Search Discovery]
 
     ZONE -.->|401 Unauthorized| FALLBACK[Partial Run & Fallback]
     FALLBACK --> SEARCH
