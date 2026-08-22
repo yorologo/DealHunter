@@ -155,13 +155,20 @@ def runs_start():
         db_path = current_app.config['DATABASE']
         project_root = os.path.dirname(os.path.abspath(db_path))
         
-        subprocess.run(
+        env = os.environ.copy()
+        if "PYTHONPATH" not in env:
+            env["PYTHONPATH"] = os.path.join(project_root, "src")
+            
+        res = subprocess.run(
             [sys.executable, "-m", "dealhunter", "discover", "--vertical", "general"],
             cwd=project_root,
+            env=env,
             capture_output=True,
             text=True,
             check=False
         )
+        print("Crawler output:", res.stdout, file=sys.stderr)
+        print("Crawler error:", res.stderr, file=sys.stderr)
     except Exception as e:
         print(f"Error starting crawler from web: {e}", file=sys.stderr)
         
