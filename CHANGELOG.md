@@ -14,6 +14,26 @@
 - fix: Elimination of hardcoded 65% discount arbitrary limits
 - fix: Structured taxonomy enforcement and robust URL fallback resolution
 
+## [2.9.1] - 2026-08-22
+
+Patch release de estabilidad y UX para Zone Inventory y Session Management.
+
+### Fixed / UX
+- SessionStatus canónico: unifica la validación y gestión de estados de sesión.
+- Clarificación de estados `CONFIGURED` vs `VALID`.
+- Conservación de sesiones `EXPIRED` en persistencia (sin borrar el archivo cifrado local).
+- Semántica robusta de 401/403/WAF.
+- Estado `UNVERIFIED` para fallos de red o WAF ambiguos.
+- Nuevos estados en Catalog Sync: `READY`, `ACTIVE`, `PARTIAL`.
+- Restauración de un wizard Web completamente funcional.
+- Recuperación del procedimiento V7 de sesión (Omni-Interceptor de AJAX).
+- Eliminación de instrucciones obsoletas y fallidas (basadas en localStorage).
+- Consolidación del Source de sesión para que refleje correctamente el almacenamiento persistente cifrado.
+- Corrección de visualización de timestamps a formato local en toda la UI.
+- Mejoras a la experiencia (UX) de los resultados legacy run.
+- Adición de la versión visible en tiempo de ejecución (footer de base.html) para identificar servidores huérfanos.
+- Ampliación sustancial del conjunto de pruebas para respaldar la estabilidad (277 tests).
+
 ## [2.9.0] - 2026-08-22
 
 ### Added

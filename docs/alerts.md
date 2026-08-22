@@ -11,4 +11,4 @@ El motor local evalúa notificaciones sin utilizar infraestructura cloud. Se eje
 
 El motor persiste los eventos en la base local y mantiene deduplicación temporal, garantizando que el usuario no reciba la misma alerta por una promoción estática prolongada.
 
-> NOTA: La gestión web (UI) completa y notificaciones push de Android están planificadas para v2.8.
+> NOTA: La gestión web (UI) completa y notificaciones push de Android están planificadas para v2.10.
