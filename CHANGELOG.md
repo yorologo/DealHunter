@@ -14,6 +14,20 @@
 - fix: Elimination of hardcoded 65% discount arbitrary limits
 - fix: Structured taxonomy enforcement and robust URL fallback resolution
 
+## [2.9.0] - 2026-08-22
+
+### Added
+- Zone Inventory mode using authenticated `catalog_sync`.
+- Automatic crawler strategy: switches to `ZONE_INVENTORY` on valid session, fallbacks to `SEARCH_DISCOVERY` on missing/expired session.
+- Run coverage metadata (`crawler_mode`, `coverage_complete`).
+- Store lifecycle reconciliation (`status`, `last_seen_at`) marking missing stores as `STALE`.
+- Product availability reconciliation marking missing products as `UNAVAILABLE`.
+- 401 fallback mechanism that cleanly aborts partial runs and restarts via Search Discovery.
+- `BACK_IN_STOCK` seamless integration via Alerts Engine.
+- Schema upgraded to v8.
+- Doctor check enhancements for Crawler Mode and Session.
+- Catalog Sync UX improvements showing active mode and coverage limits.
+
 ## [2.8.2] - 2026-08-21
 
 ### Reliability (Background Runtime)

@@ -15,9 +15,9 @@ DealHunter es un motor local-first de inteligencia de precios y oportunidades or
 
 ## Estado Actual
 
-- **Versión**: `v2.8.0`
+- **Versión**: `v2.9.0`
 - **Schema DB**: `7`
-- **Tests**: `227 passed`
+- **Tests**: `271 passed`
 - **Integración API**: 0 endpoints bloqueados, fallback local en diagnósticos.
 
 ### Experiencia Web
