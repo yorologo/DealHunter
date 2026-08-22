@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Asistente de Configuración - DealHunter{% endblock %}
+{% block title %}Asistente de Sesión Rappi - DealHunter{% endblock %}
 
 {% block content %}
 <div class="container-fluid max-w-md mx-auto" style="max-width: 600px;">
@@ -11,54 +11,160 @@
         </ol>
     </nav>
 
-    <h2 class="mb-4">Asistente de Importación de Sesión</h2>
+    <h2 class="mb-4">ASISTENTE DE SESIÓN RAPPI</h2>
 
     <div class="card shadow-sm mb-4">
         <div class="card-body">
-            <h5 class="card-title">1. Obtén tu token de Rappi</h5>
-            <p class="text-muted">Para que DealHunter pueda descargar los catálogos de los supermercados de tu zona, necesitas proveer un token de sesión de tu cuenta de Rappi. <strong>Puedes obtenerlo fácilmente utilizando este script en tu navegador.</strong></p>
-            
-            <div class="mb-3">
-                <label class="form-label fw-bold">Instrucciones</label>
-                <ol class="small text-muted">
-                    <li>Abre <a href="https://www.rappi.com.mx/" target="_blank">www.rappi.com.mx</a> y asegúrate de haber iniciado sesión.</li>
-                    <li>Abre las herramientas de desarrollo de tu navegador (F12 o Ctrl+Shift+I).</li>
-                    <li>Ve a la pestaña <strong>Consola (Console)</strong>.</li>
-                    <li>Pega y ejecuta el siguiente código:</li>
-                </ol>
-            </div>
-            
-            <div class="position-relative mb-3">
-                <textarea class="form-control font-monospace text-muted small bg-light" rows="1" readonly>localStorage.getItem('access_token');</textarea>
-            </div>
+            <h5 class="card-title text-primary">Paso 1<br><small class="text-dark">Abre Rappi e inicia sesión</small></h5>
+            <p class="text-muted mt-2">Abre Rappi en una nueva pestaña y asegúrate de haber iniciado sesión con tu cuenta.</p>
+            <a href="https://www.rappi.com.mx/" target="_blank" class="btn btn-outline-primary mb-2">Abrir Rappi</a>
         </div>
     </div>
 
-    <div class="card shadow-sm">
+    <div class="card shadow-sm mb-4">
         <div class="card-body">
-            <h5 class="card-title">2. Guarda el Token</h5>
-            <p class="text-muted">Pega el token (sin comillas) en el campo de abajo. Será cifrado localmente mediante <code>cryptography/Fernet</code>.</p>
+            <h5 class="card-title text-primary">Paso 2<br><small class="text-dark">Obtén tu sesión</small></h5>
+            <p class="text-muted mt-2">Esta herramienta se ejecuta únicamente en tu navegador y observa las solicitudes generadas por tu propia sesión de Rappi para localizar la credencial de sesión utilizada por tu cuenta. No envía datos a DealHunter hasta que tú decidas copiarlos y guardarlos.</p>
+            
+            <ol class="small text-muted mt-3 mb-3">
+                <li>En la pestaña de Rappi, pulsa <strong>F12</strong> (o Ctrl+Shift+I) para abrir las herramientas de desarrollo.</li>
+                <li>Selecciona la pestaña <strong>Consola (Console)</strong>. <em>(Si tu navegador lo impide, es posible que debas escribir "allow pasting" antes).</em></li>
+                <li>Haz clic en el botón de abajo para copiar la herramienta y pégala en la Consola. Presiona <strong>Enter</strong>.</li>
+            </ol>
+
+            <button type="button" class="btn btn-dark copy-helper-btn" onclick="copyHelper(this)">Copiar herramienta</button>
+            
+            <textarea id="helper-script" class="d-none" aria-hidden="true">
+javascript:(function(){
+    if (window.__dealhunter_active) {
+        alert("El interceptor de DealHunter ya está activo. Realiza una búsqueda (ej: coca cola).");
+        return;
+    }
+    window.__dealhunter_active = true;
+    const overlay = document.createElement('div');
+    overlay.style.cssText = 'position:fixed;top:20px;right:20px;background:#fff;border:2px solid #ff4e00;border-radius:8px;padding:15px;z-index:999999;box-shadow:0 4px 12px rgba(0,0,0,0.15);color:#333;font-family:sans-serif;max-width:350px;';
+    overlay.innerHTML = `<h3 style="margin:0 0 10px 0;color:#ff4e00;font-size:16px;">DealHunter Helper</h3><p style="margin:0 0 10px 0;font-size:14px;">Interceptor activo. Ahora busca algo en Rappi (ej: "coca cola") para generar tráfico.</p><div id="dh-status" style="font-weight:bold;color:#666;font-size:13px;">Esperando request...</div>`;
+    document.body.appendChild(overlay);
+
+    function onTokenDetected(token) {
+        if (!token.startsWith('Bearer ')) return;
+        const val = token.replace('Bearer ', '').trim();
+        if (window.__dealhunter_found === val) return;
+        window.__dealhunter_found = val;
+        const status = document.getElementById('dh-status');
+        status.style.color = '#00a300';
+        status.innerHTML = `✅ Sesión detectada<br><br><button id="dh-copy-btn" style="background:#ff4e00;color:white;border:none;padding:8px 12px;border-radius:4px;cursor:pointer;font-weight:bold;width:100%;">Copiar sesión</button>`;
+        document.getElementById('dh-copy-btn').onclick = function() {
+            navigator.clipboard.writeText(val).then(() => {
+                this.textContent = '¡Copiado!';
+                this.style.background = '#00a300';
+                setTimeout(() => { overlay.remove(); }, 2000);
+            }).catch(e => {
+                prompt('Copia este texto manualmente:', val);
+            });
+        };
+    }
+
+    const origFetch = window.fetch;
+    window.fetch = async function(...args) {
+        try {
+            const opts = args[1] || {};
+            if (opts.headers) {
+                let auth = null;
+                if (opts.headers instanceof Headers) {
+                    auth = opts.headers.get('Authorization');
+                } else if (Array.isArray(opts.headers)) {
+                    const h = opts.headers.find(x => x[0].toLowerCase() === 'authorization');
+                    if (h) auth = h[1];
+                } else if (typeof opts.headers === 'object') {
+                    const key = Object.keys(opts.headers).find(k => k.toLowerCase() === 'authorization');
+                    if (key) auth = opts.headers[key];
+                }
+                if (auth) onTokenDetected(auth);
+            }
+        } catch(e) {}
+        return origFetch.apply(this, args);
+    };
+
+    const origOpen = XMLHttpRequest.prototype.open;
+    const origSetReq = XMLHttpRequest.prototype.setRequestHeader;
+    XMLHttpRequest.prototype.open = function() { return origOpen.apply(this, arguments); };
+    XMLHttpRequest.prototype.setRequestHeader = function(header, value) {
+        if (header.toLowerCase() === 'authorization') onTokenDetected(value);
+        return origSetReq.apply(this, arguments);
+    };
+})();
+            </textarea>
+            
+            <script>
+            function copyHelper(btn) {
+                const code = document.getElementById('helper-script').value.trim();
+                navigator.clipboard.writeText(code).then(() => {
+                    const originalText = btn.innerText;
+                    btn.innerText = "¡Copiado!";
+                    btn.classList.remove('btn-dark');
+                    btn.classList.add('btn-success');
+                    setTimeout(() => {
+                        btn.innerText = originalText;
+                        btn.classList.remove('btn-success');
+                        btn.classList.add('btn-dark');
+                    }, 3000);
+                }).catch(() => {
+                    alert("Error al copiar al portapapeles. Copie el texto manualmente.");
+                });
+            }
+            </script>
+        </div>
+    </div>
+
+    <div class="card shadow-sm mb-4">
+        <div class="card-body">
+            <h5 class="card-title text-primary">Paso 3<br><small class="text-dark">Realiza una búsqueda en Rappi</small></h5>
+            <p class="text-muted mt-2">Vuelve a la pestaña de Rappi. Usa la barra de búsqueda y busca cualquier cosa, por ejemplo:<br><strong class="text-dark bg-light p-1 rounded">coca cola</strong></p>
+            <p class="text-muted small">El helper mostrará visualmente cuando detecte la request.</p>
+        </div>
+    </div>
+
+    <div class="card shadow-sm mb-4">
+        <div class="card-body">
+            <h5 class="card-title text-primary">Paso 4<br><small class="text-dark">Copia la sesión detectada</small></h5>
+            <p class="text-muted mt-2">Haz clic en el botón naranja <strong>"Copiar sesión"</strong> que aparecerá en la caja de DealHunter dentro de Rappi.</p>
+        </div>
+    </div>
+
+    <div class="card shadow-sm mb-4 border-primary">
+        <div class="card-body">
+            <h5 class="card-title text-primary">Paso 5<br><small class="text-dark">Vuelve a DealHunter y pégala aquí</small></h5>
+            <p class="text-muted mt-2">Pega la sesión obtenida abajo.</p>
             
             <form action="/admin/catalog-sync/wizard/store" method="POST">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                 <input type="hidden" name="return_path" value="{{ current_path }}">
                 
                 <div class="mb-3">
-                    <label for="tokenInput" class="form-label fw-bold">RAPPI_BEARER_TOKEN</label>
-                    <input type="password" class="form-control" id="tokenInput" name="token" placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI..." required>
+                    <label for="tokenInput" class="form-label fw-bold">Sesión Rappi</label>
+                    <input type="password" class="form-control" id="tokenInput" name="token" placeholder="Pega aquí tu sesión Rappi" required>
                 </div>
                 
                 <div class="mb-3">
-                    <label class="form-label fw-bold">Modo de almacenamiento</label>
-                    <select class="form-select" name="session_mode">
-                        <option value="persistent">Persistente (Recomendado - cifrado localmente)</option>
-                        <option value="temporary">Temporal (Se elimina al reiniciar DealHunter)</option>
-                    </select>
+                    <label class="form-label fw-bold">Modo</label>
+                    <div class="form-check">
+                        <input class="form-check-input" type="radio" name="session_mode" id="modePersistent" value="persistent" checked>
+                        <label class="form-check-label" for="modePersistent">
+                            ● Persistente — recomendado (cifrada localmente)
+                        </label>
+                    </div>
+                    <div class="form-check">
+                        <input class="form-check-input" type="radio" name="session_mode" id="modeTemporary" value="temporary">
+                        <label class="form-check-label" for="modeTemporary">
+                            ○ Temporal (se borra al reiniciar)
+                        </label>
+                    </div>
                 </div>
                 
                 <div class="d-grid gap-2 d-md-flex justify-content-md-end mt-4">
                     <a href="{{ current_path }}" class="btn btn-outline-secondary me-md-2">Cancelar</a>
-                    <button type="submit" class="btn btn-primary">Guardar y Continuar</button>
+                    <button type="submit" class="btn btn-primary">Guardar y comprobar</button>
                 </div>
             </form>
         </div>

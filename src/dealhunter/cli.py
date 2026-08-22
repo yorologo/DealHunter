@@ -351,47 +351,36 @@ def main(args_list=None):
 })();""".replace('__PORT__', str(importer.port))
                 else:
                     bookmarklet = """javascript:(function(){
-  if (window.location.hostname !== 'www.rappi.com.mx' && window.location.hostname !== 'rappi.com.mx') {
-    alert('DealHunter: this bookmarklet must be executed on rappi.com.mx');
-    return;
+  if (window.location.hostname !== 'www.rappi.com.mx' && window.location.hostname !== 'rappi.com.mx') { alert('DealHunter: Solo en rappi.com.mx'); return; }
+  if (window.__dh_active) { alert('DealHunter: Interceptor activo. Busca algo (ej: coca cola).'); return; }
+  window.__dh_active = true;
+  function onToken(t) {
+    if (!t.startsWith('Bearer ')) return;
+    const val = t.replace('Bearer ', '').trim();
+    if (window.__dh_found === val) return;
+    window.__dh_found = val;
+    var pay = JSON.stringify({nonce: '__NONCE__', token: val});
+    window.location.href = 'http://127.0.0.1:__PORT__/import#' + btoa(unescape(encodeURIComponent(pay)));
   }
-  function isJWT(str) {
-    if (typeof str !== 'string') return false;
-    const p = str.split('.'); if (p.length !== 3) return false;
-    try { JSON.parse(atob(p[0].replace(/-/g, '+').replace(/_/g, '/'))); JSON.parse(atob(p[1].replace(/-/g, '+').replace(/_/g, '/'))); return true; } catch(e) { return false; }
-  }
-  function ext(str) {
-    try { return JSON.parse(atob(str.split('.')[1].replace(/-/g, '+').replace(/_/g, '/'))); } catch(e) { return null; }
-  }
-  function findJ(obj) {
-    let f = [];
-    if (typeof obj === 'string') { if (isJWT(obj)) f.push(obj); }
-    else if (Array.isArray(obj)) { obj.forEach(v => f.push(...findJ(v))); }
-    else if (typeof obj === 'object' && obj !== null) { for (const v of Object.values(obj)) f.push(...findJ(v)); }
-    return f;
-  }
-  let c = [];
-  function scan(s) {
-    for (let i = 0; i < s.length; i++) {
-      const v = s.getItem(s.key(i));
-      if (isJWT(v)) c.push(v);
-      else { try { c.push(...findJ(JSON.parse(v))); } catch(e) {} }
-    }
-  }
-  scan(localStorage); scan(sessionStorage);
-  document.cookie.split(';').forEach(ck => {
-    const v = ck.split('=').slice(1).join('=').trim();
-    if (isJWT(v)) c.push(v);
-  });
-  let valid = [];
-  Array.from(new Set(c)).forEach(t => {
-    const p = ext(t);
-    if (p && p.exp && (p.exp * 1000 > Date.now())) valid.push(t);
-  });
-  if (valid.length === 0) { alert('DealHunter: No active session found.'); return; }
-  valid.sort((a,b) => b.length - a.length);
-  var pay = JSON.stringify({nonce: '__NONCE__', token: valid[0]});
-  window.location.href = 'http://127.0.0.1:__PORT__/import#' + btoa(unescape(encodeURIComponent(pay)));
+  const oF = window.fetch;
+  window.fetch = async function(...args) {
+    try {
+      const opts = args[1] || {};
+      if (opts.headers) {
+        let a = null;
+        if (opts.headers instanceof Headers) a = opts.headers.get('Authorization');
+        else if (Array.isArray(opts.headers)) { const h = opts.headers.find(x => x[0].toLowerCase() === 'authorization'); if (h) a = h[1]; }
+        else if (typeof opts.headers === 'object') { const k = Object.keys(opts.headers).find(k => k.toLowerCase() === 'authorization'); if (k) a = opts.headers[k]; }
+        if (a) onToken(a);
+      }
+    } catch(e) {}
+    return oF.apply(this, args);
+  };
+  const oO = XMLHttpRequest.prototype.open;
+  const oS = XMLHttpRequest.prototype.setRequestHeader;
+  XMLHttpRequest.prototype.open = function() { return oO.apply(this, arguments); };
+  XMLHttpRequest.prototype.setRequestHeader = function(h, v) { if (h.toLowerCase() === 'authorization') onToken(v); return oS.apply(this, arguments); };
+  alert('DealHunter Interceptor activo. Haz una búsqueda en la página (ej: "coca cola") para capturar la sesión.');
 })();""".replace('__NONCE__', importer.nonce).replace('__PORT__', str(importer.port))
                 
                 print("\n" + bookmarklet.replace("\n", "") + "\n")
@@ -428,12 +417,42 @@ def main(args_list=None):
                 print("To securely authenticate without exposing your tokens:")
                 print("1. Open www.rappi.com.mx in your browser and login.")
                 print("2. Open Developer Tools (F12) -> Console")
-                print("3. Paste this code to send the session securely to DealHunter:")
-                print("\nfetch('http://127.0.0.1:5050/commit', {")
-                print("  method: 'POST',")
-                print("  headers: {'Content-Type': 'application/json'},")
-                print("  body: JSON.stringify({nonce: '__NONCE__', token: localStorage.getItem('access_token')})".replace('__NONCE__', importer.nonce))
-                print("}).then(() => console.log('DealHunter Auth OK!')).catch(e => console.error(e));\n")
+                print("3. Paste this code and perform a search (e.g. 'coca cola') to send the session securely to DealHunter:\n")
+                print("""
+(function(){
+  if (window.__dh_active) return;
+  window.__dh_active = true;
+  function onToken(t) {
+    if (!t.startsWith('Bearer ')) return;
+    const val = t.replace('Bearer ', '').trim();
+    if (window.__dh_found === val) return;
+    window.__dh_found = val;
+    fetch('http://127.0.0.1:5050/commit', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({nonce: '__NONCE__', token: val})
+    }).then(() => { alert('DealHunter Auth OK! Vuelve a tu terminal.'); window.__dh_found = null; }).catch(e => console.error(e));
+  }
+  const oF = window.fetch;
+  window.fetch = async function(...args) {
+    try {
+      const opts = args[1] || {};
+      if (opts.headers) {
+        let a = null;
+        if (opts.headers instanceof Headers) a = opts.headers.get('Authorization');
+        else if (Array.isArray(opts.headers)) { const h = opts.headers.find(x => x[0].toLowerCase() === 'authorization'); if (h) a = h[1]; }
+        else if (typeof opts.headers === 'object') { const k = Object.keys(opts.headers).find(k => k.toLowerCase() === 'authorization'); if (k) a = opts.headers[k]; }
+        if (a) onToken(a);
+      }
+    } catch(e) {}
+    return oF.apply(this, args);
+  };
+  const oO = XMLHttpRequest.prototype.open;
+  const oS = XMLHttpRequest.prototype.setRequestHeader;
+  XMLHttpRequest.prototype.open = function() { return oO.apply(this, arguments); };
+  XMLHttpRequest.prototype.setRequestHeader = function(h, v) { if (h.toLowerCase() === 'authorization') onToken(v); return oS.apply(this, arguments); };
+  console.log('DealHunter Interceptor activo. Haz una búsqueda en la página.');
+})();
+""".replace('__NONCE__', importer.nonce))
                 
                 print(f"[*] Waiting for session data on port 5050...")
                 try:

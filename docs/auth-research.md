@@ -17,11 +17,11 @@
 - Inspeccionar el tráfico HTTPS vía proxy local requeriría vulnerar el *certificate pinning* de la app, lo cual viola las directivas arquitectónicas.
 
 ## 3. Estrategia: Reutilización de Sesión Web
-Rappi Web (Next.js) utiliza autenticación mediante tokens JWT/Bearer almacenados localmente en el navegador. 
+Rappi Web (Next.js) utiliza autenticación mediante tokens opacos inyectados en las peticiones AJAX. 
 - **Flujo diseñado (`dealhunter auth rappi`):**
   1. DealHunter inicia un servidor local efímero.
   2. El usuario navega a `www.rappi.com.mx` e inicia sesión legalmente (OTP/reCAPTCHA manejado por Rappi).
-  3. El usuario utiliza un *Bookmarklet* proporcionado por DealHunter para extraer el token de `localStorage` y enviarlo de vuelta a `localhost:5000/auth/callback`.
+  3. El usuario utiliza un *Bookmarklet* proporcionado por DealHunter para interceptar las peticiones AJAX nativas (V7 Omni-Interceptor) para extraer el token de manera opaca y enviarlo de vuelta a `localhost:5000/auth/callback`.
   4. DealHunter recibe el `AccessContext`, apaga el servidor y guarda el material de forma segura en `~/.config/dealhunter/session.enc` (0600), fuera de logs y variables expuestas.
 
 ## 4. Endpoints por Descubrir
