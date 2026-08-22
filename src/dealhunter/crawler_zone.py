@@ -8,10 +8,23 @@ from .auth import RappiSessionProvider
 from .core import process_and_insert_product
 
 def run_zone_inventory(config, lat, lng, conn, run_id, dry_run=False):
-    return asyncio.run(_run_zone_inventory_async(config, lat, lng, conn, run_id, dry_run))
+    try:
+        return asyncio.run(_run_zone_inventory_async(config, lat, lng, conn, run_id, dry_run))
+    except (KeyboardInterrupt, asyncio.CancelledError):
+        c = conn.cursor()
+        c.execute("UPDATE runs SET status = 'PARTIAL', coverage_complete = 0, finished_at = CURRENT_TIMESTAMP WHERE run_id = ?", (run_id,))
+        conn.commit()
+        return "PARTIAL", 0
+    except BaseException:
+        c = conn.cursor()
+        c.execute("UPDATE runs SET status = 'ERROR', coverage_complete = 0, finished_at = CURRENT_TIMESTAMP WHERE run_id = ?", (run_id,))
+        conn.commit()
+        raise
 
 async def _run_zone_inventory_async(config, lat, lng, conn, run_id, dry_run=False):
     c = conn.cursor()
+    c.execute('UPDATE runs SET crawler_mode = ? WHERE run_id = ?', ('ZONE_INVENTORY', run_id))
+    conn.commit()
     seen_in_run = set()
     requests_count = 0
     start_time = time.time()
@@ -131,8 +144,8 @@ async def _run_zone_inventory_async(config, lat, lng, conn, run_id, dry_run=Fals
                 c.execute('UPDATE stores SET status = "STALE" WHERE store_id = ?', (row[0],))
         conn.commit()
         
-    c.execute('''UPDATE runs SET crawler_mode = ?, coverage_complete = ?, finished_at = CURRENT_TIMESTAMP WHERE run_id = ?''', 
-              ("ZONE_INVENTORY", 1 if global_state == "COMPLETED" else 0, run_id))
+    c.execute('''UPDATE runs SET crawler_mode = ?, coverage_complete = ?, status = ?, finished_at = CURRENT_TIMESTAMP WHERE run_id = ?''', 
+              ("ZONE_INVENTORY", 1 if global_state == "COMPLETED" else 0, global_state, run_id))
     conn.commit()
               
     return global_state, report.authenticated_requests

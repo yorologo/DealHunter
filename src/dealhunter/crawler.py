@@ -81,156 +81,170 @@ def matches_filters(p_name, brand, s_name, category, config, d_eff, p_type, eff_
     return True
 
 def run_discover(config, lat, lng, conn, run_id, dry_run=False):
-    c = conn.cursor()
-    verticals_to_run = config.get("vertical", [])
-    if not verticals_to_run:
-        verticals_to_run = list(VERTICALS.keys())[:-1]
-        
-    queries_to_run = config.get("query", [])
-    
-    seen_in_run = set()
-    requests_count = 0
-    restaurant_category_cache = {}
-    max_reqs = config.get("max_requests", 1000)
-    start_time = time.time()
-    max_time = config.get("max_runtime", 3600)
-    
-    results = []
-    global_state = "COMPLETED"
-    error_code = None
-    
-    # Initialize checkpoint
-    checkpoint = RunCheckpoint(
-        run_id=run_id,
-        mode="discover",
-        status="RUNNING",
-    )
-    
-    for v_name in verticals_to_run:
-        base_queries = queries_to_run if queries_to_run else VERTICALS.get(v_name, [v_name])
-        queries = list(base_queries)
-        visited = set()
-        candidate_keywords = {}
-        
-        vertical_total_valid = 0
-        state = "LOW_COVERAGE"
-        
-        checkpoint.current_vertical = v_name
-        
-        while queries:
-            if requests_count >= max_reqs:
-                global_state = "REQUEST_BUDGET_REACHED"
-                error_code = "REQUEST_BUDGET_REACHED"
-                break
-            if time.time() - start_time >= max_time:
-                global_state = "TIMEOUT"
-                error_code = "TIMEOUT"
-                break
-                
-            q = queries.pop(0).lower().strip()
-            if q in visited or len(q) < 3:
-                continue
-                
-            visited.add(q)
-            if dry_run:
-                print(f"[DRY-RUN] Would search: {q}")
-                checkpoint.queries_completed += 1
-                checkpoint.last_completed_query = q
-                continue
-                
-            print(f"    [{v_name}] Query: '{q}'", file=sys.stderr)
-            
-            try:
-                data = fetch_unified_search(q, lat, lng)
-            except Exception as exc:
-                err = classify_error(exc)
-                print(f"    [{v_name}] Error: {err}", file=sys.stderr)
-                if not err.recoverable or err.code in ("HTTP_429", "CLOUDFLARE_LIMIT"):
-                    # For rate limits: stop conservatively, preserve what we have
-                    global_state = "PARTIAL"
-                    error_code = err.code
-                    # Save checkpoint before stopping
-                    checkpoint.status = "PARTIAL"
-                    checkpoint.error_code = err.code
+    try:
+
+            c = conn.cursor()
+            c.execute('UPDATE runs SET crawler_mode = ? WHERE run_id = ?', ('SEARCH_DISCOVERY', run_id))
+            conn.commit()
+            verticals_to_run = config.get("vertical", [])
+            if not verticals_to_run:
+                verticals_to_run = list(VERTICALS.keys())[:-1]
+
+            queries_to_run = config.get("query", [])
+
+            seen_in_run = set()
+            requests_count = 0
+            restaurant_category_cache = {}
+            max_reqs = config.get("max_requests", 1000)
+            start_time = time.time()
+            max_time = config.get("max_runtime", 3600)
+
+            results = []
+            global_state = "COMPLETED"
+            error_code = None
+
+            # Initialize checkpoint
+            checkpoint = RunCheckpoint(
+                run_id=run_id,
+                mode="discover",
+                status="RUNNING",
+            )
+
+            for v_name in verticals_to_run:
+                base_queries = queries_to_run if queries_to_run else VERTICALS.get(v_name, [v_name])
+                queries = list(base_queries)
+                visited = set()
+                candidate_keywords = {}
+
+                vertical_total_valid = 0
+                state = "LOW_COVERAGE"
+
+                checkpoint.current_vertical = v_name
+
+                while queries:
+                    if requests_count >= max_reqs:
+                        global_state = "REQUEST_BUDGET_REACHED"
+                        error_code = "REQUEST_BUDGET_REACHED"
+                        break
+                    if time.time() - start_time >= max_time:
+                        global_state = "TIMEOUT"
+                        error_code = "TIMEOUT"
+                        break
+
+                    q = queries.pop(0).lower().strip()
+                    if q in visited or len(q) < 3:
+                        continue
+
+                    visited.add(q)
+                    if dry_run:
+                        print(f"[DRY-RUN] Would search: {q}")
+                        checkpoint.queries_completed += 1
+                        checkpoint.last_completed_query = q
+                        continue
+
+                    print(f"    [{v_name}] Query: '{q}'", file=sys.stderr)
+
+                    try:
+                        data = fetch_unified_search(q, lat, lng)
+                    except Exception as exc:
+                        err = classify_error(exc)
+                        print(f"    [{v_name}] Error: {err}", file=sys.stderr)
+                        if not err.recoverable or err.code in ("HTTP_429", "CLOUDFLARE_LIMIT"):
+                            # For rate limits: stop conservatively, preserve what we have
+                            global_state = "PARTIAL"
+                            error_code = err.code
+                            # Save checkpoint before stopping
+                            checkpoint.status = "PARTIAL"
+                            checkpoint.error_code = err.code
+                            checkpoint.requests_made = requests_count
+
+                            save_checkpoint(conn, checkpoint)
+                            return global_state, requests_count
+                        # For recoverable errors, skip this query and continue
+                        continue
+
+                    requests_count += 1
+
+                    if data == "RATE_LIMIT":
+                        global_state = "PARTIAL"
+                        error_code = "HTTP_429"
+                        checkpoint.status = "PARTIAL"
+                        checkpoint.error_code = "HTTP_429"
+                        checkpoint.requests_made = requests_count
+                        save_checkpoint(conn, checkpoint)
+                        return global_state, requests_count
+                    elif not data:
+                        checkpoint.queries_completed += 1
+                        checkpoint.last_completed_query = q
+                        continue
+
+                    stores = data.get("stores", []) or []
+                    new_in_query = 0
+                    total_in_query = 0
+
+                    for s in stores:
+                        if v_name == "turbo" and not is_turbo_store(s):
+                            continue
+                        if v_name == "restaurants" and not is_restaurant(s):
+                            continue
+
+                        s_id = str(s.get("store_id"))
+                        s_name = s.get("store_name", s_id)
+
+                        c.execute('INSERT OR IGNORE INTO stores (store_id, name, brand, type) VALUES (?, ?, ?, ?)', 
+                                  (s_id, s_name, s.get("store_brand_name", ""), s.get("parent_store_type", "")))
+
+                        prods = s.get("products", [])
+
+                        for p in prods:
+                            total_in_query += 1
+                            vertical_total_valid += 1
+                            p_id = str(p.get("product_id"))
+                            uid = f"{s_id}_{p_id}"
+
+
+                            process_and_insert_product(p, run_id, s_id, s_name, config, q, conn, seen_in_run)
+
+                    # Commit after each query to preserve partial data
+                    conn.commit()
+
+                    checkpoint.queries_completed += 1
+                    checkpoint.last_completed_query = q
                     checkpoint.requests_made = requests_count
 
-                    save_checkpoint(conn, checkpoint)
-                    return global_state, requests_count
-                # For recoverable errors, skip this query and continue
-                continue
-            
-            requests_count += 1
-            
-            if data == "RATE_LIMIT":
-                global_state = "PARTIAL"
-                error_code = "HTTP_429"
-                checkpoint.status = "PARTIAL"
-                checkpoint.error_code = "HTTP_429"
-                checkpoint.requests_made = requests_count
-                save_checkpoint(conn, checkpoint)
-                return global_state, requests_count
-            elif not data:
-                checkpoint.queries_completed += 1
-                checkpoint.last_completed_query = q
-                continue
-                
-            stores = data.get("stores", []) or []
-            new_in_query = 0
-            total_in_query = 0
-            
-            for s in stores:
-                if v_name == "turbo" and not is_turbo_store(s):
-                    continue
-                if v_name == "restaurants" and not is_restaurant(s):
-                    continue
-                    
-                s_id = str(s.get("store_id"))
-                s_name = s.get("store_name", s_id)
-                
-                c.execute('INSERT OR IGNORE INTO stores (store_id, name, brand, type) VALUES (?, ?, ?, ?)', 
-                          (s_id, s_name, s.get("store_brand_name", ""), s.get("parent_store_type", "")))
-                
-                prods = s.get("products", [])
-                
-                for p in prods:
-                    total_in_query += 1
-                    vertical_total_valid += 1
-                    p_id = str(p.get("product_id"))
-                    uid = f"{s_id}_{p_id}"
-                    
+                    # Simple keyword expansion based on query results (simplified for length)
+                    if len(visited) < 10 and not queries_to_run: # only expand if no explicit queries
+                        for s in stores:
+                            if len(queries) < 20:
+                                queries.append(s.get("store_name", "").lower())
 
-                    process_and_insert_product(p, run_id, s_id, s_name, config, q, conn, seen_in_run)
-                                      
-            # Commit after each query to preserve partial data
-            conn.commit()
-            
-            checkpoint.queries_completed += 1
-            checkpoint.last_completed_query = q
+                    if not dry_run:
+                        time.sleep(3)
+
+                if global_state not in ("COMPLETED",):
+                    break
+
+            # Final checkpoint update
+            checkpoint.status = global_state
+            checkpoint.error_code = error_code
             checkpoint.requests_made = requests_count
-            
-            # Simple keyword expansion based on query results (simplified for length)
-            if len(visited) < 10 and not queries_to_run: # only expand if no explicit queries
-                for s in stores:
-                    if len(queries) < 20:
-                        queries.append(s.get("store_name", "").lower())
-            
-            if not dry_run:
-                time.sleep(3)
-                
-        if global_state not in ("COMPLETED",):
-            break
-    
-    # Final checkpoint update
-    checkpoint.status = global_state
-    checkpoint.error_code = error_code
-    checkpoint.requests_made = requests_count
-    save_checkpoint(conn, checkpoint)
-    
-    c.execute("UPDATE runs SET crawler_mode = ?, coverage_complete = ? WHERE run_id = ?", ("SEARCH_DISCOVERY", 0, run_id))
-    conn.commit()
-            
-    return global_state, requests_count
+            save_checkpoint(conn, checkpoint)
 
+            c.execute("UPDATE runs SET crawler_mode = ?, coverage_complete = ? WHERE run_id = ?", ("SEARCH_DISCOVERY", 0, run_id))
+            conn.commit()
+
+            return global_state, requests_count
+
+    except KeyboardInterrupt:
+        c = conn.cursor()
+        c.execute("UPDATE runs SET status = 'PARTIAL', coverage_complete = 0, finished_at = CURRENT_TIMESTAMP WHERE run_id = ?", (run_id,))
+        conn.commit()
+        return "PARTIAL", 0
+    except BaseException:
+        c = conn.cursor()
+        c.execute("UPDATE runs SET status = 'ERROR', coverage_complete = 0, finished_at = CURRENT_TIMESTAMP WHERE run_id = ?", (run_id,))
+        conn.commit()
+        raise
 def run_update(config, lat, lng, conn, run_id, dry_run=False):
     # UPDATE mode aims to refresh known items
     c = conn.cursor()
