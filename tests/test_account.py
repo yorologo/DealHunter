@@ -35,6 +35,8 @@ def test_account_status_invalid_session(mock_fetch):
 
 @patch('dealhunter.api.urllib.request.urlopen')
 def test_fetch_profile_401(mock_urlopen):
+    from dealhunter.config import save_config
+    save_config({'location': {'lat': 19.0, 'lng': -99.0}})
     mock_urlopen.side_effect = urllib.error.HTTPError(
         url="", code=401, msg="Unauthorized", hdrs=None, fp=None
     )
@@ -70,6 +72,9 @@ def test_account_status_unverified(mock_fetch):
 
 @patch('dealhunter.api.urllib.request.urlopen')
 def test_fetch_profile_waf_fallback_unverified(mock_urlopen):
+    from dealhunter.config import save_config
+    save_config({'location': {'lat': 19.0, 'lng': -99.0}})
+
     from unittest.mock import MagicMock
     import json
     mock_response = MagicMock()
@@ -84,6 +89,9 @@ def test_fetch_profile_waf_fallback_unverified(mock_urlopen):
 
 @patch('dealhunter.api.urllib.request.urlopen')
 def test_fetch_profile_waf_fallback_valid(mock_urlopen):
+    from dealhunter.config import save_config
+    save_config({'location': {'lat': 19.0, 'lng': -99.0}})
+
     from unittest.mock import MagicMock
     import json
     mock_response = MagicMock()

@@ -92,6 +92,8 @@ class DealHunterError(Exception):
 def classify_error(exc):
     """Classify a Python exception into a structured DealHunterError."""
     if isinstance(exc, urllib.error.HTTPError):
+        if exc.code == 401:
+            return DealHunterError('ACCOUNT_SESSION_UNAVAILABLE', recoverable=False)
         if exc.code == 429:
             return DealHunterError("HTTP_429")
         if exc.code == 1015:
