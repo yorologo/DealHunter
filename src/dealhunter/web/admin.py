@@ -434,7 +434,19 @@ def catalog_sync_wizard_store():
     else:
         svc.store_temporary(token)
         
-    flash("Sesión importada correctamente.", "success")
+    # Guardar y comprobar
+    from dealhunter.account import get_account_status
+    cfg = load_config()
+    status_res = get_account_status(cfg, check_network=True)
+    status_str = status_res.get('status', 'UNVERIFIED')
+    
+    if status_str == 'VALID':
+        flash("Sesión guardada y verificada exitosamente.", "success")
+    elif status_str == 'UNVERIFIED':
+        flash("Sesión guardada, pero no pudimos verificarla en este momento (WAF/Red).", "warning")
+    elif status_str == 'EXPIRED':
+        flash("La sesión guardada ya está expirada o es inválida.", "error")
+        
     return redirect(return_path)
 
 @admin_bp.route('/catalog-sync')
@@ -486,7 +498,7 @@ def catalog_sync():
                            session_ready=acc['configured'],
                            stored_at=stored_at_str,
                            encryption_method="Fernet",
-                           valid=acc['effective'],
+                           valid=(acc['status'] == 'VALID'),
                            warnings=svc.store.check_permissions(),
                            status=acc['status'],
                            stores_count=stores_count,

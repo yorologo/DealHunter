@@ -9,6 +9,7 @@ import json
 import base64
 import hashlib
 import platform
+from datetime import datetime
 import getpass
 import logging
 import time
@@ -171,7 +172,7 @@ class SecretStore:
             dk = hashlib.pbkdf2_hmac('sha256', entropy, salt, 100000)
             return base64.urlsafe_b64encode(dk)
 
-    def store(self, token: str, is_expired: bool = False) -> bool:
+    def store(self, token: str, is_expired: bool = False, last_validation_status: str = None, last_validated_at: str = None) -> bool:
         """Encrypt and persist token."""
         try:
             self._ensure_dir()
@@ -182,6 +183,8 @@ class SecretStore:
                 'stored_at': time.time(),
                 'token': token,
                 'is_expired': is_expired,
+                'last_validation_status': last_validation_status,
+                'last_validated_at': last_validated_at,
                 'encryption': ENCRYPTION_METHOD
             }
             raw_data = json.dumps(data).encode('utf-8')
@@ -431,4 +434,23 @@ class SessionService:
         self._temp_is_expired = True
         data = self.store.load_with_metadata()
         if data and data.get('token'):
-            self.store.store(data['token'], is_expired=True)
+            self.store.store(data['token'], is_expired=True, last_validation_status="EXPIRED", last_validated_at=datetime.now().isoformat() if 'datetime' in globals() else None)
+
+    def update_validation(self, status: str, timestamp: str):
+        """Update the last validation status and timestamp."""
+        data = self.store.load_with_metadata()
+        if data and data.get('token'):
+            # Preserve existing is_expired unless status changes it explicitly
+            is_expired = data.get('is_expired', False)
+            if status == "EXPIRED":
+                is_expired = True
+                self._temp_is_expired = True
+            elif status == "VALID":
+                is_expired = False
+                self._temp_is_expired = False
+            self.store.store(
+                data['token'],
+                is_expired=is_expired,
+                last_validation_status=status,
+                last_validated_at=timestamp
+            )

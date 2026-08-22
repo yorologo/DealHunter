@@ -544,8 +544,12 @@ def main(args_list=None):
         try:
             import asyncio
             from dealhunter.auth import RappiSessionProvider
+            from dealhunter.account import SessionStatus
+            
             provider = RappiSessionProvider()
-            is_auth = asyncio.run(provider.is_authenticated())
+            has_token = asyncio.run(provider.is_authenticated())
+            status = SessionStatus().get_current(check_network=False)
+            is_auth = has_token and status.get("status") == "VALID"
             
             if is_auth and config.get("catalog_sync", {}).get("enabled", True):
                 print("SESSION_VALID: Using ZONE_INVENTORY mode.", file=sys.stderr)

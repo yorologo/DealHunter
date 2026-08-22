@@ -65,7 +65,7 @@ def run_doctor(conn=None, db_path=None, check_network=False):
     cfg = load_config()
     session_res = get_account_status(cfg, check_network=False)
     
-    if session_res["effective"]:
+    if session_res["status"] == "VALID":
         sync_status = "READY (Zone Inventory)"
     else:
         sync_status = "LIMITED (Search Discovery)"

@@ -66,7 +66,7 @@ def test_account_status_unverified(mock_fetch):
     import os
     with patch.dict(os.environ, {"RAPPI_BEARER_TOKEN": "dummy"}):
         status = get_account_status({}, check_network=True)
-    assert status["status"] == "CONFIGURED"
+    assert status["status"] == "UNVERIFIED"
 
 @patch('dealhunter.api.urllib.request.urlopen')
 def test_fetch_profile_waf_fallback_unverified(mock_urlopen):

@@ -24,6 +24,8 @@
                                 <span class="badge bg-success fs-6"><i class="bi bi-check-circle"></i> Válida</span>
                             {% elif status == 'EXPIRED' %}
                                 <span class="badge bg-danger fs-6"><i class="bi bi-x-circle"></i> Expirada</span>
+                                                        {% elif status == 'UNVERIFIED' %}
+                                <span class="badge bg-warning text-dark fs-6"><i class="bi bi-exclamation-triangle"></i> No fue posible verificar la sesión</span>
                             {% elif status == 'CONFIGURED' %}
                                 <span class="badge bg-info text-dark fs-6"><i class="bi bi-info-circle"></i> Configurada, sin comprobar</span>
                             {% elif status == 'INVALID' %}
@@ -35,12 +37,20 @@
 
                         <dt class="col-sm-4 text-muted fw-normal">Origen:</dt>
                         <dd class="col-sm-8">
-                            {% if source == 'SESSION_PERSISTENT' %}
+                            {% if source == 'PERSISTENT' %}
                                 <i class="bi bi-shield-lock text-success"></i> Almacenamiento local cifrado
-                            {% elif source == 'SESSION_EPHEMERAL' %}
+                            {% elif source == 'EPHEMERAL' %}
                                 <i class="bi bi-terminal"></i> Variable de entorno <code>RAPPI_BEARER_TOKEN</code> (Temporal)
-                            {% elif source == 'SESSION_TEMPORARY' %}
+                            {% elif source == 'TEMPORARY' %}
                                 <i class="bi bi-clock-history"></i> Memoria RAM (Temporal)
+                            {% else %}
+                                -
+                            {% endif %}
+                        </dd>
+                        <dt class="col-sm-4 text-muted fw-normal mt-2">Último intento:</dt>
+                        <dd class="col-sm-8 mt-2">
+                            {% if last_validated_at %}
+                                <span class="local-time" data-iso="{{ last_validated_at }}">{{ last_validated_at }}</span>
                             {% else %}
                                 -
                             {% endif %}
@@ -48,11 +58,26 @@
                         
                         <dt class="col-sm-4 text-muted fw-normal">Detalles:</dt>
                         <dd class="col-sm-8 text-muted small mb-0">
-                            {% if market and market != 'UNKNOWN' %}
+                            {% if status == 'UNVERIFIED' %}
+                                Rappi no permitió confirmar la sesión en este momento (WAF o Rate Limit). Tu sesión fue conservada, inténtalo más tarde.
+                            {% elif status == 'CONFIGURED' %}
+                                No verificada recientemente
+                            {% elif status == 'VALID' %}
+                                {% if market and market != 'UNKNOWN' %}
                                 {{ region }} ({{ market }})
                                 {% if has_prime %}<br><i class="bi bi-star-fill text-warning"></i> Prime ({{ prime_type }}){% endif %}
                             {% else %}
                                 No verificada recientemente
+                            {% endif %}
+                            {% elif status == 'EXPIRED' %}
+                                La sesión ha expirado y debe ser reemplazada
+                            {% else %}
+                                {% if market and market != 'UNKNOWN' %}
+                                {{ region }} ({{ market }})
+                                {% if has_prime %}<br><i class="bi bi-star-fill text-warning"></i> Prime ({{ prime_type }}){% endif %}
+                            {% else %}
+                                No verificada recientemente
+                            {% endif %}
                             {% endif %}
                         </dd>
                     </dl>
@@ -72,7 +97,7 @@
                             <a href="/admin/catalog-sync/wizard" class="btn btn-outline-secondary">
                                 Reemplazar sesión
                             </a>
-                            {% if source == 'SESSION_PERSISTENT' or source == 'SESSION_TEMPORARY' %}
+                            {% if source == 'PERSISTENT' or source == 'TEMPORARY' %}
                             <button class="btn btn-outline-danger"
                                     hx-post="/admin/account/delete"
                                     hx-confirm="¿Seguro que deseas eliminar la sesión actual?"

@@ -43,6 +43,13 @@
                         <h4 class="alert-heading mb-2">❌ Sesión expirada o inválida</h4>
                         <p class="mb-0">El token actual ha sido rechazado por el servidor. Por favor, <a href="/admin/catalog-sync/wizard" class="alert-link">importa uno nuevo</a>.</p>
                     </div>
+                                        {% elif status == 'UNVERIFIED' %}
+                        <div class="alert alert-warning">
+                            <h4 class="alert-heading mb-2">⚠ Sesión no verificada</h4>
+                            <p>Rappi no permitió verificar tu sesión temporalmente debido a bloqueos de red o Rate Limits. Hasta que se verifique, DealHunter seguirá usando <strong>Search Discovery</strong>.</p>
+                            <hr>
+                            <a href="/admin/account" class="btn btn-outline-dark">Volver a comprobar</a>
+                        </div>
                     {% elif status == 'CONFIGURED' %}
                     <div class="alert alert-info">
                         <h4 class="alert-heading mb-2">ℹ️ Sesión configurada pero no comprobada</h4>
