@@ -45,7 +45,7 @@ class SessionStatus:
         if check_network:
             try:
                 data = fetch_account_profile(token)
-                if data == "RATE_LIMIT":
+                if data in ("RATE_LIMIT", "UNVERIFIED"):
                     # We can't be sure, assume configured
                     pass
                 elif not data:

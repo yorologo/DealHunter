@@ -36,7 +36,8 @@ def fetch_account_profile(token):
     headers = {
         "Accept": "application/json",
         "Authorization": f"Bearer {token}",
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120.0.0.0 Safari/537.36"
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120.0.0.0 Safari/537.36",
+        "Content-Type": "application/json"
     }
     req = urllib.request.Request(url, headers=headers)
     try:
@@ -47,20 +48,25 @@ def fetch_account_profile(token):
         if e.code == 401:
             raise DealHunterError("ACCOUNT_SESSION_UNAVAILABLE", "Invalid or expired session", recoverable=False)
         elif e.code == 403:
-            # WAF might block /profile. Validate token by hitting search API
+            # WAF might block /profile. Validate token by hitting search API with a dummy payload
             search_url = "https://services.mxgrability.rappi.com/api/pns-global-search-api/v1/unified-search"
-            search_req = urllib.request.Request(search_url, headers=headers, method="POST")
+            # We send a valid, minimal payload to expect HTTP 200 if the token is valid.
+            import json
+            body = json.dumps({"is_prime": False, "query": "a", "state": {"lat": 19.4, "lng": -99.1}}).encode('utf-8')
+            search_req = urllib.request.Request(search_url, data=body, headers=headers, method="POST")
             try:
-                urllib.request.urlopen(search_req, timeout=10)
+                with urllib.request.urlopen(search_req, timeout=10) as search_res:
+                    if search_res.status == 200:
+                        return {"market": "UNKNOWN", "prime": False, "note": "Validated via fallback (200)"}
+                    return "UNVERIFIED"
             except urllib.error.HTTPError as se:
                 if se.code == 401:
                     raise DealHunterError("ACCOUNT_SESSION_UNAVAILABLE", "Invalid or expired session", recoverable=False)
-                # 400 Bad Request is expected because we didn't send a payload, but it proves the token was accepted!
-                elif se.code == 400 or se.code == 403:
-                    return {"market": "UNKNOWN", "prime": False, "note": "Validated via fallback"}
+                if se.code in [429, 1015]:
+                    return "RATE_LIMIT"
+                return "UNVERIFIED"
             except Exception:
-                pass
-            return {"market": "UNKNOWN", "prime": False, "note": "Validated via fallback (403)"}
+                return "UNVERIFIED"
         
         if e.code in [429, 1015]:
             return "RATE_LIMIT"

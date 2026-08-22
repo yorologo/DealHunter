@@ -58,3 +58,43 @@ def test_token_cannot_be_saved_in_config():
     from dealhunter.config import load_config
     cfg = load_config()
     assert "rappi_token" not in cfg
+
+@patch('dealhunter.account.fetch_account_profile')
+def test_account_status_unverified(mock_fetch):
+    mock_fetch.return_value = "UNVERIFIED"
+    from unittest.mock import patch
+    import os
+    with patch.dict(os.environ, {"RAPPI_BEARER_TOKEN": "dummy"}):
+        status = get_account_status({}, check_network=True)
+    assert status["status"] == "CONFIGURED"
+
+@patch('dealhunter.api.urllib.request.urlopen')
+def test_fetch_profile_waf_fallback_unverified(mock_urlopen):
+    from unittest.mock import MagicMock
+    import urllib.error
+    # First call: 403 Forbidden
+    err_403 = urllib.error.HTTPError(url="", code=403, msg="Forbidden", hdrs=None, fp=None)
+    # Second call: 400 Bad Request (fallback)
+    err_400 = urllib.error.HTTPError(url="", code=400, msg="Bad Request", hdrs=None, fp=None)
+    mock_urlopen.side_effect = [err_403, err_400]
+    
+    from dealhunter.api import fetch_account_profile
+    res = fetch_account_profile("dummy")
+    assert res == "UNVERIFIED"
+
+@patch('dealhunter.api.urllib.request.urlopen')
+def test_fetch_profile_waf_fallback_valid(mock_urlopen):
+    from unittest.mock import MagicMock
+    import urllib.error
+    err_403 = urllib.error.HTTPError(url="", code=403, msg="Forbidden", hdrs=None, fp=None)
+    
+    mock_response = MagicMock()
+    mock_response.status = 200; mock_response.__enter__.return_value = mock_response
+    mock_response.read.return_value = b"{}"
+    
+    mock_urlopen.side_effect = [err_403, mock_response]
+    
+    from dealhunter.api import fetch_account_profile
+    res = fetch_account_profile("dummy")
+    assert isinstance(res, dict)
+    assert res["note"] == "Validated via fallback (200)"

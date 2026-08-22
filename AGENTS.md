@@ -3120,3 +3120,14 @@ These remain future work unless explicitly requested.
 - Handled backwards compatibility for legacy runs (reporting "LEGACY" crawler mode) in `doctor.py`.
 - Formatted all raw timestamps into local human-readable formats via a `main.js` `.local-time` fallback parser.
 - Passed 270+ integration tests safely confirming UI doesn't incorrectly trigger backend network requests prematurely.
+
+## DealHunter v2.9 Semantic Fixes (Late V2_9_RELEASE_CANDIDATE)
+- **Session Status**: 
+  - `CONFIGURED != VALID`. Configuration just means the token exists locally (e.g. `session.enc`). 
+  - `VALID` means the token was successfully verified against the live Rappi API. 
+  - `UNVERIFIED / INCONCLUSIVE` is used if the backend encounters HTTP 400, 429, timeout, or Cloudflare WAF 403 blocks during validation. In these cases, the token is kept as `CONFIGURED` and not destroyed.
+  - ONLY a real `HTTP 401 Unauthorized` flags the session as `EXPIRED / INVALID`.
+- **Zone Inventory**: 
+  - `READY != SYNCHRONIZED`. A valid session means the crawler is `READY`, but it is only `SYNCHRONIZED / ACTIVE` if the last `ZONE_INVENTORY` run finished with `COMPLETED` and `coverage_complete=1`.
+  - `PARTIAL`: If the last zone run was interrupted (`PARTIAL`) or `coverage_complete=0`, the UI marks it as partially synced.
+  - `coverage_complete` controls whether store and product reconciliation (marking things unavailable or stale) occurs.

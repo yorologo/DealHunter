@@ -18,17 +18,26 @@
             <div class="card shadow-sm h-100">
                 <div class="card-body">
                     
-                    {% if status == 'VALID' and stores_count > 0 %}
-                    <div class="alert alert-success">
-                        <h4 class="alert-heading mb-2">✅ Inventario de zona activo</h4>
-                        <p class="mb-0">Usa tu sesión para consultar los catálogos disponibles en tu zona y mantener tiendas, productos, precios y disponibilidad actualizados de forma automática.</p>
-                    </div>
-                    {% elif status == 'VALID' %}
-                    <div class="alert alert-success">
-                        <h4 class="alert-heading mb-2">✅ Sesión validada</h4>
-                        <p class="mb-0">Tu sesión es válida pero no has ejecutado una sincronización de Zone Inventory aún. <a href="#" onclick="document.getElementById('sync-form').submit(); return false;" class="alert-link">Sincroniza ahora</a> para descubrir tiendas.</p>
-                        <form id="sync-form" action="/admin/catalog-sync/run" method="POST" style="display: none;"></form>
-                    </div>
+                    
+                    {% if status == 'VALID' %}
+                        {% if last_zone_status == 'COMPLETED' and last_zone_coverage == 1 %}
+                        <div class="alert alert-success">
+                            <h4 class="alert-heading mb-2">✅ Inventario de zona actualizado</h4>
+                            <p class="mb-0">Usa tu sesión para consultar los catálogos disponibles en tu zona y mantener tiendas, productos, precios y disponibilidad actualizados de forma automática.</p>
+                        </div>
+                        {% elif last_zone_status == 'PARTIAL' or last_zone_coverage == 0 %}
+                        <div class="alert alert-warning">
+                            <h4 class="alert-heading mb-2">⚠ Inventario parcialmente actualizado</h4>
+                            <p class="mb-0">La última sincronización no se completó en su totalidad. No toda la cobertura está garantizada. <a href="#" onclick="document.getElementById('sync-form').submit(); return false;" class="alert-link">Reintentar sincronización</a>.</p>
+                            <form id="sync-form" action="/admin/catalog-sync/run" method="POST" style="display: none;"></form>
+                        </div>
+                        {% else %}
+                        <div class="alert alert-success">
+                            <h4 class="alert-heading mb-2">✅ Sesión válida <br><span class="text-warning fs-5">🟡 Inventario de zona preparado</span></h4>
+                            <p class="mb-0">Ejecuta una sincronización para actualizar el inventario de tu zona. <a href="#" onclick="document.getElementById('sync-form').submit(); return false;" class="alert-link">Sincronizar zona</a>.</p>
+                            <form id="sync-form" action="/admin/catalog-sync/run" method="POST" style="display: none;"></form>
+                        </div>
+                        {% endif %}
                     {% elif status == 'EXPIRED' %}
                     <div class="alert alert-danger">
                         <h4 class="alert-heading mb-2">❌ Sesión expirada o inválida</h4>
@@ -40,6 +49,7 @@
                         <p class="mb-0">Tienes una sesión configurada, pero necesitas comprobarla en la sección Cuenta & Sesión antes de asegurar que Catalog Sync funcione correctamente.</p>
                     </div>
                     {% else %}
+
 
                     <div class="alert alert-warning">
                         <h4 class="alert-heading mb-2">⚠ Cobertura limitada (Search Discovery)</h4>
@@ -60,7 +70,7 @@
                         <dt class="col-sm-5 text-muted fw-normal">Estado de Sesión:</dt>
                         <dd class="col-sm-7 fw-bold">{{ status }}</dd>
 
-                        <dt class="col-sm-5 text-muted fw-normal">Tiendas conocidas:</dt>
+                        <dt class="col-sm-5 text-muted fw-normal">Tiendas locales conocidas:</dt>
                         <dd class="col-sm-7">{{ stores_count }}</dd>
 
                         <dt class="col-sm-5 text-muted fw-normal">Último Zone Inventory:</dt>

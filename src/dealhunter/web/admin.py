@@ -463,12 +463,22 @@ def catalog_sync():
         cur = conn.cursor()
         cur.execute("SELECT COUNT(*) FROM stores")
         stores_count = cur.fetchone()[0]
-        cur.execute("SELECT MAX(started_at) FROM runs WHERE crawler_mode='ZONE_INVENTORY'")
-        last_zone = cur.fetchone()[0]
+        cur.execute("SELECT started_at, status, coverage_complete FROM runs WHERE crawler_mode='ZONE_INVENTORY' ORDER BY started_at DESC LIMIT 1")
+        row = cur.fetchone()
+        if row:
+            last_zone = row[0]
+            last_zone_status = row[1]
+            last_zone_coverage = row[2]
+        else:
+            last_zone = None
+            last_zone_status = None
+            last_zone_coverage = 0
         conn.close()
     except Exception:
         stores_count = 0
         last_zone = None
+        last_zone_status = None
+        last_zone_coverage = 0
 
     return render_template('admin/catalog_sync.html',
                            current_path='/admin/catalog-sync',
@@ -480,7 +490,9 @@ def catalog_sync():
                            warnings=svc.store.check_permissions(),
                            status=acc['status'],
                            stores_count=stores_count,
-                           last_zone=last_zone)
+                           last_zone=last_zone,
+                           last_zone_status=last_zone_status,
+                           last_zone_coverage=last_zone_coverage)
 
 
 

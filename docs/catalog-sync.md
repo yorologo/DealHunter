@@ -84,3 +84,17 @@ Si ZONE_INVENTORY inicia y en medio del proceso recibe un HTTP 401, el run abort
 - Supermercados/Farmacias (Market/Turbo) están totalmente soportados.
 - Restaurants están limitados (categorías agregadas, parseo heterogéneo).
 - Sujeto a provider layout changes, timeout y request budgets.
+
+## Semantic State Constraints
+
+1. **Session Lifecycle**:
+   - `NOT_CONFIGURED`: No token.
+   - `CONFIGURED`: Token exists locally (e.g., in `session.enc`), but its validity is `UNVERIFIED`.
+   - `VALID`: Token successfully verified. If the profile API gets a WAF 403, we fall back to a dummy search. An HTTP 400 (Bad Request due to payload) or 200 proves authenticity.
+   - `EXPIRED`: Only a true `HTTP 401 Unauthorized` destroys the session and marks it expired. Timeouts or 429s result in `CONFIGURED (Unverified)`.
+
+2. **Zone Inventory Lifecycle**:
+   - `READY`: The session is `VALID` but no inventory has been run.
+   - `SYNCHRONIZED (ACTIVE)`: The last run had `crawler_mode = ZONE_INVENTORY`, `status = COMPLETED`, and `coverage_complete = 1`.
+   - `PARTIAL`: The last run had `coverage_complete = 0` or status `PARTIAL`.
+   - `SEARCH DISCOVERY`: Fallback mode when session is missing or expired.
