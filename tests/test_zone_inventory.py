@@ -9,7 +9,8 @@ def db_conn():
     conn = sqlite3.connect(':memory:')
     c = conn.cursor()
     c.execute('''CREATE TABLE runs (run_id TEXT PRIMARY KEY, started_at DATETIME, finished_at DATETIME, 
-                 crawler_mode TEXT, coverage_complete INTEGER, status TEXT)''')
+                 lat REAL, lng REAL, radius REAL, vertical TEXT, status TEXT, crawler_mode TEXT, coverage_complete INTEGER DEFAULT 0,
+                 run_metadata TEXT, source TEXT)''')
     c.execute('''CREATE TABLE stores (store_id TEXT PRIMARY KEY, name TEXT, brand TEXT, type TEXT, status TEXT, last_seen_at DATETIME)''')
     c.execute('''CREATE TABLE products (product_id TEXT, store_id TEXT, name TEXT, brand TEXT, image TEXT, 
                  normalized_name TEXT, quantity REAL, unit TEXT, normalized_quantity REAL, normalized_unit TEXT, 
