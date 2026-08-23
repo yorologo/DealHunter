@@ -8,8 +8,8 @@ LNG = -99.133209
 try:
     from dealhunter.config import load_config
     cfg = load_config()
-    LAT = cfg.get('crawler', {}).get('default_lat', LAT)
-    LNG = cfg.get('crawler', {}).get('default_lng', LNG)
+    LAT = cfg.get('lat', LAT)
+    LNG = cfg.get('lng', LNG)
 except Exception:
     pass
 
