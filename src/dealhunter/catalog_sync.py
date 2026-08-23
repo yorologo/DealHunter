@@ -79,7 +79,10 @@ class MerchantDiscovery:
                     unique_stores[sid] = {
                         "store_id": sid,
                         "name": s.get("store_name"),
-                        "type": s.get("parent_store_type", "market")
+                        "type": s.get("parent_store_type", "market"),
+                        "vertical_sub_group": s.get("vertical_sub_group"),
+                        "categories": s.get("categories"),
+                        "tags": s.get("tags")
                     }
 
         if discovery_mode == "full":
