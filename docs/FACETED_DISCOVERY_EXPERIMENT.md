@@ -119,3 +119,12 @@ Si no aporta beneficio demostrable, no se incorpora.
 - **Resultado del Golden Check:** "California especial" y "Sushi del mes" están **presentes**. Ambos mantienen el precio de oferta (63 de 210, y 150 de 300), demostrando descuentos reales del 70% y 50% extraídos y aislados correctamente de la taxonomía. Ninguno tenía campo "category"; dependían puramente de su membresía al _corridor_ "Sushi".
 - **Limitaciones:** Este payload específico de restaurante no poseía _corridors_ llamados explícitamente "Populares" o "Descuentos", aunque expuso productos sueltos como pasillos que funcionalmente actúan como colecciones destacadas.
 
+
+## Phase 2C — Cross-vertical Taxonomy Validation
+
+- **Muestras:** City Market (Supermarket), Turbo (Turbo), Farmacias Benavides (Pharmacy).
+- **Nivel A (Vertical):** El campo `parent_store_type` está sucio (ej. Farmacias es "Farmatodo", Turbo es "chiper_home"). Sin embargo, `vertical_sub_group` demostró ser una señal limpia y universal ("restaurants", "Market", "Turbo", "Farmacia").
+- **Nivel B (Store Subcategories):** Sólo los restaurantes incluyen esta información nativa (ej. "Sushi · China"). Supermercados y Farmacias retornan nulo.
+- **Jerarquía y Multi-pertenencia:** Validado generalizable. En Turbo, 14 de 88 productos (15.9%) presentaron multi-pertenencia explícita en el JSON (ej. `['¡Licores y botanas en 10min!', 'Ofertas', 'Botanas']`).
+- **Señales de Colección vs Taxonomía:** **Estructuralmente idénticos**. En el payload de Turbo CPG, contenedores como "Ofertas" (colección) y "Botanas" (taxonomía) son nodos hermanos con idénticas propiedades (`parent_id: 0`, `icon`, `product_count`). 
+- **Conclusión Semántica:** Las heurísticas de nombre (diccionarios, regex, NLP) serán **obligatorias** para poder separar colecciones comerciales de clasificaciones reales, ya que Rappi no expone una bandera (flag) diferencial en el JSON de catálogo.
