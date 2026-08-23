@@ -28,33 +28,6 @@ def matches_filters(name, brand, store, cat, config, eff_discount, promo_type, e
             if ex.lower() in store.lower():
                 return False
 
-    min_d = config.get("min_discount")
-    if min_d is not None and eff_discount < min_d:
-        return False
-        
-    max_d = config.get("max_discount")
-    if max_d is not None and eff_discount > max_d:
-        return False
-        
-    min_p = config.get("min_price")
-    if min_p is not None and eff_price < min_p:
-        return False
-        
-    max_p = config.get("max_price")
-    if max_p is not None and eff_price > max_p:
-        return False
-        
-    req_promo = config.get("promo")
-    if req_promo and promo_type != req_promo:
-        return False
-        
-    if config.get("only_nxm") and promo_type != "NxM":
-        return False
-        
-    min_pd = config.get("min_promo_discount")
-    if min_pd is not None and promo_type and eff_discount < min_pd:
-        return False
-        
     return True
 
 def process_and_insert_product(p, run_id, s_id, s_name, config, q, conn, seen_in_run):

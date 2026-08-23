@@ -13,7 +13,7 @@ El token debe exportarse en terminal antes de ejecutar (Ej: `RAPPI_BEARER_TOKEN=
 
 ## Ejemplos de Ajustes Seguros (`SAFE_EDITABLE`)
 - `lat`, `lng`: Ubicación de entrega usada por el crawler. Son obligatorias para capturas reales y deben corresponder a la dirección activa de Rappi.
-- `min_discount`: Descuento mínimo aceptado (0 a 100)
+- `min_discount`: Descuento mínimo para mostrar en Oportunidades y Vistas (0 a 100). No impide la ingesta del Crawler.
 - `max_requests`: Cuota (budget) máxima de consultas HTTP por run.
 - `radius`: Cobertura del rastreador.
 - `compact`: Estilo de visualización terminal.
