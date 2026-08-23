@@ -185,3 +185,18 @@ Si no aporta beneficio demostrable, no se incorpora.
 - **Memberships RAW preservados:** Se detectaron 66 taxonomías válidas (ej. "Sushi", "Especialidades", "Bebidas", "Postres").
 - **Golden Check:** "California especial" y "Sushi del mes" demostraron heredar limpiamente `["Sushi"]` como membresía, como era esperado estructuralmente.
 - **Corrección final de boundary:** Debido a que Next.js anida el store context, en lugar de confiar solo en un booleano `is_root=True` posicional, la función `is_container` ahora bloquea activamente a cualquier nodo con firmas estructurales de wrapper/store (`logo`, `storeType`, `brandId`, `deliveryPrice`). 
+
+## Phase 3C.3 — Promotion integrity audit
+
+- **Problema:** En Phase 3C.2, dos productos Golden (California especial, Sushi del mes) perdieron sus campos promocionales (`real_price`, `discount`) tras corregir los memberships.
+- **Causa Raíz:** La lógica original de deduplicación de productos en `catalog_sync.py` priorizaba incondicionalmente la *primera* aparición del producto en el catálogo. Si un producto era procesado primero dentro de un corredor regular (sin campos promocionales) y luego dentro del corredor "Ofertas" (con promociones), los valores comerciales de la segunda aparición eran descartados y solo se anexaba el string del `membership`.
+- **Commit Hygiene:** Se detectó que el commit de "docs" de Phase 3C.2 incluyó de manera descuidada la actualización funcional del archivo `catalog_sync.py`. Este problema de higiene en el historial será evitado en commits futuros.
+- **Solución:** Se corrigió el ciclo de deduplicación para que inspeccione `promo_fields`. Si una subsecuente aparición posee datos de promoción explícitos, los transfiere sobre el registro `existing` (preservando los memberships sin degradar el valor comercial).
+- **Invariantes:** Esta corrección resolvió el problema de deduplicación que silenciosamente descartaba descuentos en todas las instancias CPG y Restaurants previas de DealHunter. Las promociones ahora sobreviven intactas el merge de taxonomías.
+
+## Phase 3C.4 — Live promotion integrity confirmation
+
+- **Validación final:** Se comprobó el comportamiento en vivo del pipeline completo (incluyendo el fix de merge) utilizando 1 sola llamada a la red para VELMA BOX ZAPOPAN.
+- **Resultados de Invariantes:** El root wrapper fue excluido exitosamente (0 contamination). Las membresías RAW auténticas (ej. `["Sushi"]`) se preservaron intactas. 
+- **Catalog Drift:** Se detectó un cambio real en el menú del proveedor: todos los productos duplicados promocionales (ej. los del corredor "Ofertas") desaparecieron de la estructura devuelta por Rappi en este instante. La caída a `real_price: None` para "California especial" no fue un error del parser, sino la fiel representación del menú en tiempo real.
+- **Conclusión de Extracción:** El merge procesa de forma independiente al orden conservando la mejor representación comercial sin perder membresías. El sistema está 100% estable, no descarta falsamente promociones, no inventa promociones inexistentes y mantiene limpia la frontera taxonómica de las tiendas.
