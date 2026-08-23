@@ -101,7 +101,7 @@ class CPGCatalogAdapter:
         report.merchants_attempted += 1
         # Implement web scraping catalog via next_data to guarantee 100% catalog size!
         import urllib.request, json, re
-        url = f"https://www.rappi.com.mx/tiendas/{store_id}"
+        url = f"https://www.rappi.com.mx/tiendas/{store_id}?csr=false"
         headers = {
             "Accept": "text/html,application/xhtml+xml,application/xml",
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120.0.0.0 Safari/537.36"
@@ -109,33 +109,56 @@ class CPGCatalogAdapter:
         req = urllib.request.Request(url, headers=headers, method="GET")
         try:
             with urllib.request.urlopen(req, timeout=15) as response:
+                # If store is offline or doesn't exist, it redirects to generic market
+                final_url = response.geturl()
+                if "tipo/market" in final_url or "restaurantNotFound" in final_url:
+                    report.merchants_completed += 1
+                    return []
+                
                 html = response.read().decode('utf-8')
                 m = re.search(r'<script id="__NEXT_DATA__" type="application/json">(.*?)</script>', html)
                 if not m:
-                    report.merchants_failed += 1
-                    return []
-                
+                    m = re.search(r'window\.__INITIAL_STATE__=(.*?);', html)
+                    if not m:
+                        report.merchants_failed += 1
+                        return []
+                        
                 data = json.loads(m.group(1))
                 items = []
                 
+                def is_product(d):
+                    if not isinstance(d, dict): return False
+                    pid = d.get('id') or d.get('product_id')
+                    if not pid: return False
+                    name = d.get('name')
+                    if not name or not isinstance(name, str): return False
+                    if 'price' not in d: return False
+                    if not isinstance(d['price'], (int, float)): return False
+                    
+                    # Reject non-product objects
+                    if d.get('type') in ['banner', 'store', 'merchant', 'category', 'promotions']: return False
+                    if 'lat' in d or 'lng' in d: return False
+                    if 'deliveryCost' in d or 'logo' in d: return False
+                    return True
+
                 def extract_products(d):
                     if isinstance(d, dict):
-                        if 'products' in d and isinstance(d['products'], list):
-                            for p in d['products']:
-                                pid = str(p.get("id", ""))
-                                name = p.get("name", "")
-                                price = p.get("price", 0)
-                                if pid and name:
-                                    p["store_id"] = str(store_id)
-                                    p["category"] = p.get("category", "")
-                                    items.append(p)
-                        for v in d.values(): extract_products(v)
+                        if is_product(d):
+                            d["store_id"] = str(store_id)
+                            # Attempt to find category if it exists somewhere nearby
+                            d["category"] = d.get("category_name", d.get("category", ""))
+                            items.append(d)
+                        else:
+                            cat_name = d.get("name") if (d.get("type") == "corridor" or "corridors" in d or "aisles" in d) else ""
+                            for v in d.values():
+                                extract_products(v)
                     elif isinstance(d, list):
-                        for v in d: extract_products(v)
+                        for v in d:
+                            extract_products(v)
                         
                 extract_products(data)
                 
-                # Remove duplicates
+                # Remove duplicates by ID
                 unique = {str(i.get("id") or i.get("product_id")): i for i in items}
                 res = list(unique.values())
                 
@@ -155,7 +178,7 @@ class RestaurantMenuAdapter:
         report.authenticated_requests += 1
         report.merchants_attempted += 1
         import urllib.request, json, re
-        url = f"https://www.rappi.com.mx/restaurantes/{store_id}"
+        url = f"https://www.rappi.com.mx/restaurantes/{store_id}?csr=false"
         headers = {
             "Accept": "text/html,application/xhtml+xml,application/xml",
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120.0.0.0 Safari/537.36"
@@ -163,6 +186,12 @@ class RestaurantMenuAdapter:
         req = urllib.request.Request(url, headers=headers, method="GET")
         try:
             with urllib.request.urlopen(req, timeout=15) as response:
+                # If store is offline or doesn't exist, it redirects to generic market
+                final_url = response.geturl()
+                if "tipo/market" in final_url or "restaurantNotFound" in final_url:
+                    report.merchants_completed += 1
+                    return []
+                
                 html = response.read().decode('utf-8')
                 # Wait, restaurants may not use __NEXT_DATA__ anymore, or structure is different
                 m = re.search(r'<script id="__NEXT_DATA__" type="application/json">(.*?)</script>', html)
@@ -176,26 +205,40 @@ class RestaurantMenuAdapter:
                 data = json.loads(m.group(1))
                 items = []
                 
+                def is_product(d):
+                    if not isinstance(d, dict): return False
+                    pid = d.get('id') or d.get('product_id')
+                    if not pid: return False
+                    name = d.get('name')
+                    if not name or not isinstance(name, str): return False
+                    if 'price' not in d: return False
+                    if not isinstance(d['price'], (int, float)): return False
+                    
+                    # Reject non-product objects
+                    if d.get('type') in ['banner', 'store', 'merchant', 'category', 'promotions']: return False
+                    if 'lat' in d or 'lng' in d: return False
+                    if 'deliveryCost' in d or 'logo' in d: return False
+                    return True
+
                 def extract_products(d):
                     if isinstance(d, dict):
-                        if 'corridors' in d and isinstance(d['corridors'], list):
-                            for c in d['corridors']:
-                                cat_name = c.get("name", "")
-                                for p in c.get("products", []):
-                                    pid = str(p.get("id") or p.get("product_id", ""))
-                                    name = p.get("name", "")
-                                    price = p.get("price", 0)
-                                    if pid and name:
-                                        p["store_id"] = str(store_id)
-                                        p["category"] = cat_name
-                                        items.append(p)
-                        for v in d.values(): extract_products(v)
+                        if is_product(d):
+                            d["store_id"] = str(store_id)
+                            # Attempt to find category if it exists somewhere nearby
+                            d["category"] = d.get("category_name", d.get("category", ""))
+                            items.append(d)
+                        else:
+                            # Also inherit category name if it's obvious from a parent (corridor or aisle)
+                            cat_name = d.get("name") if (d.get("type") == "corridor" or "corridors" in d or "aisles" in d) else ""
+                            for v in d.values():
+                                extract_products(v)
                     elif isinstance(d, list):
-                        for v in d: extract_products(v)
+                        for v in d:
+                            extract_products(v)
                         
                 extract_products(data)
                 
-                # Remove duplicates
+                # Remove duplicates by ID to avoid explosion
                 unique = {str(i.get("id") or i.get("product_id")): i for i in items}
                 res = list(unique.values())
                 
