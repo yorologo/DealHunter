@@ -39,14 +39,13 @@ class MerchantDiscovery:
         self.client = client
 
     async def discover_merchants(self, lat: float, lng: float, report: CoverageReport) -> List[Dict]:
-        # Exhaustive search fallback using the alphabet to bypass the 40-item API limit
         import urllib.request, json, string
         from dealhunter.auth import RappiSessionProvider
         url = "https://services.mxgrability.rappi.com/api/pns-global-search-api/v1/unified-search"
         headers = {
             "Accept": "application/json",
             "Content-Type": "application/json",
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120.0.0.0 Safari/537.36",
+            "User-Agent": "Mozilla/5.0",
             "Origin": "https://www.rappi.com.mx"
         }
         prov = RappiSessionProvider()
@@ -54,15 +53,26 @@ class MerchantDiscovery:
             headers["Authorization"] = f"Bearer {prov.context._access_token}"
             
         unique_stores = {}
-        # Iterate over alphabet to discover as many stores as possible
-        for q in list(string.ascii_lowercase):
+        
+        # Adaptive BFS enumeration
+        # Start with a-z. If a query hits the soft limit (e.g., >= 30), subdivide it.
+        from collections import deque
+        queue = deque([(c, 1) for c in string.ascii_lowercase])
+        MAX_DEPTH = 2
+        LIMIT_THRESHOLD = 30
+        
+        while queue:
+            query, depth = queue.popleft()
             report.authenticated_requests += 1
-            payload = json.dumps({"query": q, "lat": lat, "lng": lng, "limit": 100}).encode('utf-8')
+            payload = json.dumps({"query": query, "lat": lat, "lng": lng, "limit": 100}).encode('utf-8')
             req = urllib.request.Request(url, data=payload, headers=headers, method='POST')
             try:
                 with urllib.request.urlopen(req, timeout=15) as response:
                     data = json.loads(response.read().decode('utf-8'))
-                    for s in data.get("stores", []):
+                    stores = data.get("stores", [])
+                    results_count = len(stores)
+                    
+                    for s in stores:
                         sid = str(s.get("store_id"))
                         if sid not in unique_stores:
                             unique_stores[sid] = {
@@ -70,6 +80,11 @@ class MerchantDiscovery:
                                 "name": s.get("store_name"),
                                 "type": s.get("parent_store_type", "market")
                             }
+                            
+                    # Adaptive subdivision
+                    if results_count >= LIMIT_THRESHOLD and depth < MAX_DEPTH:
+                        for c in string.ascii_lowercase:
+                            queue.append((query + c, depth + 1))
             except Exception as e:
                 pass
                 
