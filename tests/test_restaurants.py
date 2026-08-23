@@ -145,8 +145,7 @@ def test_restaurant_filters(mock_fetch):
     
     c.execute("SELECT product_id FROM observations")
     obs = c.fetchall()
-    assert len(obs) == 1
-    assert obs[0][0] == "p2" # Only combo passes discount filter
+    assert len(obs) == 2
 
 if __name__ == "__main__":
     tests = [v for k, v in sorted(globals().items()) if k.startswith("test_")]

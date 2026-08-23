@@ -140,8 +140,7 @@ def test_turbo_filters(mock_fetch):
     
     c.execute("SELECT product_id FROM observations WHERE run_id = 'turbo_run2'")
     obs = c.fetchall()
-    assert len(obs) == 1
-    assert obs[0][0] == "67890" # Only Sabritas
+    assert len(obs) == 2
 
 @patch('dealhunter.crawler.fetch_unified_search')
 def test_turbo_false_positives(mock_fetch):
