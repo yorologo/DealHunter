@@ -223,7 +223,7 @@ class CPGCatalogAdapter:
 
                 extract_products(data)
 
-                # Remove duplicates by ID to avoid explosion, but merge memberships!
+                # Remove duplicates by ID to avoid explosion, but merge memberships and commercial fields!
                 unique = {}
                 for i in items:
                     pid = str(i.get("id") or i.get("product_id"))
@@ -231,6 +231,23 @@ class CPGCatalogAdapter:
                         unique[pid] = i
                     else:
                         existing = unique[pid]
+                        
+                        promo_fields = ["real_price", "discount", "discount_effective", "discounts_bundle", "deal", "promotion_value", "units_condition"]
+                        new_has_promo = any(i.get(f) for f in promo_fields)
+                        ex_has_promo = any(existing.get(f) for f in promo_fields)
+                        
+                        if new_has_promo and not ex_has_promo:
+                            for field in ["price"] + promo_fields:
+                                if field in i:
+                                    existing[field] = i[field]
+                        else:
+                            for field in ["price"] + promo_fields:
+                                if field in i and i[field] is not None and i[field] != "":
+                                    val = i[field]
+                                    ex_val = existing.get(field)
+                                    if ex_val is None or ex_val == "" or (isinstance(ex_val, (int, float)) and ex_val == 0 and val != 0):
+                                        existing[field] = val
+                                        
                         for m in i.get("memberships", []):
                             if m not in existing.get("memberships", []):
                                 existing["memberships"].append(m)
@@ -343,7 +360,7 @@ class RestaurantMenuAdapter:
 
                 extract_products(data)
 
-                # Remove duplicates by ID to avoid explosion, but merge memberships!
+                # Remove duplicates by ID to avoid explosion, but merge memberships and commercial fields!
                 unique = {}
                 for i in items:
                     pid = str(i.get("id") or i.get("product_id"))
@@ -351,6 +368,23 @@ class RestaurantMenuAdapter:
                         unique[pid] = i
                     else:
                         existing = unique[pid]
+                        
+                        promo_fields = ["real_price", "discount", "discount_effective", "discounts_bundle", "deal", "promotion_value", "units_condition"]
+                        new_has_promo = any(i.get(f) for f in promo_fields)
+                        ex_has_promo = any(existing.get(f) for f in promo_fields)
+                        
+                        if new_has_promo and not ex_has_promo:
+                            for field in ["price"] + promo_fields:
+                                if field in i:
+                                    existing[field] = i[field]
+                        else:
+                            for field in ["price"] + promo_fields:
+                                if field in i and i[field] is not None and i[field] != "":
+                                    val = i[field]
+                                    ex_val = existing.get(field)
+                                    if ex_val is None or ex_val == "" or (isinstance(ex_val, (int, float)) and ex_val == 0 and val != 0):
+                                        existing[field] = val
+                                        
                         for m in i.get("memberships", []):
                             if m not in existing.get("memberships", []):
                                 existing["memberships"].append(m)
