@@ -11,6 +11,8 @@ def db_conn():
     c.execute('''CREATE TABLE runs (run_id TEXT PRIMARY KEY, started_at DATETIME, finished_at DATETIME, 
                  lat REAL, lng REAL, radius REAL, vertical TEXT, status TEXT, crawler_mode TEXT, coverage_complete INTEGER DEFAULT 0,
                  run_metadata TEXT, source TEXT)''')
+    c.execute("""CREATE TABLE store_facets (store_id TEXT, facet_type TEXT, raw_value TEXT, source TEXT, last_seen DATETIME, UNIQUE(store_id, facet_type, raw_value))""")
+    c.execute("""CREATE TABLE product_memberships (store_id TEXT, product_id TEXT, raw_type TEXT, raw_name TEXT, raw_id TEXT, path TEXT, source TEXT, last_seen DATETIME, UNIQUE(store_id, product_id, raw_type, raw_name, path))""")
     c.execute('''CREATE TABLE stores (store_id TEXT PRIMARY KEY, name TEXT, brand TEXT, type TEXT, status TEXT, last_seen_at DATETIME, vertical TEXT)''')
     c.execute('''CREATE TABLE products (product_id TEXT, store_id TEXT, name TEXT, brand TEXT, image TEXT, 
                  normalized_name TEXT, quantity REAL, unit TEXT, normalized_quantity REAL, normalized_unit TEXT, 

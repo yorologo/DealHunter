@@ -116,12 +116,20 @@ async def _run_zone_inventory_async(config, lat, lng, conn, run_id, dry_run=Fals
             for c_str in cats.split("·"):
                 if c_str.strip(): facets.add((c_str.strip(), "categories"))
                 
+        # Phase 3A.1: Store Facets Reconciliation
+        has_metadata = ("tags" in m and m.get("tags") is not None) or ("categories" in m and m.get("categories") is not None)
+        now_store_facets = datetime.now().isoformat()
+        
         for val, src in facets:
             c.execute('''INSERT INTO store_facets (store_id, facet_type, raw_value, source, last_seen)
                          VALUES (?, ?, ?, ?, ?)
                          ON CONFLICT(store_id, facet_type, raw_value) DO UPDATE SET
                          last_seen=excluded.last_seen
-                      ''', (s_id, "store_subcategory", val, src, datetime.now().isoformat()))
+                      ''', (s_id, "store_subcategory", val, src, now_store_facets))
+                      
+        if has_metadata:
+            c.execute('DELETE FROM store_facets WHERE store_id=? AND last_seen != ?', (s_id, now_store_facets))
+            
         conn.commit()
 
         if m.get("type") and "restaurant" in m.get("type").lower():

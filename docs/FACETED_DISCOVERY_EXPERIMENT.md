@@ -138,3 +138,9 @@ Si no aporta beneficio demostrable, no se incorpora.
 - **Reconciliación y Partial-run safety:** Se insertan vía `INSERT ... ON CONFLICT DO UPDATE SET last_seen=excluded.last_seen`. No se borran datos masivamente, protegiendo contra timeouts y ejecuciones parciales.
 - **Compatibilidad Legacy:** `stores.type`, `products.category` y `products.category_source` continúan operando idéntico (sin alteraciones), evitando romper queries existentes o lógicas web.
 - **Lo que sigue sin clasificarse:** "Ofertas", "Populares" y otros contenedores entran crudos a la DB sin un flag semántico de colección.
+
+## Phase 3A.1 — Safe Facet Reconciliation
+
+- **Reconciliación de Product Memberships:** En observaciones completas de un producto, las membresías que ya no aparecen en el payload se eliminan de `product_memberships`. Si un run es parcial o el producto no se observa, se conservan todas sus membresías históricas.
+- **Reconciliación de Store Facets:** En observaciones de tiendas, si el payload incluye los campos `tags` o `categories` pero ya no contienen ciertos valores, dichos valores se eliminan. Si el payload omite completamente esos metadatos, los facets históricos se conservan por seguridad.
+- **Mecanismo KISS:** Se utilizó `last_seen != now` en el ciclo de persistencia para eliminar las relaciones caducadas sin necesidad de añadir versionado complejo ni alterar el `schema_version` (10).

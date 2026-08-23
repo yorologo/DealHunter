@@ -162,6 +162,12 @@ def process_and_insert_product(p, run_id, s_id, s_name, config, q, conn, seen_in
                      last_seen=excluded.last_seen, raw_id=excluded.raw_id
                   ''', (s_id, p_id, raw_type, raw_name, raw_id, path_str, "catalog_sync", now))
     
+    # Phase 3A.1: Safe Facet Reconciliation
+    # Remove stale memberships for this product that were not seen in this complete observation
+    c.execute('''DELETE FROM product_memberships 
+                 WHERE store_id=? AND product_id=? AND last_seen != ?''', 
+              (s_id, p_id, now))
+    
     c.execute('''INSERT OR IGNORE INTO observations (run_id, store_id, product_id, price, original_price, stock, timestamp, 
                  discount_price, discount_promotion, discount_effective, discount_source, promotion_type, promotion_label, query_term, availability)
                  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''', 
