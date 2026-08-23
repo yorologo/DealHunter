@@ -152,3 +152,12 @@ Si no aporta beneficio demostrable, no se incorpora.
 - **Comportamiento de parent_id/aisle_id:** `parent_id: 0` se trata correctamente como nodo raíz, sin crear un ancestro fantasma "0". Cualquier nodo CPG válido agrega su "name" al path de los productos descendientes y extrae su ID real (sea `id`, `corridor_id` o `aisle_id`).
 - **Ausencia de clasificación semántica:** Los nodos CPG capturados heredan `raw_type: "unknown"` en la persistencia RAW, dado que Rappi no expone un tag diferenciador en el JSON para estos comercios.
 - **Compatibilidad Legacy:** No se modificaron esquemas, heurísticas ni la estructura principal del pipeline. La multi-pertenencia para CPG ahora viaja idéntica a la de Restaurants.
+
+## Phase 3B — Conservative semantic classifier
+
+- **Tres Estados Semánticos:** Un `product_membership` RAW puede clasificarse como `CATEGORY`, `COLLECTION` o `UNKNOWN`. La prioridad es la precisión, delegando a `UNKNOWN` cualquier caso dudoso.
+- **Fuentes de Evidencia para CATEGORY:** Se considera `CATEGORY` si existe coincidencia exacta (tras normalizar espacios y mayúsculas) entre el nombre del membership y la categoría proporcionada por Rappi (`products.category` cuando `category_source = 'provider'`). No se confía en las categorías inferidas legacy.
+- **Fuentes de Evidencia para COLLECTION:** Se considera `COLLECTION` si el nombre normalizado coincide exactamente con un diccionario estricto de colecciones demostradas: *Promos, Ofertas, Descuentos, Populares, Destacados, Last Chance, Last Chance Deals, Ofertas Pro*. No se emplean regex amplias.
+- **UNKNOWN intencional:** Contenedores homónimos (ej. "Morita Roll"), contenedores de un solo producto, y cualquier contenedor que no tenga evidencia fuerte caen en `UNKNOWN`. "unknown" es también el `raw_type` base para la ingesta CPG, el cual no influye en la semántica.
+- **Precedencia:** Si un contenedor coincide simultáneamente como categoría de proveedor y como colección conocida, el conflicto se resuelve devolviendo `UNKNOWN`.
+- **Persistencia:** No se persistió semántica. El código de la Fase 3B es puramente validación in-memory (`src/dealhunter/semantic.py`). Todo el esquema permanece inalterado.
