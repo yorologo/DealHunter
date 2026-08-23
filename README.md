@@ -1,5 +1,7 @@
 # DealHunter
 
+[⚡ Very Very Easy Android Quick Start](docs/VERY_EASY_QUICK_START.md) — (Recomendado para principiantes absolutos)
+
 DealHunter es un motor local-first de inteligencia de precios y oportunidades orientado inicialmente a Rappi. Su misión NO es perseguir el descuento anunciado más grande (que a menudo es engañoso o ficticio), sino **encontrar el mejor valor demostrable con datos históricos**.
 
 ## Características Principales

@@ -1,5 +1,15 @@
 # Changelog
 
+## v2.9.5 - 2026-08-23
+
+### Added
+- **Onboarding Experience**: Añadido `docs/VERY_EASY_QUICK_START.md`, un flujo 100% automatizado por IA (Codex/Antigravity) que permite instalar y configurar DealHunter en Termux sin conocimientos de Linux ni comandos.
+- **Universal Extraction Contract**: Refactorizado el parser de catálogos y menús de Rappi en `CPGCatalogAdapter` y `RestaurantMenuAdapter`. La nueva búsqueda recursiva (`is_product`) detecta estructuralmente cualquier producto válido en todo el árbol JSON (aisles, components, fallback), eliminando el 100% de los falsos *parser misses* reportados.
+- **CSR Bypass**: Se fuerza la carga de SSR inicial mediante `?csr=false` para cadenas masivas como City Market y Farmacias Benavides.
+- **Unavailable Detection**: El crawler detecta y clasifica correctamente redirecciones como `tipo/market` o `restaurantNotFound` marcando los stores como `LEGITIMATE_EMPTY` o `UNAVAILABLE`.
+
+
+
 ## v2.9.4 (Unreleased)
 
 Patch release enfocado en la estabilización de la interfaz de administración web y comportamiento del crawler asíncrono:

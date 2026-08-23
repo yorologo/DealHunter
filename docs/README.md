@@ -3,7 +3,9 @@
 Este es el índice oficial de documentación para DealHunter v2.9.5.
 
 ## Getting Started
+- [⚡ Very Very Easy Quick Start](VERY_EASY_QUICK_START.md) (Recomendado)
 - [Getting Started](getting-started.md)
+- [Installation (Advanced Termux/AI)](installation-termux.md)
 - [Configuration](configuration.md)
 - [CLI Reference](cli.md)
 - [Architecture](architecture.md)
