@@ -97,3 +97,12 @@ Cada nueva pieza debe demostrar una mejora medible en:
 - eficiencia
 
 Si no aporta beneficio demostrable, no se incorpora.
+
+## Phase 2A - Offline Control Application
+
+- **Bug Corregido:** La función recursiva `extract_products` en `catalog_sync.py` detectaba el nombre de los `corridors`/`aisles` padre pero descartaba la variable inmediatamente al descender por los nodos hijos, causando que miles de productos perdieran su contexto jerárquico.
+- **Jerarquía Preservada:** Se modificó la firma para aceptar `ancestors`, propagando el _path_ completo hasta el nodo del producto. La nueva propiedad `memberships` en el diccionario del producto almacena múltiples ancestros (incluyendo nombre, ID original, tipo y ruta completa).
+- **Multi-pertenencia:** Se corrigió la deduplicación de diccionarios que pisaba el producto completo. Ahora el producto único por ID preserva la suma de todas sus membresías si aparece en más de un contenedor (e.g. en la categoría regular y en "Promociones").
+- **No Integrado Aún:** El crawler no inserta todavía estas `memberships` en la base de datos real. El schema permanece intacto.
+- **Compatibilidad Legacy:** La lógica de extracción anterior para asignar `p["category"]` fue dejada intacta como compatibilidad legacy en `extract_products`.
+- **Limitaciones de Medición Offline:** Ya que los diccionarios JSON `__NEXT_DATA__` no se persisten en el sistema local después del crawler, el número exacto de categorías que podrán ser inyectadas permanece UNKNOWN hasta que se realice el _crawl_ real, pero la estructura ahora lo permite de forma demostrada en las pruebas.

@@ -170,25 +170,61 @@ class CPGCatalogAdapter:
                     if 'deliveryCost' in d or 'logo' in d: return False
                     return True
 
-                def extract_products(d):
+                def extract_products(d, ancestors=None):
+                    if ancestors is None: ancestors = []
+                    
                     if isinstance(d, dict):
                         if is_product(d):
                             d["store_id"] = str(store_id)
                             # Attempt to find category if it exists somewhere nearby
                             d["category"] = d.get("category_name", d.get("category", ""))
+                            
+                            if "memberships" not in d:
+                                d["memberships"] = []
+                            for anc in ancestors:
+                                if anc not in d["memberships"]:
+                                    d["memberships"].append(anc)
+                            
                             items.append(d)
                         else:
-                            cat_name = d.get("name") if (d.get("type") == "corridor" or "corridors" in d or "aisles" in d) else ""
+                            cat_name = d.get("name", "")
+                            cat_type = d.get("type", "")
+                            
+                            # Identify container nodes
+                            is_container = False
+                            if cat_type in ["corridor", "aisle", "section"] or "corridors" in d or "aisles" in d:
+                                is_container = True
+                                
+                            new_ancestors = list(ancestors)
+                            if is_container and cat_name:
+                                anc_node = {
+                                    "raw_name": cat_name,
+                                    "raw_type": cat_type if cat_type else "unknown",
+                                    "raw_id": d.get("id", d.get("corridor_id", d.get("aisle_id", None))),
+                                    "source": "provider",
+                                    "path": [a["raw_name"] for a in ancestors] + [cat_name]
+                                }
+                                new_ancestors.append(anc_node)
+                                
                             for v in d.values():
-                                extract_products(v)
+                                extract_products(v, new_ancestors)
                     elif isinstance(d, list):
                         for v in d:
-                            extract_products(v)
+                            extract_products(v, ancestors)
 
                 extract_products(data)
 
-                # Remove duplicates by ID
-                unique = {str(i.get("id") or i.get("product_id")): i for i in items}
+                # Remove duplicates by ID to avoid explosion, but merge memberships!
+                unique = {}
+                for i in items:
+                    pid = str(i.get("id") or i.get("product_id"))
+                    if pid not in unique:
+                        unique[pid] = i
+                    else:
+                        existing = unique[pid]
+                        for m in i.get("memberships", []):
+                            if m not in existing.get("memberships", []):
+                                existing["memberships"].append(m)
                 res = list(unique.values())
 
                 report.merchants_completed += 1
@@ -249,26 +285,60 @@ class RestaurantMenuAdapter:
                     if 'deliveryCost' in d or 'logo' in d: return False
                     return True
 
-                def extract_products(d):
+                def extract_products(d, ancestors=None):
+                    if ancestors is None: ancestors = []
+                    
                     if isinstance(d, dict):
                         if is_product(d):
                             d["store_id"] = str(store_id)
                             # Attempt to find category if it exists somewhere nearby
                             d["category"] = d.get("category_name", d.get("category", ""))
+                            
+                            if "memberships" not in d:
+                                d["memberships"] = []
+                            for anc in ancestors:
+                                if anc not in d["memberships"]:
+                                    d["memberships"].append(anc)
+                            
                             items.append(d)
                         else:
-                            # Also inherit category name if it's obvious from a parent (corridor or aisle)
-                            cat_name = d.get("name") if (d.get("type") == "corridor" or "corridors" in d or "aisles" in d) else ""
+                            cat_name = d.get("name", "")
+                            cat_type = d.get("type", "")
+                            
+                            is_container = False
+                            if cat_type in ["corridor", "aisle", "section"] or "corridors" in d or "aisles" in d:
+                                is_container = True
+                                
+                            new_ancestors = list(ancestors)
+                            if is_container and cat_name:
+                                anc_node = {
+                                    "raw_name": cat_name,
+                                    "raw_type": cat_type if cat_type else "unknown",
+                                    "raw_id": d.get("id", d.get("corridor_id", d.get("aisle_id", None))),
+                                    "source": "provider",
+                                    "path": [a["raw_name"] for a in ancestors] + [cat_name]
+                                }
+                                new_ancestors.append(anc_node)
+                                
                             for v in d.values():
-                                extract_products(v)
+                                extract_products(v, new_ancestors)
                     elif isinstance(d, list):
                         for v in d:
-                            extract_products(v)
+                            extract_products(v, ancestors)
 
                 extract_products(data)
 
-                # Remove duplicates by ID to avoid explosion
-                unique = {str(i.get("id") or i.get("product_id")): i for i in items}
+                # Remove duplicates by ID to avoid explosion, but merge memberships!
+                unique = {}
+                for i in items:
+                    pid = str(i.get("id") or i.get("product_id"))
+                    if pid not in unique:
+                        unique[pid] = i
+                    else:
+                        existing = unique[pid]
+                        for m in i.get("memberships", []):
+                            if m not in existing.get("memberships", []):
+                                existing["memberships"].append(m)
                 res = list(unique.values())
 
                 report.merchants_completed += 1
