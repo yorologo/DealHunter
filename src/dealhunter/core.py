@@ -145,6 +145,23 @@ def process_and_insert_product(p, run_id, s_id, s_name, config, q, conn, seen_in
                norm["normalized_quantity"], norm["normalized_unit"], fingerprint,
                norm["pack_count"], cat, has_toppings, cat_source))
     
+    # Phase 3A: Persist RAW memberships
+    import json
+    from datetime import datetime as _dt
+    memberships = p.get("memberships", [])
+    now = _dt.now().isoformat()
+    for m in memberships:
+        raw_type = m.get("raw_type", "")
+        raw_name = m.get("raw_name", "")
+        raw_id = str(m.get("raw_id", ""))
+        path_str = json.dumps(m.get("path", []))
+        c.execute('''INSERT INTO product_memberships
+                     (store_id, product_id, raw_type, raw_name, raw_id, path, source, last_seen)
+                     VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                     ON CONFLICT(store_id, product_id, raw_type, raw_name, path) DO UPDATE SET
+                     last_seen=excluded.last_seen, raw_id=excluded.raw_id
+                  ''', (s_id, p_id, raw_type, raw_name, raw_id, path_str, "catalog_sync", now))
+    
     c.execute('''INSERT OR IGNORE INTO observations (run_id, store_id, product_id, price, original_price, stock, timestamp, 
                  discount_price, discount_promotion, discount_effective, discount_source, promotion_type, promotion_label, query_term, availability)
                  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''', 

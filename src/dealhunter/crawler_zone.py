@@ -71,14 +71,57 @@ async def _run_zone_inventory_async(config, lat, lng, conn, run_id, dry_run=Fals
         s_name = m.get("name", "")
         seen_store_ids.add(s_id)
 
-        c.execute('''INSERT INTO stores (store_id, name, brand, type, status, last_seen_at)
-                     VALUES (?, ?, ?, ?, ?, ?)
+        # Phase 3A: Vertical normalization
+        raw_vsg = m.get("vertical_sub_group")
+        parent_type = m.get("type", "supermercado")
+        
+        vertical = None
+        if raw_vsg:
+            v_lower = raw_vsg.lower()
+            if "restaurant" in v_lower: vertical = "Restaurantes"
+            elif "market" in v_lower: vertical = "Supermercado"
+            elif "turbo" in v_lower: vertical = "Turbo"
+            elif "farmacia" in v_lower: vertical = "Farmacia"
+            else: vertical = raw_vsg
+        else:
+            p_lower = parent_type.lower()
+            if "restaurant" in p_lower: vertical = "Restaurantes"
+            elif "market" in p_lower: vertical = "Supermercado"
+            elif "turbo" in p_lower: vertical = "Turbo"
+            elif "farma" in p_lower: vertical = "Farmacia"
+            else: vertical = parent_type
+
+        c.execute('''INSERT INTO stores (store_id, name, brand, type, status, last_seen_at, vertical)
+                     VALUES (?, ?, ?, ?, ?, ?, ?)
                      ON CONFLICT(store_id) DO UPDATE SET
                      name = COALESCE(excluded.name, name),
                      type = COALESCE(excluded.type, type),
+                     vertical = COALESCE(excluded.vertical, vertical),
                      status = 'ACTIVE',
                      last_seen_at = excluded.last_seen_at''',
-                  (s_id, s_name, m.get("brand", ""), m.get("type", "supermercado"), "ACTIVE", datetime.now().isoformat()))
+                  (s_id, s_name, m.get("brand", ""), parent_type, "ACTIVE", datetime.now().isoformat(), vertical))
+                  
+        # Phase 3A: Store Facets
+        facets = set()
+        
+        # tags array
+        tags = m.get("tags")
+        if isinstance(tags, list):
+            for t in tags:
+                if t and isinstance(t, str): facets.add((t.strip(), "tags"))
+                
+        # categories string
+        cats = m.get("categories")
+        if isinstance(cats, str) and cats:
+            for c_str in cats.split("·"):
+                if c_str.strip(): facets.add((c_str.strip(), "categories"))
+                
+        for val, src in facets:
+            c.execute('''INSERT INTO store_facets (store_id, facet_type, raw_value, source, last_seen)
+                         VALUES (?, ?, ?, ?, ?)
+                         ON CONFLICT(store_id, facet_type, raw_value) DO UPDATE SET
+                         last_seen=excluded.last_seen
+                      ''', (s_id, "store_subcategory", val, src, datetime.now().isoformat()))
         conn.commit()
 
         if m.get("type") and "restaurant" in m.get("type").lower():

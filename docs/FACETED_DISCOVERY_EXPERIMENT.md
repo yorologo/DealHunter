@@ -128,3 +128,13 @@ Si no aporta beneficio demostrable, no se incorpora.
 - **Jerarquía y Multi-pertenencia:** Validado generalizable. En Turbo, 14 de 88 productos (15.9%) presentaron multi-pertenencia explícita en el JSON (ej. `['¡Licores y botanas en 10min!', 'Ofertas', 'Botanas']`).
 - **Señales de Colección vs Taxonomía:** **Estructuralmente idénticos**. En el payload de Turbo CPG, contenedores como "Ofertas" (colección) y "Botanas" (taxonomía) son nodos hermanos con idénticas propiedades (`parent_id: 0`, `icon`, `product_count`). 
 - **Conclusión Semántica:** Las heurísticas de nombre (diccionarios, regex, NLP) serán **obligatorias** para poder separar colecciones comerciales de clasificaciones reales, ya que Rappi no expone una bandera (flag) diferencial en el JSON de catálogo.
+
+## Phase 3A — RAW faceted persistence
+
+- **Schema introducido:** Se actualizó `schema_version` a 10. Se agregó la columna `vertical` a `stores`. Se crearon las tablas `store_facets` (para subcategorías de sucursal) y `product_memberships` (para herencia N:M de productos).
+- **Fuente de Vertical:** Se extrae de `vertical_sub_group` (o `parent_store_type` como fallback), normalizando a `Restaurantes`, `Supermercado`, `Turbo` o `Farmacia`.
+- **Store Facets:** Se unifican `categories` (string "·") y `tags` (array) deduplicados en `store_facets`.
+- **Product Memberships:** Cada contenedor padre del JSON `__NEXT_DATA__` visitado se guarda asociando el producto al pasillo. Se incluye el `path` como JSON.
+- **Reconciliación y Partial-run safety:** Se insertan vía `INSERT ... ON CONFLICT DO UPDATE SET last_seen=excluded.last_seen`. No se borran datos masivamente, protegiendo contra timeouts y ejecuciones parciales.
+- **Compatibilidad Legacy:** `stores.type`, `products.category` y `products.category_source` continúan operando idéntico (sin alteraciones), evitando romper queries existentes o lógicas web.
+- **Lo que sigue sin clasificarse:** "Ofertas", "Populares" y otros contenedores entran crudos a la DB sin un flag semántico de colección.
