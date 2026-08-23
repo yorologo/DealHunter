@@ -666,65 +666,6 @@ def session_check():
         )
 
 
-@admin_bp.route('/catalog-sync/run', methods=['POST'])
-def catalog_sync_run():
-    """Trigger a catalog sync run."""
-    from dealhunter.secret_store import SessionService
-    from dealhunter.config import load_config
-    svc = SessionService()
-    token = svc.get_token()
-
-    if not token:
-        from flask import flash, redirect, request
-        if request.headers.get('HX-Request'):
-            return '<div class="alert alert-danger">No hay sesión configurada.</div>'
-        else:
-            flash("No hay sesión configurada.", "error")
-            return redirect('/admin/catalog-sync')
-
-    try:
-        import asyncio
-        from dealhunter.catalog_sync import run_sync
-        import sqlite3
-        import uuid
-        from flask import flash, redirect, request
-        db_path = current_app.config['DATABASE']
-        conn = sqlite3.connect(db_path)
-        cfg = load_config()
-
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        try:
-            status, report = loop.run_until_complete(
-                run_sync(cfg, 19.4326, -99.1332, conn, str(uuid.uuid4()))
-            )
-        finally:
-            loop.close()
-            conn.close()
-
-        msg = f"Sincronización completada. Estado: {status}. Comercios: {report.merchants_completed}/{report.merchants_attempted}. Productos: {report.items_unique}"
-
-        if request.headers.get('HX-Request'):
-            return f'''<div class="alert alert-success">
-                <strong>Sincronización completada</strong><br>
-                Estado: {status}<br>
-                Comercios procesados: {report.merchants_completed}/{report.merchants_attempted}<br>
-                Productos únicos extraídos: {report.items_unique}
-            </div>'''
-        else:
-            flash(msg, "success")
-            return redirect('/admin/catalog-sync')
-
-    except Exception as e:
-        from flask import flash, redirect, request
-        if request.headers.get('HX-Request'):
-            return f'<div class="alert alert-danger">Error: {escape(str(e))}</div>'
-        else:
-            flash(f"Error: {e}", "error")
-            return redirect('/admin/catalog-sync')
-
-
-def _session_status_response(flash_message=None, flash_success=True, valid=None):
     """Helper to render session status partial with flash message."""
     from dealhunter.secret_store import SessionService
     import datetime

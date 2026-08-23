@@ -1,6 +1,6 @@
 # Documentation Index
 
-Este es el índice oficial de documentación para DealHunter v2.9.4.
+Este es el índice oficial de documentación para DealHunter v2.9.5.
 
 ## Getting Started
 - [Getting Started](getting-started.md)

@@ -29,7 +29,7 @@
                         <div class="alert alert-warning">
                             <h4 class="alert-heading mb-2">⚠ Inventario parcialmente actualizado</h4>
                             <p class="mb-0">La última sincronización no se completó en su totalidad. No toda la cobertura está garantizada. <a href="#" onclick="document.getElementById('sync-form').submit(); return false;" class="alert-link">Reintentar sincronización</a>.</p>
-                            <form id="sync-form" action="/admin/catalog-sync/run" method="POST" style="display: none;">
+                            <form id="sync-form" action="/admin/runs/start" method="POST" style="display: none;">
                                 <input type="hidden" name="csrf_token" value="{{ csrf_token }}"/>
                             </form>
                         </div>
@@ -37,7 +37,7 @@
                         <div class="alert alert-success">
                             <h4 class="alert-heading mb-2">✅ Sesión válida <br><span class="text-warning fs-5">🟡 Inventario de zona preparado</span></h4>
                             <p class="mb-0">Ejecuta una sincronización para actualizar el inventario de tu zona. <a href="#" onclick="document.getElementById('sync-form').submit(); return false;" class="alert-link">Sincronizar zona</a>.</p>
-                            <form id="sync-form" action="/admin/catalog-sync/run" method="POST" style="display: none;">
+                            <form id="sync-form" action="/admin/runs/start" method="POST" style="display: none;">
                                 <input type="hidden" name="csrf_token" value="{{ csrf_token }}"/>
                             </form>
                         </div>
