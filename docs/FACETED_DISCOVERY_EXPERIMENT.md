@@ -161,3 +161,12 @@ Si no aporta beneficio demostrable, no se incorpora.
 - **UNKNOWN intencional:** Contenedores homónimos (ej. "Morita Roll"), contenedores de un solo producto, y cualquier contenedor que no tenga evidencia fuerte caen en `UNKNOWN`. "unknown" es también el `raw_type` base para la ingesta CPG, el cual no influye en la semántica.
 - **Precedencia:** Si un contenedor coincide simultáneamente como categoría de proveedor y como colección conocida, el conflicto se resuelve devolviendo `UNKNOWN`.
 - **Persistencia:** No se persistió semántica. El código de la Fase 3B es puramente validación in-memory (`src/dealhunter/semantic.py`). Todo el esquema permanece inalterado.
+
+## Phase 3C — Real-data shadow semantic validation
+
+- **Ejecución:** Se analizaron offline 4 sucursales (Velma Box, City Market, Turbo, Farmacias Benavides) extrayendo 314 productos y 405 memberships RAW en una base de datos temporal, consumiendo solo 4 requests.
+- **Precisión:** De 405 memberships, el clasificador identificó 15 como `CATEGORY` (ej. "Cervezas", corroboradas contra el proveedor) y 30 como `COLLECTION` (ej. "Ofertas"). 360 cayeron en `UNKNOWN`.
+- **UNKNOWNs de Restaurantes:** Para Velma Box, términos como "Sushi" cayeron en `UNKNOWN` intencionalmente, debido a que el producto tenía la categoría `Sushi` pero provenía de `inferred` (heurística antigua). Esto valida la postura restrictiva de no usar inferencias antiguas como ground truth.
+- **Colecciones útiles:** La etiqueta "Ofertas" apareció en 30 memberships, validando el diccionario restrictivo.
+- **Falsos positivos (Sanity check):** Las 15 clasificaciones a CATEGORY provinieron de coincidencias perfectas ("Cervezas") avaladas por el proveedor (`provider`), cumpliendo al 100% el contrato.
+- **Estado de Schema:** El schema se mantuvo en v10 sin inyectar las clasificaciones. El clasificador es un filtro puramente lógico y confiable para su eventual despliegue masivo.
