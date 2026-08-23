@@ -106,3 +106,16 @@ Si no aporta beneficio demostrable, no se incorpora.
 - **No Integrado Aún:** El crawler no inserta todavía estas `memberships` en la base de datos real. El schema permanece intacto.
 - **Compatibilidad Legacy:** La lógica de extracción anterior para asignar `p["category"]` fue dejada intacta como compatibilidad legacy en `extract_products`.
 - **Limitaciones de Medición Offline:** Ya que los diccionarios JSON `__NEXT_DATA__` no se persisten en el sistema local después del crawler, el número exacto de categorías que podrán ser inyectadas permanece UNKNOWN hasta que se realice el _crawl_ real, pero la estructura ahora lo permite de forma demostrada en las pruebas.
+
+## Phase 2B — Single-store live observation
+
+- **Store Utilizada:** VELMA BOX (store_id: 1923782439)
+- **Request Count:** 1 a `unified-search`, 1 a `tiendas/` (`__NEXT_DATA__`). Límite respetado rigurosamente.
+- **Evidencia sobre Nivel A/B:**
+  - Nivel A (`parent_store_type`) llegó como `restaurants`.
+  - Nivel B (Subcategorías) llegó como `"categories": "Sushi · China"` en `unified-search`, y como el array `"tags": ["Sushi", "China"]` en `__NEXT_DATA__`.
+- **Estructuras Reales Observadas:** Todos los agrupadores ("Sushi", "Bebidas", pero también productos sueltos promocionados como "Morita Roll") llegaron en el mismo array plano `"corridors"`, con `type="corridor"`. No existe discriminador estructural (flag) nativo que separe "colecciones/promociones" de "taxonomía pura".
+- **Evidencia de Multi-pertenencia:** Al menos 3 productos ("Eby don", "Zu-sushi hot", "Cheese ball") pertenecen simultáneamente a un _corridor_ con su mismo nombre y al _corridor_ "Especialidades".
+- **Resultado del Golden Check:** "California especial" y "Sushi del mes" están **presentes**. Ambos mantienen el precio de oferta (63 de 210, y 150 de 300), demostrando descuentos reales del 70% y 50% extraídos y aislados correctamente de la taxonomía. Ninguno tenía campo "category"; dependían puramente de su membresía al _corridor_ "Sushi".
+- **Limitaciones:** Este payload específico de restaurante no poseía _corridors_ llamados explícitamente "Populares" o "Descuentos", aunque expuso productos sueltos como pasillos que funcionalmente actúan como colecciones destacadas.
+
