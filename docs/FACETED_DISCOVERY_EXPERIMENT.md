@@ -170,3 +170,10 @@ Si no aporta beneficio demostrable, no se incorpora.
 - **Colecciones útiles:** La etiqueta "Ofertas" apareció en 30 memberships, validando el diccionario restrictivo.
 - **Falsos positivos (Sanity check):** Las 15 clasificaciones a CATEGORY provinieron de coincidencias perfectas ("Cervezas") avaladas por el proveedor (`provider`), cumpliendo al 100% el contrato.
 - **Estado de Schema:** El schema se mantuvo en v10 sin inyectar las clasificaciones. El clasificador es un filtro puramente lógico y confiable para su eventual despliegue masivo.
+
+## Phase 3C.1 — Membership boundary correction
+
+- **Bug detectado en Phase 3C:** El objeto raíz JSON del comercio (que incluye su nombre y arrays como `corridors` o `components`) estaba evaluándose accidentalmente como `is_container = True`. Esto provocó que pseudo-memberships como "VELMA BOX ZAPOPAN - Lomas de Zapopan" se anexaran a la taxonomía de los productos (multi-membership artificial masivo).
+- **Causa:** La generalización del reconocimiento jerárquico CPG en Phase 3A.2 aceptaba a cualquier nodo con "name" y descendientes como contenedor taxonómico.
+- **Corrección Estructural:** En lugar de aplicar heurísticas sobre el nombre o bloqueos duros de IDs (que podrían fallar), se introdujo el concepto posicional de `is_root=True` (top-level document payload) dentro del recorrido recursivo `extract_products`.
+- **Efecto:** El documento raíz que inicia el parseo nunca se considera un contenedor taxonómico, mientras que cualquier contenedor interno (tenga tipo CPG implícito o explícito de Restaurants, o incluso `parent_id=0`) es procesado y propagado correctamente hacia `memberships`.

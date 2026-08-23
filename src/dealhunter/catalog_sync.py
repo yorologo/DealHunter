@@ -173,7 +173,7 @@ class CPGCatalogAdapter:
                     if 'deliveryCost' in d or 'logo' in d: return False
                     return True
 
-                def extract_products(d, ancestors=None):
+                def extract_products(d, ancestors=None, is_root=True):
                     if ancestors is None: ancestors = []
                     
                     if isinstance(d, dict):
@@ -195,10 +195,11 @@ class CPGCatalogAdapter:
                             
                             # Identify container nodes
                             is_container = False
-                            if cat_type in ["corridor", "aisle", "section"] or "corridors" in d or "aisles" in d:
-                                is_container = True
-                            elif ("parent_id" in d or "aisle_id" in d or "products" in d or "items" in d) and "name" in d:
-                                is_container = True
+                            if not is_root:
+                                if cat_type in ["corridor", "aisle", "section"] or "corridors" in d or "aisles" in d:
+                                    is_container = True
+                                elif ("parent_id" in d or "aisle_id" in d or "products" in d or "items" in d) and "name" in d:
+                                    is_container = True
                                 
                             new_ancestors = list(ancestors)
                             if is_container and cat_name:
@@ -212,10 +213,10 @@ class CPGCatalogAdapter:
                                 new_ancestors.append(anc_node)
                                 
                             for v in d.values():
-                                extract_products(v, new_ancestors)
+                                extract_products(v, new_ancestors, is_root=False)
                     elif isinstance(d, list):
                         for v in d:
-                            extract_products(v, ancestors)
+                            extract_products(v, ancestors, is_root=False)
 
                 extract_products(data)
 
@@ -290,7 +291,7 @@ class RestaurantMenuAdapter:
                     if 'deliveryCost' in d or 'logo' in d: return False
                     return True
 
-                def extract_products(d, ancestors=None):
+                def extract_products(d, ancestors=None, is_root=True):
                     if ancestors is None: ancestors = []
                     
                     if isinstance(d, dict):
@@ -311,10 +312,11 @@ class RestaurantMenuAdapter:
                             cat_type = d.get("type", "")
                             
                             is_container = False
-                            if cat_type in ["corridor", "aisle", "section"] or "corridors" in d or "aisles" in d:
-                                is_container = True
-                            elif ("parent_id" in d or "aisle_id" in d or "products" in d or "items" in d) and "name" in d:
-                                is_container = True
+                            if not is_root:
+                                if cat_type in ["corridor", "aisle", "section"] or "corridors" in d or "aisles" in d:
+                                    is_container = True
+                                elif ("parent_id" in d or "aisle_id" in d or "products" in d or "items" in d) and "name" in d:
+                                    is_container = True
                                 
                             new_ancestors = list(ancestors)
                             if is_container and cat_name:
@@ -328,10 +330,10 @@ class RestaurantMenuAdapter:
                                 new_ancestors.append(anc_node)
                                 
                             for v in d.values():
-                                extract_products(v, new_ancestors)
+                                extract_products(v, new_ancestors, is_root=False)
                     elif isinstance(d, list):
                         for v in d:
-                            extract_products(v, ancestors)
+                            extract_products(v, ancestors, is_root=False)
 
                 extract_products(data)
 
