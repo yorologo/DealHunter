@@ -39,12 +39,10 @@ class MerchantDiscovery:
         self.client = client
 
     async def discover_merchants(self, lat: float, lng: float, report: CoverageReport) -> List[Dict]:
-        report.authenticated_requests += 1
-        # Fallback to Unified Search to get initial merchants around coords
-        import urllib.request, json
+        # Exhaustive search fallback using the alphabet to bypass the 40-item API limit
+        import urllib.request, json, string
         from dealhunter.auth import RappiSessionProvider
         url = "https://services.mxgrability.rappi.com/api/pns-global-search-api/v1/unified-search"
-        payload = json.dumps({"query": "a", "lat": lat, "lng": lng, "limit": 100}).encode('utf-8')
         headers = {
             "Accept": "application/json",
             "Content-Type": "application/json",
@@ -55,21 +53,29 @@ class MerchantDiscovery:
         if prov.context and prov.context._access_token:
             headers["Authorization"] = f"Bearer {prov.context._access_token}"
             
-        req = urllib.request.Request(url, data=payload, headers=headers, method='POST')
-        try:
-            with urllib.request.urlopen(req, timeout=15) as response:
-                data = json.loads(response.read().decode('utf-8'))
-                merchants = []
-                for s in data.get("stores", []):
-                    merchants.append({
-                        "store_id": str(s.get("store_id")),
-                        "name": s.get("store_name"),
-                        "type": s.get("parent_store_type", "market")
-                    })
-                report.merchants_discovered = len(merchants)
-                return merchants
-        except Exception as e:
-            return []
+        unique_stores = {}
+        # Iterate over alphabet to discover as many stores as possible
+        for q in list(string.ascii_lowercase):
+            report.authenticated_requests += 1
+            payload = json.dumps({"query": q, "lat": lat, "lng": lng, "limit": 100}).encode('utf-8')
+            req = urllib.request.Request(url, data=payload, headers=headers, method='POST')
+            try:
+                with urllib.request.urlopen(req, timeout=15) as response:
+                    data = json.loads(response.read().decode('utf-8'))
+                    for s in data.get("stores", []):
+                        sid = str(s.get("store_id"))
+                        if sid not in unique_stores:
+                            unique_stores[sid] = {
+                                "store_id": sid,
+                                "name": s.get("store_name"),
+                                "type": s.get("parent_store_type", "market")
+                            }
+            except Exception as e:
+                pass
+                
+        merchants = list(unique_stores.values())
+        report.merchants_discovered = len(merchants)
+        return merchants
 
 class CPGCatalogAdapter:
     def __init__(self, client: AuthenticatedHttpClient):
