@@ -144,3 +144,11 @@ Si no aporta beneficio demostrable, no se incorpora.
 - **Reconciliación de Product Memberships:** En observaciones completas de un producto, las membresías que ya no aparecen en el payload se eliminan de `product_memberships`. Si un run es parcial o el producto no se observa, se conservan todas sus membresías históricas.
 - **Reconciliación de Store Facets:** En observaciones de tiendas, si el payload incluye los campos `tags` o `categories` pero ya no contienen ciertos valores, dichos valores se eliminan. Si el payload omite completamente esos metadatos, los facets históricos se conservan por seguridad.
 - **Mecanismo KISS:** Se utilizó `last_seen != now` en el ciclo de persistencia para eliminar las relaciones caducadas sin necesidad de añadir versionado complejo ni alterar el `schema_version` (10).
+
+## Phase 3A.2 — CPG RAW membership completeness
+
+- **Diferencia Restaurants vs CPG:** Los restaurantes estructuran sus membresías mediante diccionarios explícitos de tipo "corridor". Los CPG (Supermercado, Turbo, Farmacia) carecen de `type` semántico en el JSON, empleando contenedores jerárquicos basados en `parent_id`, `aisle_id` y atributos `products`/`items`.
+- **Estructura soportada:** Se amplió `extract_products()` para identificar nodos CPG que posean un `name` y al menos un indicador de membresía (`parent_id`, `aisle_id`, `products` o `items`). 
+- **Comportamiento de parent_id/aisle_id:** `parent_id: 0` se trata correctamente como nodo raíz, sin crear un ancestro fantasma "0". Cualquier nodo CPG válido agrega su "name" al path de los productos descendientes y extrae su ID real (sea `id`, `corridor_id` o `aisle_id`).
+- **Ausencia de clasificación semántica:** Los nodos CPG capturados heredan `raw_type: "unknown"` en la persistencia RAW, dado que Rappi no expone un tag diferenciador en el JSON para estos comercios.
+- **Compatibilidad Legacy:** No se modificaron esquemas, heurísticas ni la estructura principal del pipeline. La multi-pertenencia para CPG ahora viaja idéntica a la de Restaurants.
