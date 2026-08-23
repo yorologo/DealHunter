@@ -48,7 +48,7 @@
             <div class="card shadow-sm text-center">
                 <div class="card-body py-2">
                     <div class="fs-4 fw-bold text-primary">{{ run.store_count or 0 }}</div>
-                    <div class="small text-muted">Tiendas Procesadas</div>
+                    <div class="small text-muted">Tiendas con Productos</div>
                 </div>
             </div>
         </div>
@@ -78,11 +78,11 @@
                 </div>
                 <div class="col border-start">
                     <div class="fs-5 fw-bold text-success">{{ run.metadata.get('merchants_completed', 0) }}</div>
-                    <div class="small text-muted">Completados</div>
+                    <div class="small text-muted">Parseados (OK)</div>
                 </div>
                 <div class="col border-start">
                     <div class="fs-5 fw-bold text-danger">{{ run.metadata.get('merchants_failed', 0) }}</div>
-                    <div class="small text-muted">Fallidos / Vacíos</div>
+                    <div class="small text-muted">Errores/Fallidos</div>
                 </div>
                 <div class="col border-start">
                     <div class="fs-5 fw-bold">{{ run.metadata.get('authenticated_requests', 0) }}</div>
