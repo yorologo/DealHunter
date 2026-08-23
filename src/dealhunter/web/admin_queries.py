@@ -66,9 +66,21 @@ def get_run_detail(db_path, run_id):
     # Calculate duration
     run['duration'] = _calc_duration(run.get('started_at'), run.get('finished_at'))
 
-    # Count observations for this run
     c.execute("SELECT COUNT(*) FROM observations WHERE run_id = ?", (run_id,))
     run['observation_count'] = c.fetchone()[0]
+
+    # Count unavailable items
+    c.execute("SELECT COUNT(*) FROM observations WHERE run_id = ? AND availability = 'UNAVAILABLE'", (run_id,))
+    run['unavailable_count'] = c.fetchone()[0]
+
+    # Parse metadata if present
+    if run.get('run_metadata'):
+        try:
+            run['metadata'] = json.loads(run['run_metadata'])
+        except:
+            run['metadata'] = {}
+    else:
+        run['metadata'] = {}
 
     # Count distinct products
     c.execute("SELECT COUNT(DISTINCT product_id) FROM observations WHERE run_id = ?", (run_id,))

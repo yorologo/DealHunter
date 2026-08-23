@@ -1,6 +1,8 @@
 import argparse
 import math
 import sys
+import os
+import logging
 from .config import get_merged_config, save_config, load_config
 from .db import setup_db, db_status, db_integrity, db_vacuum, backup_db
 from .crawler import run_discover, run_update
@@ -197,6 +199,7 @@ def handle_config_command(args):
         save_config({})
 
 def main(args_list=None):
+    import os
     parser = build_parser()
     args = parser.parse_args(args_list)
 
@@ -531,12 +534,14 @@ def main(args_list=None):
                 config["store"] = args.restaurant
 
         run_id = args.run_id or f"run_{datetime.now().strftime('%Y%m%d_%H%M%S_%f')}"
-        c = conn.cursor()
         lat, lng = location
         _warn_on_location_change(conn, lat, lng)
-        c.execute('''INSERT OR IGNORE INTO runs (run_id, started_at, lat, lng, radius, status)
-                     VALUES (?, CURRENT_TIMESTAMP, ?, ?, ?, 'RUNNING')''',
-                  (run_id, lat, lng, config.get("radius", 5.0)))
+        run_source = os.environ.get("DEALHUNTER_SOURCE", "CLI")
+        
+        c = conn.cursor()
+        c.execute('''INSERT INTO runs (run_id, started_at, lat, lng, radius, vertical, status, source) 
+                     VALUES (?, ?, ?, ?, ?, ?, ?, ?)''', 
+                  (run_id, datetime.now().isoformat(), lat, lng, config.get("radius"), str(config.get("vertical", "general")), "RUNNING", run_source))
         conn.commit()
 
         mode = args.command if args.command else "discover"

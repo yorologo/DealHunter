@@ -541,6 +541,10 @@ def catalog_sync():
         last_zone_status = None
         last_zone_coverage = 0
 
+    from dealhunter.scheduler import is_scheduler_enabled, get_next_run
+    scheduler_enabled = is_scheduler_enabled()
+    next_run = get_next_run()
+
     return render_template('admin/catalog_sync.html',
                            current_path='/admin/catalog-sync',
                            mode=acc['mode'],
@@ -551,9 +555,12 @@ def catalog_sync():
                            warnings=svc.store.check_permissions(),
                            status=acc['status'],
                            stores_count=stores_count,
-                           last_zone_attempt=last_zone_attempt, last_zone_complete=last_zone_complete,
-                           last_zone_status=last_zone_status
-                           )
+                           last_zone_attempt=last_zone_attempt,
+                           last_zone_complete=last_zone_complete,
+                           last_zone_status=last_zone_status,
+                           last_zone_coverage=last_zone_coverage,
+                           scheduler_enabled=scheduler_enabled,
+                           next_run=next_run)
 
 
 
@@ -742,3 +749,18 @@ def _session_status_response(flash_message=None, flash_success=True, valid=None)
                            warnings=status.get('warnings', []),
                            flash_message=flash_message,
                            flash_success=flash_success)
+
+@admin_bp.route('/catalog-sync/scheduler', methods=['POST'])
+def catalog_sync_scheduler():
+    from flask import request, redirect, flash
+    from dealhunter.scheduler import enable_scheduler, disable_scheduler
+    
+    enabled = request.form.get('enabled') == '1'
+    if enabled:
+        enable_scheduler()
+        flash("Scheduler activado exitosamente (10:00 a.m. diariamente).", "success")
+    else:
+        disable_scheduler()
+        flash("Scheduler desactivado.", "info")
+        
+    return redirect('/admin/catalog-sync')

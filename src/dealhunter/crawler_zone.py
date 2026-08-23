@@ -144,8 +144,19 @@ async def _run_zone_inventory_async(config, lat, lng, conn, run_id, dry_run=Fals
                 c.execute('UPDATE stores SET status = "STALE" WHERE store_id = ?', (row[0],))
         conn.commit()
         
-    c.execute('''UPDATE runs SET crawler_mode = ?, coverage_complete = ?, status = ?, finished_at = CURRENT_TIMESTAMP WHERE run_id = ?''', 
-              ("ZONE_INVENTORY", 1 if global_state == "COMPLETED" else 0, global_state, run_id))
+    import json
+    metadata_json = json.dumps({
+        "merchants_discovered": report.merchants_discovered,
+        "merchants_attempted": report.merchants_attempted,
+        "merchants_completed": report.merchants_completed,
+        "merchants_failed": report.merchants_failed,
+        "items_raw": report.items_raw,
+        "items_unique": report.items_unique,
+        "authenticated_requests": report.authenticated_requests
+    })
+        
+    c.execute('''UPDATE runs SET crawler_mode = ?, coverage_complete = ?, status = ?, finished_at = CURRENT_TIMESTAMP, run_metadata = ? WHERE run_id = ?''', 
+              ("ZONE_INVENTORY", 1 if global_state == "COMPLETED" else 0, global_state, metadata_json, run_id))
     conn.commit()
               
     return global_state, report.authenticated_requests

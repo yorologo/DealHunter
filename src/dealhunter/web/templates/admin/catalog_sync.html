@@ -110,7 +110,49 @@
         </div>
 
         <div class="col-lg-5">
-            <div class="card shadow-sm h-100 border-start border-4 border-primary">
+            <div class="card shadow-sm mb-4 border-start border-4 border-primary">
+                <div class="card-body d-flex flex-column">
+                    <h5 class="card-title">Full Zone Inventory automático</h5>
+                    <p class="text-muted small mb-3">Sincronización diaria del inventario completo a las 10:00 a. m.</p>
+
+                    <div class="d-flex align-items-center mb-3">
+                        <div class="form-check form-switch fs-5">
+                            <input class="form-check-input" type="checkbox" role="switch" id="schedulerSwitch" {% if scheduler_enabled %}checked{% endif %} onchange="toggleScheduler(this.checked)">
+                            <label class="form-check-label fs-6 fw-bold ms-2" for="schedulerSwitch">
+                                {% if scheduler_enabled %}Activado{% else %}Desactivado{% endif %}
+                            </label>
+                        </div>
+                    </div>
+
+                    <dl class="row mb-0 small">
+                        <dt class="col-sm-6 text-muted fw-normal">Frecuencia:</dt>
+                        <dd class="col-sm-6 fw-bold">Diaria</dd>
+                        <dt class="col-sm-6 text-muted fw-normal">Hora:</dt>
+                        <dd class="col-sm-6 fw-bold">10:00 a. m.</dd>
+                        <dt class="col-sm-6 text-muted fw-normal">Próxima ejecución:</dt>
+                        <dd class="col-sm-6">
+                            {% if next_run %}
+                                <span class="local-time">{{ next_run.isoformat() }}</span>
+                            {% else %}
+                                -
+                            {% endif %}
+                        </dd>
+                    </dl>
+
+                    <form id="schedulerForm" action="/admin/catalog-sync/scheduler" method="POST" style="display: none;">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token }}"/>
+                        <input type="hidden" name="enabled" id="schedulerEnabledInput"/>
+                    </form>
+                    <script>
+                        function toggleScheduler(enabled) {
+                            document.getElementById('schedulerEnabledInput').value = enabled ? "1" : "0";
+                            document.getElementById('schedulerForm').submit();
+                        }
+                    </script>
+                </div>
+            </div>
+
+            <div class="card shadow-sm h-100">
                 <div class="card-body d-flex flex-column">
                     <h5 class="card-title">Acciones Rápidas</h5>
                     <p class="text-muted small">Gestiona tu experiencia Catalog Sync.</p>

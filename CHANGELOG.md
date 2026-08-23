@@ -12,8 +12,16 @@ Patch release enfocado en la estabilización de la interfaz de administración w
 - Uso de `INSERT OR IGNORE` en la inicialización de ejecuciones mediante CLI para prevenir duplicaciones o conflictos con la Web UI.
 - Mejor manejo del token CSRF con un mensaje claro humano para errores CSRF genuinos (y preservando otros errores HTTP 400).
 - Fallback a redirección HTTP normal cuando las peticiones como la creación de runs o syncs provienen de clientes que no envían cabeceras de HTMX.
-- Procesamiento UTC estricto en el frontend (`main.js`) para evitar problemas con la zona horaria del navegador.
 - Corregida etiqueta de métricas a "Tiendas conocidas en inventario" para clarificar semántica vs tiendas descubiertas.
+
+## v2.9.5 (Unreleased)
+
+Patch release enfocado en la validación del problema de Popeyes y la transparencia del inventario:
+
+- Corrección del `RestaurantMenuAdapter` confirmada mediante validación End-to-End para extraer correctamente los menús de restaurantes como Popeyes y Popeyes Turbo sin fallar ni omitir productos.
+- Mejoras a la observabilidad en la página de detalle de Run: se reporta por separado el número de tiendas procesadas vs los productos insertados vs las tiendas fallidas/saltadas.
+- Integración de `run_metadata` en SQLite para registrar internamente estadísticas detalladas de descubrimiento (merchants discovered, attempted, completed, failed, y requests generadas).
+- Sistema de automatización diaria (Daily Sweep) programable a las 10:00 a.m., integrado con `cron` y la interfaz Web (Catalog Sync), e implementando bloqueos (`flock`) para evitar concurrencia.
 
 ## v2.9.3
 

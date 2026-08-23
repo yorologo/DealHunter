@@ -4,7 +4,7 @@ import datetime
 import shutil
 import sys
 
-CURRENT_SCHEMA_VERSION = 8
+CURRENT_SCHEMA_VERSION = 9
 
 def get_default_db_path():
     return os.environ.get("RAPPI_DB_PATH", os.path.expanduser("~/rappi-deal-hunter/rappi-deals.db"))
@@ -142,6 +142,14 @@ def migrate(conn, db_path):
                 c.execute("ALTER TABLE runs ADD COLUMN coverage_complete INTEGER DEFAULT 0")
             except Exception:
                 pass
+                
+        if version < 9:
+            try:
+                c.execute("ALTER TABLE runs ADD COLUMN run_metadata TEXT")
+                c.execute("ALTER TABLE runs ADD COLUMN source TEXT DEFAULT 'CLI'")
+            except Exception:
+                pass
+
         c.execute('UPDATE schema_version SET version = ?', (CURRENT_SCHEMA_VERSION,))
         conn.commit()
 

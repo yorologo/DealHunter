@@ -28,8 +28,8 @@ The project must prioritize demonstrable value, not the largest advertised disco
 
 ## CURRENT STABLE
 
-- **Version**: v2.9.4
-- **Schema**: 7
+- **Version**: v2.9.5
+- **Schema**: 9
 
 ### Web Modules Status:
 - **COMPRAR**: Completado (Deals, Market, Turbo, Restaurants, Categories, Stores)
