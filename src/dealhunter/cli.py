@@ -116,6 +116,7 @@ def build_parser():
     group_crawler = base_parser.add_argument_group("Crawler Control")
     group_crawler.add_argument('--dry-run', action='store_true', help="Do not execute requests")
     group_crawler.add_argument('--max-requests', type=int, help="Stop after N requests")
+    group_crawler.add_argument('--discovery-mode', choices=['normal', 'deep', 'full'], help="Adaptive discovery policy (normal=Top-K 10, deep=Top-K 20, full=Legacy)")
     group_crawler.add_argument('--max-runtime', type=int, help="Stop after N seconds")
     group_crawler.add_argument('--run-id', type=str, help="Specific run ID to use")
 

@@ -38,7 +38,7 @@ class MerchantDiscovery:
     def __init__(self, client: AuthenticatedHttpClient):
         self.client = client
 
-    async def discover_merchants(self, lat: float, lng: float, report: CoverageReport) -> List[Dict]:
+    async def discover_merchants(self, lat: float, lng: float, report: CoverageReport, discovery_mode: str = "full") -> List[Dict]:
         import urllib.request, json, string
         from dealhunter.auth import RappiSessionProvider
         url = "https://services.mxgrability.rappi.com/api/pns-global-search-api/v1/unified-search"
@@ -51,43 +51,72 @@ class MerchantDiscovery:
         prov = RappiSessionProvider()
         if prov.context and prov.context._access_token:
             headers["Authorization"] = f"Bearer {prov.context._access_token}"
-            
+
         unique_stores = {}
-        
-        # Adaptive BFS enumeration
-        # Start with a-z. If a query hits the soft limit (e.g., >= 30), subdivide it.
-        from collections import deque
-        queue = deque([(c, 1) for c in string.ascii_lowercase])
-        MAX_DEPTH = 2
-        LIMIT_THRESHOLD = 30
-        
-        while queue:
-            query, depth = queue.popleft()
+
+        # Helper to run a single query
+        def run_q(q):
             report.authenticated_requests += 1
-            payload = json.dumps({"query": query, "lat": lat, "lng": lng, "limit": 100}).encode('utf-8')
+            payload = json.dumps({"query": q, "lat": lat, "lng": lng, "limit": 100}).encode('utf-8')
             req = urllib.request.Request(url, data=payload, headers=headers, method='POST')
             try:
                 with urllib.request.urlopen(req, timeout=15) as response:
                     data = json.loads(response.read().decode('utf-8'))
                     stores = data.get("stores", [])
-                    results_count = len(stores)
-                    
-                    for s in stores:
-                        sid = str(s.get("store_id"))
-                        if sid not in unique_stores:
-                            unique_stores[sid] = {
-                                "store_id": sid,
-                                "name": s.get("store_name"),
-                                "type": s.get("parent_store_type", "market")
-                            }
-                            
-                    # Adaptive subdivision
-                    if results_count >= LIMIT_THRESHOLD and depth < MAX_DEPTH:
-                        for c in string.ascii_lowercase:
-                            queue.append((query + c, depth + 1))
+                    return stores, None
             except Exception as e:
-                pass
-                
+                status = getattr(e, 'code', 0)
+                if status == 401: report.http_401 += 1
+                elif status == 403: report.http_403 += 1
+                elif status == 429: report.http_429 += 1
+                elif status >= 500: report.http_5xx += 1
+                return [], e
+
+        def add_stores(stores):
+            for s in stores:
+                sid = str(s.get("store_id"))
+                if sid not in unique_stores:
+                    unique_stores[sid] = {
+                        "store_id": sid,
+                        "name": s.get("store_name"),
+                        "type": s.get("parent_store_type", "market")
+                    }
+
+        if discovery_mode == "full":
+            from collections import deque
+            queue = deque([(c, 1) for c in string.ascii_lowercase])
+            MAX_DEPTH = 2
+            LIMIT_THRESHOLD = 30
+            while queue:
+                query, depth = queue.popleft()
+                stores, err = run_q(query)
+                if err: continue
+                add_stores(stores)
+                if len(stores) >= LIMIT_THRESHOLD and depth < MAX_DEPTH:
+                    for c in string.ascii_lowercase:
+                        queue.append((query + c, depth + 1))
+        else:
+            # Top-K Adaptive Modes
+            top_k = 10 if discovery_mode == "normal" else 20
+
+            d1_results = []
+            for c in string.ascii_lowercase:
+                stores, err = run_q(c)
+                if err: continue
+                add_stores(stores)
+                d1_results.append({"query": c, "raw_count": len(stores)})
+
+            # Sort descending by raw_count, then alphabetically for deterministic tie-breaking
+            d1_results.sort(key=lambda x: (-x["raw_count"], x["query"]))
+
+            # Expand Top-K
+            for item in d1_results[:top_k]:
+                query = item["query"]
+                for c in string.ascii_lowercase:
+                    stores, err = run_q(query + c)
+                    if err: continue
+                    add_stores(stores)
+
         merchants = list(unique_stores.values())
         report.merchants_discovered = len(merchants)
         return merchants
@@ -114,7 +143,7 @@ class CPGCatalogAdapter:
                 if "tipo/market" in final_url or "restaurantNotFound" in final_url:
                     report.merchants_completed += 1
                     return []
-                
+
                 html = response.read().decode('utf-8')
                 m = re.search(r'<script id="__NEXT_DATA__" type="application/json">(.*?)</script>', html)
                 if not m:
@@ -122,10 +151,10 @@ class CPGCatalogAdapter:
                     if not m:
                         report.merchants_failed += 1
                         return []
-                        
+
                 data = json.loads(m.group(1))
                 items = []
-                
+
                 def is_product(d):
                     if not isinstance(d, dict): return False
                     pid = d.get('id') or d.get('product_id')
@@ -134,7 +163,7 @@ class CPGCatalogAdapter:
                     if not name or not isinstance(name, str): return False
                     if 'price' not in d: return False
                     if not isinstance(d['price'], (int, float)): return False
-                    
+
                     # Reject non-product objects
                     if d.get('type') in ['banner', 'store', 'merchant', 'category', 'promotions']: return False
                     if 'lat' in d or 'lng' in d: return False
@@ -155,13 +184,13 @@ class CPGCatalogAdapter:
                     elif isinstance(d, list):
                         for v in d:
                             extract_products(v)
-                        
+
                 extract_products(data)
-                
+
                 # Remove duplicates by ID
                 unique = {str(i.get("id") or i.get("product_id")): i for i in items}
                 res = list(unique.values())
-                
+
                 report.merchants_completed += 1
                 report.items_raw += len(items)
                 report.items_unique += len(res)
@@ -191,7 +220,7 @@ class RestaurantMenuAdapter:
                 if "tipo/market" in final_url or "restaurantNotFound" in final_url:
                     report.merchants_completed += 1
                     return []
-                
+
                 html = response.read().decode('utf-8')
                 # Wait, restaurants may not use __NEXT_DATA__ anymore, or structure is different
                 m = re.search(r'<script id="__NEXT_DATA__" type="application/json">(.*?)</script>', html)
@@ -201,10 +230,10 @@ class RestaurantMenuAdapter:
                     if not m:
                         report.merchants_failed += 1
                         return []
-                        
+
                 data = json.loads(m.group(1))
                 items = []
-                
+
                 def is_product(d):
                     if not isinstance(d, dict): return False
                     pid = d.get('id') or d.get('product_id')
@@ -213,7 +242,7 @@ class RestaurantMenuAdapter:
                     if not name or not isinstance(name, str): return False
                     if 'price' not in d: return False
                     if not isinstance(d['price'], (int, float)): return False
-                    
+
                     # Reject non-product objects
                     if d.get('type') in ['banner', 'store', 'merchant', 'category', 'promotions']: return False
                     if 'lat' in d or 'lng' in d: return False
@@ -235,13 +264,13 @@ class RestaurantMenuAdapter:
                     elif isinstance(d, list):
                         for v in d:
                             extract_products(v)
-                        
+
                 extract_products(data)
-                
+
                 # Remove duplicates by ID to avoid explosion
                 unique = {str(i.get("id") or i.get("product_id")): i for i in items}
                 res = list(unique.values())
-                
+
                 report.merchants_completed += 1
                 report.items_raw += len(items)
                 report.items_unique += len(res)
