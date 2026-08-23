@@ -4,7 +4,7 @@ import datetime
 import shutil
 import sys
 
-CURRENT_SCHEMA_VERSION = 10
+CURRENT_SCHEMA_VERSION = 11
 
 def get_default_db_path():
     return os.environ.get("RAPPI_DB_PATH", os.path.expanduser("~/rappi-deal-hunter/rappi-deals.db"))
@@ -169,8 +169,18 @@ def migrate(conn, db_path):
                 path TEXT,
                 source TEXT,
                 last_seen DATETIME,
+                semantic_type TEXT DEFAULT 'UNKNOWN',
+                semantic_reason TEXT DEFAULT 'not_classified',
                 UNIQUE(store_id, product_id, raw_type, raw_name, path)
             )''')
+
+
+        if version < 11:
+            try:
+                c.execute("ALTER TABLE product_memberships ADD COLUMN semantic_type TEXT DEFAULT 'UNKNOWN'")
+                c.execute("ALTER TABLE product_memberships ADD COLUMN semantic_reason TEXT DEFAULT 'not_classified'")
+            except sqlite3.OperationalError:
+                pass # Already exists
 
         c.execute('UPDATE schema_version SET version = ?', (CURRENT_SCHEMA_VERSION,))
         conn.commit()

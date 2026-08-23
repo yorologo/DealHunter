@@ -200,3 +200,13 @@ Si no aporta beneficio demostrable, no se incorpora.
 - **Resultados de Invariantes:** El root wrapper fue excluido exitosamente (0 contamination). Las membresías RAW auténticas (ej. `["Sushi"]`) se preservaron intactas. 
 - **Catalog Drift:** Se detectó un cambio real en el menú del proveedor: todos los productos duplicados promocionales (ej. los del corredor "Ofertas") desaparecieron de la estructura devuelta por Rappi en este instante. La caída a `real_price: None` para "California especial" no fue un error del parser, sino la fiel representación del menú en tiempo real.
 - **Conclusión de Extracción:** El merge procesa de forma independiente al orden conservando la mejor representación comercial sin perder membresías. El sistema está 100% estable, no descarta falsamente promociones, no inventa promociones inexistentes y mantiene limpia la frontera taxonómica de las tiendas.
+
+## Phase 3D — Semantic persistence / schema v11
+
+- **Migración a schema v11:** Se actualizaron `db.py` y `core.py` para persistir la clasificación semántica en la tabla `product_memberships`. Se agregaron las columnas:
+  - `semantic_type` (TEXT, default: 'UNKNOWN')
+  - `semantic_reason` (TEXT, default: 'not_classified')
+- **Invarianza RAW:** La clasificación semántica es puramente *derivada*. Los datos RAW (`raw_name`, `path`, etc.) continúan siendo la fuente inmutable de verdad. La migración inicial de registros v10 asigna de forma segura un estado neutral (`UNKNOWN` / `not_classified`) sin ejecutar inferencias retroactivas inseguras.
+- **Ciclo de vida en Upsert:** Las filas son re-clasificadas dinámicamente en cada observación. Un membership catalogado como `UNKNOWN` transitará a `CATEGORY` en cuanto el payload provea evidencia fuerte del proveedor. Del mismo modo, retornará a `UNKNOWN` si la evidencia desaparece, garantizando reproducibilidad continua sin estados "zombies".
+- **Multi-membership y Colecciones:** Un solo producto puede poseer simultáneamente relaciones `CATEGORY` (ej. "Cervezas") y `COLLECTION` (ej. "Ofertas"). El clasificador opera individualmente por cada relación `product_id -> membership`. Si ocurre un conflicto de evidencia (por ejemplo, una sección llamada "Ofertas" intentando catalogarse erróneamente como category root), se cataloga protectoramente como `UNKNOWN` con razón `conflicting_evidence`. 
+- **Compatibilidad Legacy:** La taxonomía legacy (`products.category`, `stores.vertical`, heurísticas legacy, etc.) permanece intacta sin modificaciones, cumpliendo con la regla de transición conservadora dictada para este experimento.

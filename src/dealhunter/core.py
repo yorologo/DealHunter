@@ -1,3 +1,4 @@
+from dealhunter.semantic import classify_membership
 from datetime import datetime
 from .discounts import calculate_discount
 from .normalization import parse_product_name, generate_fingerprint
@@ -155,12 +156,16 @@ def process_and_insert_product(p, run_id, s_id, s_name, config, q, conn, seen_in
         raw_name = m.get("raw_name", "")
         raw_id = str(m.get("raw_id", ""))
         path_str = json.dumps(m.get("path", []))
+        # Re-classify membership on every observation
+        stype, sreason = classify_membership(raw_name, cat, cat_source)
+        
         c.execute('''INSERT INTO product_memberships
-                     (store_id, product_id, raw_type, raw_name, raw_id, path, source, last_seen)
-                     VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                     (store_id, product_id, raw_type, raw_name, raw_id, path, source, last_seen, semantic_type, semantic_reason)
+                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                      ON CONFLICT(store_id, product_id, raw_type, raw_name, path) DO UPDATE SET
-                     last_seen=excluded.last_seen, raw_id=excluded.raw_id
-                  ''', (s_id, p_id, raw_type, raw_name, raw_id, path_str, "catalog_sync", now))
+                     last_seen=excluded.last_seen, raw_id=excluded.raw_id,
+                     semantic_type=excluded.semantic_type, semantic_reason=excluded.semantic_reason
+                  ''', (s_id, p_id, raw_type, raw_name, raw_id, path_str, "catalog_sync", now, stype, sreason))
     
     # Phase 3A.1: Safe Facet Reconciliation
     # Remove stale memberships for this product that were not seen in this complete observation
