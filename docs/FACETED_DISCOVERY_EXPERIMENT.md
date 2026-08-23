@@ -177,3 +177,11 @@ Si no aporta beneficio demostrable, no se incorpora.
 - **Causa:** La generalización del reconocimiento jerárquico CPG en Phase 3A.2 aceptaba a cualquier nodo con "name" y descendientes como contenedor taxonómico.
 - **Corrección Estructural:** En lugar de aplicar heurísticas sobre el nombre o bloqueos duros de IDs (que podrían fallar), se introdujo el concepto posicional de `is_root=True` (top-level document payload) dentro del recorrido recursivo `extract_products`.
 - **Efecto:** El documento raíz que inicia el parseo nunca se considera un contenedor taxonómico, mientras que cualquier contenedor interno (tenga tipo CPG implícito o explícito de Restaurants, o incluso `parent_id=0`) es procesado y propagado correctamente hacia `memberships`.
+
+## Phase 3C.2 — Single-store post-fix validation
+
+- **Validación Exitosa:** Se ejecutó una prueba empírica puntual sobre VELMA BOX ZAPOPAN (1923782439) consumiendo solo 1 petición HTTP al menú.
+- **Root regression eliminada:** La contaminación masiva desapareció. El nombre de la sucursal ("VELMA BOX ZAPOPAN - Lomas de Zapopan") bajó a 0 ocurrencias dentro de `memberships`.
+- **Memberships RAW preservados:** Se detectaron 66 taxonomías válidas (ej. "Sushi", "Especialidades", "Bebidas", "Postres").
+- **Golden Check:** "California especial" y "Sushi del mes" demostraron heredar limpiamente `["Sushi"]` como membresía, como era esperado estructuralmente.
+- **Corrección final de boundary:** Debido a que Next.js anida el store context, en lugar de confiar solo en un booleano `is_root=True` posicional, la función `is_container` ahora bloquea activamente a cualquier nodo con firmas estructurales de wrapper/store (`logo`, `storeType`, `brandId`, `deliveryPrice`). 

@@ -195,11 +195,14 @@ class CPGCatalogAdapter:
                             
                             # Identify container nodes
                             is_container = False
-                            if not is_root:
+                            if not is_root and cat_type not in ["store", "merchant", "banner", "brand"]:
                                 if cat_type in ["corridor", "aisle", "section"] or "corridors" in d or "aisles" in d:
                                     is_container = True
                                 elif ("parent_id" in d or "aisle_id" in d or "products" in d or "items" in d) and "name" in d:
                                     is_container = True
+                                # Explicitly reject if it contains store root properties
+                                if is_container and cat_type not in ["corridor", "aisle", "section"] and ("logo" in d or "deliveryPrice" in d or "storeType" in d or "brandId" in d or "store_id" in d or "lat" in d or "lng" in d):
+                                    is_container = False
                                 
                             new_ancestors = list(ancestors)
                             if is_container and cat_name:
@@ -312,11 +315,14 @@ class RestaurantMenuAdapter:
                             cat_type = d.get("type", "")
                             
                             is_container = False
-                            if not is_root:
+                            if not is_root and cat_type not in ["store", "merchant", "banner", "brand"]:
                                 if cat_type in ["corridor", "aisle", "section"] or "corridors" in d or "aisles" in d:
                                     is_container = True
                                 elif ("parent_id" in d or "aisle_id" in d or "products" in d or "items" in d) and "name" in d:
                                     is_container = True
+                                # Explicitly reject if it contains store root properties
+                                if is_container and cat_type not in ["corridor", "aisle", "section"] and ("logo" in d or "deliveryPrice" in d or "storeType" in d or "brandId" in d or "store_id" in d or "lat" in d or "lng" in d):
+                                    is_container = False
                                 
                             new_ancestors = list(ancestors)
                             if is_container and cat_name:
