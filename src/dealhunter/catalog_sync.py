@@ -222,6 +222,21 @@ class CPGCatalogAdapter:
                         return []
 
                 data = json.loads(m.group(1))
+                
+                aisle_types = {}
+                def map_aisles(obj):
+                    if isinstance(obj, dict):
+                        aid = str(obj.get("id", obj.get("corridor_id", obj.get("aisle_id", ""))))
+                        if aid:
+                            if "view_config" in obj:
+                                aisle_types[aid] = "collection_view"
+                            elif "aisle_type" in obj:
+                                aisle_types[aid] = obj.get("aisle_type")
+                        for k, v in obj.items(): map_aisles(v)
+                    elif isinstance(obj, list):
+                        for item in obj: map_aisles(item)
+                map_aisles(data)
+
                 items = []
 
                 def is_product(d):
@@ -272,14 +287,13 @@ class CPGCatalogAdapter:
                                 
                             new_ancestors = list(ancestors)
                             if is_container and cat_name:
-                                final_type = d.get("aisle_type", cat_type if cat_type else "unknown")
-                                if "view_config" in d:
-                                    final_type = "collection_view"
+                                raw_id_val = str(d.get("id", d.get("corridor_id", d.get("aisle_id", ""))))
+                                final_type = aisle_types.get(raw_id_val, cat_type if cat_type else "unknown")
                                 
                                 anc_node = {
                                     "raw_name": cat_name,
                                     "raw_type": final_type,
-                                    "raw_id": d.get("id", d.get("corridor_id", d.get("aisle_id", None))),
+                                    "raw_id": raw_id_val if raw_id_val else None,
                                     "source": "provider",
                                     "path": [a["raw_name"] for a in ancestors] + [cat_name]
                                 }
@@ -364,6 +378,21 @@ class RestaurantMenuAdapter:
                         return []
 
                 data = json.loads(m.group(1))
+                
+                aisle_types = {}
+                def map_aisles(obj):
+                    if isinstance(obj, dict):
+                        aid = str(obj.get("id", obj.get("corridor_id", obj.get("aisle_id", ""))))
+                        if aid:
+                            if "view_config" in obj:
+                                aisle_types[aid] = "collection_view"
+                            elif "aisle_type" in obj:
+                                aisle_types[aid] = obj.get("aisle_type")
+                        for k, v in obj.items(): map_aisles(v)
+                    elif isinstance(obj, list):
+                        for item in obj: map_aisles(item)
+                map_aisles(data)
+
                 items = []
 
                 def is_product(d):
@@ -413,14 +442,13 @@ class RestaurantMenuAdapter:
                                 
                             new_ancestors = list(ancestors)
                             if is_container and cat_name:
-                                final_type = d.get("aisle_type", cat_type if cat_type else "unknown")
-                                if "view_config" in d:
-                                    final_type = "collection_view"
+                                raw_id_val = str(d.get("id", d.get("corridor_id", d.get("aisle_id", ""))))
+                                final_type = aisle_types.get(raw_id_val, cat_type if cat_type else "unknown")
                                 
                                 anc_node = {
                                     "raw_name": cat_name,
                                     "raw_type": final_type,
-                                    "raw_id": d.get("id", d.get("corridor_id", d.get("aisle_id", None))),
+                                    "raw_id": raw_id_val if raw_id_val else None,
                                     "source": "provider",
                                     "path": [a["raw_name"] for a in ancestors] + [cat_name]
                                 }
