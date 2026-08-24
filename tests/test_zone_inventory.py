@@ -65,7 +65,7 @@ def test_store_reconciliation_missing_product(db_conn):
 
 def test_missing_store_stale(db_conn):
     c = db_conn.cursor()
-    c.execute("INSERT INTO stores (store_id, status) VALUES ('2', 'ACTIVE')")
+    c.execute("INSERT INTO stores (store_id, status, type) VALUES ('2', 'ACTIVE', 'market')")
     db_conn.commit()
     config = {"max_runtime": 3600}
     with patch("dealhunter.crawler_zone.RappiSessionProvider.is_authenticated", return_value=True):
@@ -78,7 +78,7 @@ def test_missing_store_stale(db_conn):
 def test_mid_run_401_preserves_state(db_conn):
     c = db_conn.cursor()
     c.execute("INSERT INTO stores (store_id, status) VALUES ('1', 'ACTIVE')")
-    c.execute("INSERT INTO stores (store_id, status) VALUES ('2', 'ACTIVE')")
+    c.execute("INSERT INTO stores (store_id, status, type) VALUES ('2', 'ACTIVE', 'market')")
     c.execute("INSERT INTO products (product_id, store_id, name) VALUES ('p1', '1', 'Prod 1')")
     c.execute("INSERT INTO products (product_id, store_id, name) VALUES ('p2', '1', 'Prod 2')")
     db_conn.commit()
