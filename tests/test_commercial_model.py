@@ -119,3 +119,27 @@ def test_malformed_pro_does_not_contaminate_public():
     dp, dpromo, deff, dsrc, ptype, plab, ep, er, extra = calculate_discount(p)
     assert deff is None or deff == 0.0
 
+
+def test_progressive_unknown_math():
+    from dealhunter.discounts import calculate_discount
+    p = {
+        "price": 100.0,
+        "discounts_bundle": {
+            "progressive": {"some_complex": "struct"}
+        }
+    }
+    dp, dpromo, deff, dsrc, ptype, plab, ep, er, extra = calculate_discount(p)
+    assert ptype == "PROGRESSIVE_UNKNOWN"
+    assert deff is None
+    assert extra["progressive"] is not None
+
+def test_promotion_limits_preserved():
+    from dealhunter.discounts import calculate_discount
+    p = {
+        "price": 100.0,
+        "discounts_bundle": {
+            "deal": [{"promotion_value": 2, "units_condition": 1, "limit": 2}]
+        }
+    }
+    dp, dpromo, deff, dsrc, ptype, plab, ep, er, extra = calculate_discount(p)
+    assert extra["limit"] == 2
