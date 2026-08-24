@@ -276,3 +276,13 @@ Si no aporta beneficio demostrable, no se incorpora.
 - **Read-before-write:** El ciclo consumió un presupuesto estricto de 4 HTTP requests, descargando la metadata y catálogos completos en memoria, y comprobando la inexistencia de *root leaks* o excepciones antes de autorizar las escrituras.
 - **Normalización y Persistencia:** La capa canónica funcionó impecablemente, asignando `Restaurantes` y `Supermercado` de forma precisa, y persistiendo un total de 230 membresías sin mutar ni afectar a los 867 stores restantes de la base de datos (Scope audit: 100% aislado).
 - **Resultados:** `stores.vertical` fue exitosamente activado con datos reales. Las relaciones de productos fueron poblando la nueva tabla de `product_memberships`. Las consultas probadas respondieron de forma performante (<15ms) sin necesidad de reindexación inmediata. El baseline de 354 tests se mantuvo verde (cero regresiones funcionales) y las revisiones de integridad SQLite pasaron en limpio. La validación end-to-end de la migración y la captura adaptada queda certificada.
+
+## Phase 4B.3A — Rappi Web Secondary Oracle Recon
+
+- **Estrategia**: Investigación controlada de `rappi.com.mx` como oráculo secundario para enriquecer la taxonomía Android de forma *read-only*. Se probó en Sushi Central, City Market y Turbo sin realizar modificaciones en la base de datos de producción.
+- **Hallazgo Estructural (Next.js)**: Las páginas públicas renderizan la estructura completa en un bloque SSR (`<script id="__NEXT_DATA__">`). Con 1 request no autenticada se obtiene la taxonomía completa.
+- **Correlación de Taxonomía**:
+  - **Restaurantes**: La lista de `corridors` web mapea exactamente con los `product_memberships` de Android, probando que son de tipo `CATEGORY` (ej. "Frutas y Verduras").
+  - **CPG/Supermercados**: La lista `aisles_tree_response` expone explícitamente los pasillos.
+- **Mejoras descubiertas**: El JSON incluye explícitamente el stock, el `pum` (precio unitario), `discounts_bundle` (para ofertas NxM / Pro), y deeplinks a Android. Además, la web resuelve IDs obsoletos (como el de Turbo) a sus representaciones actuales de forma inmediata.
+- **Conclusión**: La web es altamente valiosa para validar y transformar los nodos de taxonomía `UNKNOWN` a `CATEGORY`. No debe reemplazar al crawler Android, sino actuar como oráculo secundario con 0 requests adicionales a las necesarias, sin riesgo para el crawler base.
