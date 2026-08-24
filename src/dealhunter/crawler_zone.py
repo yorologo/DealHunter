@@ -187,16 +187,16 @@ async def _run_zone_inventory_async(config, lat, lng, conn, run_id, dry_run=Fals
 
     # Stores not seen in a full discovery should be marked STALE
     if global_state == "COMPLETED" and not dry_run:
-        # A5 covers CPG only. Reconcile only CPG. Leave Restaurants untouched unless explicitly covered.
-        # So we only mark STALE if it is not a Restaurant.
-        c.execute('SELECT store_id, vertical, type FROM stores WHERE status = "ACTIVE"')
+        # Phase 4B.3F.2 Scope-Safe Reconciliation:
+        # Only stale a store if it belongs to a firmly covered A5 CPG scope.
+        # We explicitly preserve restaurants, liquor, mall (rappimall_parent), and unknowns.
+        c.execute('SELECT store_id, type FROM stores WHERE status = "ACTIVE"')
+        covered_types = {'market', 'chiper_home', 'chiper_extended', 'express_parent', 'pets_cpgs', 'Farmatodo'}
         for row in c.fetchall():
             sid = row[0]
-            vertical = row[1]
-            stype = row[2]
+            stype = row[1]
             if sid not in seen_store_ids:
-                is_restaurant = (vertical == 'Restaurantes') or (stype == 'restaurants')
-                if not is_restaurant:
+                if stype in covered_types:
                     c.execute('UPDATE stores SET status = "STALE" WHERE store_id = ?', (sid,))
         conn.commit()
 

@@ -306,3 +306,9 @@ Si no aporta beneficio demostrable, no se incorpora.
 - **Fallback**: The `unified-search` engine remains completely intact as a fallback (FAIL-OPEN), preserving all adaptive modes (NORMAL, DEEP, FULL). If A5 fails, or if we need coverage for surfaces not covered by A5 (like Restaurants), the system gracefully cascades back to the Unified Search BFS.
 - **Data Retention**: A5 does not overwrite legacy stores or restaurants, avoiding DB corruption or data loss for out-of-scope surfaces.
 - **Live Shadow Test**: Validated natively in Termux. Resulted in 218 unique CPG store IDs from a single request. 85 of these were novel CPG stores not previously discovered by Unified Search in this zone. Turbo was successfully discovered.
+
+## Phase 4B.3F.2: A5 Scope-Safe Reconciliation
+- Re-evaluated the store pruning (STALE marking) condition during discovery. 
+- **Previous logic:** Assumed that any `non-Restaurant` was covered by A5. This unsafe broad condition threatened stores out of A5's natural scope (like `liquor_store` limits or `rappimall_parent`).
+- **New logic:** `crawler_zone.py` now explicitly protects unsupported or tangentially supported verticals. A store is marked `STALE` only if it belongs to a verified covered type (`market`, `chiper_home`, `chiper_extended`, `express_parent`, `pets_cpgs`, `Farmatodo`).
+- **Clarification:** `A5_SCOPE_COMPLETE != ALL_NON_RESTAURANT_COMPLETE`. A5 completes its specific CPG subset safely without polluting legacy restaurants, malls, or liquor stores outside its local payload radius.
