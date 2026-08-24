@@ -64,3 +64,5 @@ This playbook documents the formalized, step-by-step methodology for integrating
 6. **Precision > Coverage**: A 28% reduction in noise with 100% precision is vastly superior to a 90% reduction with false positives.
 7. **Reuse Network Requests**: Whenever possible, piggyback semantic metadata extraction onto the existing catalog fetch (e.g., snagging `aisle_type` during the SSR crawl) to keep extra network requests at exactly 0.
 8. **Provenance**: Always record exactly *why* a semantic classification was applied (e.g. `web_exact_category_id`).
+
+9. **Never assume provider IDs are globally semantic until cross-context invariance is demonstrated.** An ID like `265` might mean 'Lácteos' in Turbo, but could mean something else entirely in a Restaurant menu. Always scope fallback dictionaries to the `parent_type` unless global invariance is strictly proven.
