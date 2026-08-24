@@ -395,111 +395,18 @@ def get_deals(db_path, filters, sort, page, per_page=25):
 
 
 def get_catalog(db_path, filters, sort, page, per_page=25):
+    import sqlite3
+    from dealhunter.query_layer import build_faceted_query
     conn = sqlite3.connect(db_path)
     c = conn.cursor()
     
-    offset = (page - 1) * per_page
+    facets = _translate_filters(filters, sort, page, per_page)
+    q, count_q, params = build_faceted_query(facets)
     
-    conds = []
-    params = []
-    
-    if not filters.get("store"):
-        pass # Workaround removed: conds.append("NOT (store_type = 'restaurants' AND discount_percent > 65.0)")
-        
-    if filters.get("store"):
-        stores = filters["store"]
-        if isinstance(stores, list) and stores:
-            conds.append(f"store_id IN ({','.join(['?']*len(stores))})")
-            params.extend(stores)
-        elif stores and isinstance(stores, str):
-            conds.append("store_id = ?")
-            params.append(stores)
-        
-    if filters.get("vertical"):
-        if filters["vertical"] == "turbo":
-            conds.append("store_type IN ('chiper_home', 'chiper_extended', 'chiper_express')")
-        elif filters["vertical"] == "market":
-            conds.append("store_type NOT IN ('chiper_home', 'chiper_extended', 'chiper_express', 'restaurants')")
-        else:
-            conds.append("store_type = ?")
-            params.append(filters["vertical"])
-        
-    if filters.get("category"):
-        cats = filters["category"]
-        if isinstance(cats, list) and cats:
-            if "Uncategorized" in cats:
-                # If Uncategorized is in the list, we need to handle NULL/empty
-                others = [c for c in cats if c != "Uncategorized"]
-                if others:
-                    conds.append(f"(category IS NULL OR category = '' OR category IN ({','.join(['?']*len(others))}))")
-                    params.extend(others)
-                else:
-                    conds.append("(category IS NULL OR category = '')")
-            else:
-                conds.append(f"category IN ({','.join(['?']*len(cats))})")
-                params.extend(cats)
-        elif cats and isinstance(cats, str):
-            if cats == "Uncategorized":
-                conds.append("(category IS NULL OR category = '')")
-            else:
-                conds.append("category = ?")
-                params.append(cats)
-            
-    if filters.get("only_deals"):
-        conds.append("original_price > current_price")
-        
-    if filters.get("min_discount"):
-        try:
-            md = float(filters["min_discount"])
-            conds.append("discount_percent >= ?")
-            params.append(md)
-        except:
-            pass
-
-    where_clause = f"WHERE {' AND '.join(conds)}" if conds else ""
-    
-    order_clause = "ORDER BY ts DESC"
-    if sort == "price_asc":
-        order_clause = "ORDER BY current_price ASC"
-    elif sort == "price_desc":
-        order_clause = "ORDER BY current_price DESC"
-    elif sort == "name_asc":
-        order_clause = "ORDER BY name ASC"
-    elif sort == "discount":
-        order_clause = "ORDER BY discount_percent DESC"
-    elif sort == "savings":
-        order_clause = "ORDER BY savings DESC"
-        
-    base_query = '''
-        SELECT p.product_id, p.store_id, p.name, s.name as store_name, s.type as store_type, p.brand, p.category, p.quantity, p.unit, p.normalized_quantity, p.normalized_unit,
-               o.timestamp as ts, o.price as current_price, o.original_price,
-               ((o.original_price - o.price) / o.original_price) * 100 as discount_percent,
-               (o.original_price - o.price) as savings, o.promotion_type, o.promotion_label
-        FROM products p
-        JOIN stores s ON p.store_id = s.store_id
-        JOIN (
-            SELECT product_id, store_id, timestamp, price, original_price, promotion_type, promotion_label,
-                   ROW_NUMBER() OVER (PARTITION BY store_id, product_id ORDER BY timestamp DESC, ROWID DESC) as rn
-            FROM observations
-        ) o ON p.product_id = o.product_id AND p.store_id = o.store_id AND o.rn = 1
-    '''
-    
-    query = f'''
-        SELECT * FROM ({base_query}) 
-        {where_clause}
-        {order_clause}
-        LIMIT ? OFFSET ?
-    '''
-    
-    count_query = f'''
-        SELECT COUNT(*) FROM ({base_query})
-        {where_clause}
-    '''
-    
-    c.execute(count_query, params)
+    c.execute(count_q, params)
     total = c.fetchone()[0]
     
-    c.execute(query, params + [per_page, offset])
+    c.execute(q, params)
     rows = c.fetchall()
     
     products = []
@@ -510,38 +417,37 @@ def get_catalog(db_path, filters, sort, page, per_page=25):
             "product_name": r[2],
             "store_name": r[3],
             "store_type": r[4],
-            "brand": r[5],
-            "category": r[6],
-            "quantity": r[7],
-            "unit": r[8],
-            "normalized_quantity": r[9],
-            "normalized_unit": r[10],
-            "current_price": r[12],
-            "promotion_type": r[16],
-            "promotion_label": r[17]
+            "brand": r[6],
+            "category": r[7],
+            "current_price": r[8],
+            "original_price": r[9],
+            "discount_percent": r[10] or 0.0,
+            "savings": (r[9] - r[8]) if r[9] and r[8] else 0.0,
+            "promotion_type": r[11],
+            "promotion_label": r[12],
+            "has_pro_offer": r[13],
+            "pro_price": r[14],
+            "pro_discount_effective": r[15],
+            "limit_info": r[16],
+            "availability": r[17],
+            "ts": r[18],
+            "quantity": r[19],
+            "unit": r[20],
+            "normalized_quantity": r[21],
+            "normalized_unit": r[22],
         })
         
     conn.close()
     
     items = enrich_products_with_metrics(db_path, products)
     
-    if sort == "opportunity":
-        def get_opp_key(item):
-            m = item.get("metrics")
-            if not m: return 99
-            st = m.get("deal_status")
-            if st == "NEW_LOW": return 0
-            if st == "REAL_DEAL": return 1
-            if st == "GOOD_PRICE": return 2
-            return 3
-        items.sort(key=get_opp_key)
-        
     return {
         "items": items,
         "total": total,
         "page": page,
         "pages": (total + per_page - 1) // per_page
     }
+
 
 
 def get_categories(db_path):
@@ -829,3 +735,55 @@ def get_available_categories(db_path, vertical=None, store_ids=None):
     query += " ORDER BY category"
     c.execute(query, params)
     return [r[0] for r in c.fetchall()]
+
+
+def _translate_filters(filters, sort=None, page=None, per_page=None):
+    facets = {}
+    if sort and page and per_page:
+        offset = (page - 1) * per_page
+        facets.update({
+            "limit": per_page,
+            "offset": offset,
+            "sort": sort.replace("_asc", "").replace("_desc", "") if sort in ["price_asc", "price_desc", "name_asc"] else sort,
+            "desc": "desc" in sort or sort in ["discount", "savings"]
+        })
+        if sort == "price_asc" or sort == "name_asc":
+            facets["desc"] = False
+    if filters.get("store"):
+        facets["store_ids"] = filters["store"] if isinstance(filters["store"], list) else [filters["store"]]
+    if filters.get("vertical"):
+        v = filters["vertical"]
+        if v == "turbo":
+            facets["verticals"] = ["turbo", "chiper_home", "chiper_extended", "chiper_express"]
+        elif v == "market":
+            facets["verticals"] = ["market", "Supermercado", "Express", "Farmacias", "Mascotas", "Hogar"]
+        else:
+            facets["verticals"] = [v]
+    if filters.get("category"):
+        cats = filters["category"] if isinstance(filters["category"], list) else [filters["category"]]
+        cats = [c for c in cats if c != "Uncategorized"]
+        if cats:
+            facets["categories"] = cats
+    if filters.get("only_deals"):
+        facets["min_discount"] = 1.0
+    if filters.get("min_discount"):
+        try:
+            facets["min_discount"] = float(filters["min_discount"])
+        except:
+            pass
+    if filters.get("channel"):
+        facets["channel"] = filters["channel"]
+    if filters.get("collections"):
+        facets["collections"] = filters["collections"] if isinstance(filters["collections"], list) else [filters["collections"]]
+    if filters.get("store_facets"):
+        facets["store_facets"] = filters["store_facets"] if isinstance(filters["store_facets"], list) else [filters["store_facets"]]
+    return facets
+
+def get_ui_facets(db_path, filters):
+    import sqlite3
+    from dealhunter.query_layer import get_facet_counts
+    conn = sqlite3.connect(db_path)
+    facets = _translate_filters(filters)
+    counts = get_facet_counts(conn, facets)
+    conn.close()
+    return counts

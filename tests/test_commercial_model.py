@@ -173,7 +173,7 @@ def test_unavailable_preserves_unknown():
     
     # We will test process_and_insert_product with v12 enabled
     import dealhunter.db as db_module
-    db_module.CURRENT_SCHEMA_VERSION = 12
+    db_module.CURRENT_SCHEMA_VERSION = 13
     
     run_id = "run-1"
     store_id = "store-1"
@@ -189,7 +189,7 @@ def test_unavailable_preserves_unknown():
 def test_available_no_pro_writes_zero():
     from dealhunter.core import process_and_insert_product
     import dealhunter.db as db_module
-    db_module.CURRENT_SCHEMA_VERSION = 12
+    db_module.CURRENT_SCHEMA_VERSION = 13
     db_conn = sqlite3.connect(':memory:')
     c = db_conn.cursor()
     c.execute("""CREATE TABLE observations (id INTEGER, run_id TEXT, store_id TEXT, product_id TEXT, price REAL, original_price REAL, stock INTEGER, timestamp DATETIME, discount_price REAL, discount_promotion REAL, discount_effective REAL, discount_source TEXT, promotion_type TEXT, promotion_label TEXT, query_term TEXT, availability TEXT, has_pro_offer INTEGER DEFAULT NULL, pro_price REAL, pro_discount_effective REAL, limit_info TEXT, UNIQUE(run_id, store_id, product_id))""")
@@ -213,7 +213,7 @@ def test_available_no_pro_writes_zero():
 def test_available_pro_writes_one():
     from dealhunter.core import process_and_insert_product
     import dealhunter.db as db_module
-    db_module.CURRENT_SCHEMA_VERSION = 12
+    db_module.CURRENT_SCHEMA_VERSION = 13
     db_conn = sqlite3.connect(':memory:')
     c = db_conn.cursor()
     c.execute("""CREATE TABLE observations (id INTEGER, run_id TEXT, store_id TEXT, product_id TEXT, price REAL, original_price REAL, stock INTEGER, timestamp DATETIME, discount_price REAL, discount_promotion REAL, discount_effective REAL, discount_source TEXT, promotion_type TEXT, promotion_label TEXT, query_term TEXT, availability TEXT, has_pro_offer INTEGER DEFAULT NULL, pro_price REAL, pro_discount_effective REAL, limit_info TEXT, UNIQUE(run_id, store_id, product_id))""")

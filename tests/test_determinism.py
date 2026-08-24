@@ -18,6 +18,15 @@ def test_determinism_ties(tmp_path):
     c.execute("INSERT INTO observations (run_id, store_id, product_id, timestamp, price, original_price) VALUES ('r2', 's1', 'p1', '2026-08-01T12:00:00', 99.0, 150.0)")
     
     conn.commit()
+
+    
+    try:
+        from dealhunter.db import migrate
+        if 'db_path' in locals(): migrate(conn, db_path)
+        elif 'test_db' in locals() and isinstance(test_db, str): migrate(conn, test_db)
+    except Exception as e:
+        print('MIGRATE ERROR:', e)
+    
     conn.close()
     
     cat = get_catalog(db_path, {"store": "s1"}, "price_asc", 1)
@@ -48,9 +57,12 @@ def test_determinism_cross_store(tmp_path):
     c.execute("INSERT INTO observations (run_id, store_id, product_id, timestamp, price, original_price) VALUES ('r1', 's2', '123', '2026-08-01T12:00:00', 50.0, 150.0)")
     
     conn.commit()
+
     
     # Query without store filter, we should get TWO items!
     # Because get_catalog groups by store_id, product_id
+    from dealhunter.db import migrate
+    migrate(conn, db_path)
     cat = get_catalog(db_path, {}, "price_asc", 1)
     
     assert len(cat["items"]) == 2

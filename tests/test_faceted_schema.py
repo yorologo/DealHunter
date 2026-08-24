@@ -42,7 +42,7 @@ def test_schema_migration_preserves_legacy():
     # Run migration from db.py
     # Since setup_db modifies a physical file or uses connection, we extract the logic or patch it.
     from dealhunter.db import CURRENT_SCHEMA_VERSION
-    assert CURRENT_SCHEMA_VERSION in [11, 12]
+    assert CURRENT_SCHEMA_VERSION in [11, 12, 13]
     
     # Just run the migration logic inline for in-memory testing
     if True:

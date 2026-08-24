@@ -17,8 +17,18 @@
         <div class="small text-secondary">{{ p.brand or '' }}</div>
     </div>
     
-    <div class="text-md-end">
+        <div class="text-md-end">
         <div class="fs-5 fw-bold text-success lh-1">${{ "%.2f"|format(p.current_price) }}</div>
+        {% if p.has_pro_offer == 1 and p.pro_price %}
+        <div class="mt-1">
+            <span class="badge bg-dark text-white border border-dark rounded-pill py-1 px-2" style="font-size: 0.75rem;">
+                Pro ${{ "%.2f"|format(p.pro_price) }}
+                {% if p.pro_discount_effective and p.pro_discount_effective > 0 %}
+                    (-{{ "%.1f"|format(p.pro_discount_effective) }}%)
+                {% endif %}
+            </span>
+        </div>
+        {% endif %}
         {% if p.unit_price %}
             <div class="small text-secondary mt-1">{{ p.unit_price }}</div>
         {% endif %}

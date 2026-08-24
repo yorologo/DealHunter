@@ -44,7 +44,19 @@
                     {% endif %}
                 </div>
                 
+                
                 <div class="text-end">
+                    {% if p.has_pro_offer == 1 and p.pro_price %}
+                    <div class="mb-1 text-end">
+                        <span class="badge bg-dark text-white border border-dark rounded-pill py-1 px-2" style="font-size: 0.75rem;">
+                            Pro ${{ "%.2f"|format(p.pro_price) }}
+                            {% if p.pro_discount_effective and p.pro_discount_effective > 0 %}
+                                (-{{ "%.1f"|format(p.pro_discount_effective) }}%)
+                            {% endif %}
+                        </span>
+                    </div>
+                    {% endif %}
+
                     {% if op and op > p.current_price and (not p.metrics or not p.metrics.is_suspicious_reference) %}
                         {% set discount = ((op - p.current_price) / op) * 100 %}
                         {% set savings = op - p.current_price %}
