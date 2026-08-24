@@ -66,3 +66,25 @@ This playbook documents the formalized, step-by-step methodology for integrating
 8. **Provenance**: Always record exactly *why* a semantic classification was applied (e.g. `web_exact_category_id`).
 
 9. **Never assume provider IDs are globally semantic until cross-context invariance is demonstrated.** An ID like `265` might mean 'Lácteos' in Turbo, but could mean something else entirely in a Restaurant menu. Always scope fallback dictionaries to the `parent_type` unless global invariance is strictly proven.
+
+## Longitudinal Validation & Mid-Flight Bugs
+
+Durante una fase longitudinal, si aparece un bug:
+
+1. **PAUSE** execution immediately.
+2. **Preserve** pre-fix evidence (do not overwrite the DB or delete old runs).
+3. **Fix** the bug and write tests to reproduce it.
+4. **Restart** a comparable baseline to gather new evidence.
+5. **Do not merge** pre-fix and post-fix metrics blindly when evaluating reliability.
+
+This ensures temporal metrics (like out-of-stock transitions or false positives) are not polluted by the bug's side-effects.
+
+## Production Cutover & Live Alerts (Phase 4I Lessons)
+When automating alerts for a new provider:
+- **Event != Delivery**: Always log state transitions internally before wiring up user-facing delivery.
+- **Historical Cutover Boundary**: Past events must be explicitly suppressed (`delivery_status = 'historical'`) before enabling live schedules to prevent retroactive spam floods.
+- **High-Signal Watch First**: Start with highly restrictive, conservative rules (e.g., `NEW_PRODUCT_WITH_DEAL >= 50%`) for the first canary phase.
+- **Noisy Events**: Record noisy events (like 10% price drops or OOS/BIS oscillations) silently. Do not deliver them until they prove reliable.
+- **Idempotency Before Automation**: Before configuring a cron, replay the exact same run twice and assert `0` new duplicate alerts are generated.
+- **Scheduler Singleton Protection**: Enforce a strict OS-level lock (e.g. `flock`) so two crawlers never write to the DB simultaneously.
+- **Delivery Failure Isolation**: If the notification provider (e.g., Termux:API) crashes, the core crawler must gracefully continue and the database should track the failed delivery attempt.

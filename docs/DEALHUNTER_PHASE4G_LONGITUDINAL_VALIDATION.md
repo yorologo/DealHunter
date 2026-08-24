@@ -12,3 +12,6 @@ Phase 4G proves DealHunter's stability over multiple sequential crawls (simulati
 ## Failure Behavior
 - **Partial Crawls**: If a crawl aborts (e.g. `timeout` or `--max-runtime`), the engine safely preserves previously crawled stores. Uncrawled stores are *not* falsely marked as `STALE`. Products in uncrawled stores are *not* marked as `UNAVAILABLE`. This strict separation is vital for alert reliability.
 - **Data Integrity**: Integrity checks and foreign keys remain flawless (`ok` and `0` respectively) throughout repeated heavy mutations.
+
+## Chronology Correction Note
+During Phase 4G, a taxonomy classification bug temporarily caused valid items to be excluded from persistence. The metrics initially gathered combined pre-fix and post-fix runs. For accurate temporal analysis (such as Alert Engine replays), only post-fix runs or isolated sequences must be used to calculate `OUT_OF_STOCK` reliability, avoiding inflated false positives.
