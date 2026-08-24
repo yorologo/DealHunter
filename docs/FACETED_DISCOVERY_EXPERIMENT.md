@@ -240,3 +240,11 @@ Si no aporta beneficio demostrable, no se incorpora.
 - **Resultados:** `schema_version = 11`. El `integrity_check` fue `ok` y los FK check fueron 0 violations.
 - **Datos Preservados:** Los 869 stores, 24752 products y 80298 observaciones se mantuvieron intactos sin pérdida de precisión. La tabla `product_memberships` y `store_facets` fueron creadas limpias y `stores.vertical` disponible sin alterar los datos legacy existentes (`0 -> 0` porque la fase poblacional aún no se dispara productivamente).
 - **Rolback Plan:** Se documentó que para revertir bastaría restaurar el backup `pre-v11` con el nombre `rappi-deals.db` tras detener cualquier escritor activo de DealHunter, verificando la integridad posteriormente.
+
+## Phase 4B.2a — Targeted merchant resolution
+
+- **Objetivo:** Resolver el limitante arquitectónico que forzaba siempre la ejecución de sweeps alfabéticos (26-546 peticiones) imposibilitando actualizar la taxonomía de una tienda con presupuesto pequeño.
+- **Implementación:** Se refactorizó `MerchantDiscovery` para exponer `_run_query_sync` y `_normalize_store`. Se añadió `discover_targeted(query, lat, lng, report, expected_store_id=None)` que realiza exactamente *una* request a `unified-search`, procesa con el parser canónico y devuelve `(MATCH_EXACT_STORE_ID, merchant)`, garantizando preservación del metadata intacto.
+- **Fallbacks:** Si no encuentra la tienda por nombre o ID, retorna explícitamente `NOT_FOUND` sin disparar ningún modo adaptativo, aislando el budget a 1 HTTP Request garantizada.
+- **Compatibilidad:** Los modos existentes (`NORMAL`, `DEEP`, `FULL`) funcionan sin modificaciones. El nuevo método es exclusivamente para consumos programáticos.
+- **Validación:** Completada offline mediante tests mockeados. Suite pasó con éxito (`353 passed`).

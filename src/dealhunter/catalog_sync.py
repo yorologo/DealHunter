@@ -38,8 +38,18 @@ class MerchantDiscovery:
     def __init__(self, client: AuthenticatedHttpClient):
         self.client = client
 
-    async def discover_merchants(self, lat: float, lng: float, report: CoverageReport, discovery_mode: str = "full") -> List[Dict]:
-        import urllib.request, json, string
+    def _normalize_store(self, s: Dict) -> Dict:
+        return {
+            "store_id": str(s.get("store_id")),
+            "name": s.get("store_name"),
+            "type": s.get("parent_store_type", "market"),
+            "vertical_sub_group": s.get("vertical_sub_group"),
+            "categories": s.get("categories"),
+            "tags": s.get("tags")
+        }
+
+    def _run_query_sync(self, query: str, lat: float, lng: float, report: CoverageReport) -> tuple[List[Dict], Exception]:
+        import urllib.request, json
         from dealhunter.auth import RappiSessionProvider
         url = "https://services.mxgrability.rappi.com/api/pns-global-search-api/v1/unified-search"
         headers = {
@@ -52,38 +62,52 @@ class MerchantDiscovery:
         if prov.context and prov.context._access_token:
             headers["Authorization"] = f"Bearer {prov.context._access_token}"
 
-        unique_stores = {}
+        report.authenticated_requests += 1
+        payload = json.dumps({"query": query, "lat": lat, "lng": lng, "limit": 100}).encode('utf-8')
+        req = urllib.request.Request(url, data=payload, headers=headers, method='POST')
+        try:
+            with urllib.request.urlopen(req, timeout=15) as response:
+                data = json.loads(response.read().decode('utf-8'))
+                stores = data.get("stores", [])
+                return stores, None
+        except Exception as e:
+            status = getattr(e, 'code', 0)
+            if status == 401: report.http_401 += 1
+            elif status == 403: report.http_403 += 1
+            elif status == 429: report.http_429 += 1
+            elif status >= 500: report.http_5xx += 1
+            return [], e
 
-        # Helper to run a single query
-        def run_q(q):
-            report.authenticated_requests += 1
-            payload = json.dumps({"query": q, "lat": lat, "lng": lng, "limit": 100}).encode('utf-8')
-            req = urllib.request.Request(url, data=payload, headers=headers, method='POST')
-            try:
-                with urllib.request.urlopen(req, timeout=15) as response:
-                    data = json.loads(response.read().decode('utf-8'))
-                    stores = data.get("stores", [])
-                    return stores, None
-            except Exception as e:
-                status = getattr(e, 'code', 0)
-                if status == 401: report.http_401 += 1
-                elif status == 403: report.http_403 += 1
-                elif status == 429: report.http_429 += 1
-                elif status >= 500: report.http_5xx += 1
-                return [], e
+    async def discover_targeted(self, query: str, lat: float, lng: float, report: CoverageReport, expected_store_id: str = None) -> tuple[str, Optional[Dict]]:
+        stores, err = self._run_query_sync(query, lat, lng, report)
+        if err:
+            return "NOT_FOUND", None
+            
+        normalized = [self._normalize_store(s) for s in stores]
+        
+        if expected_store_id:
+            for s in normalized:
+                if s["store_id"] == str(expected_store_id):
+                    return "MATCH_EXACT_STORE_ID", s
+            return "NOT_FOUND", None
+            
+        if not normalized:
+            return "NOT_FOUND", None
+            
+        if len(normalized) == 1:
+            return "SUCCESS", normalized[0]
+            
+        return "AMBIGUOUS", None
+
+    async def discover_merchants(self, lat: float, lng: float, report: CoverageReport, discovery_mode: str = "full") -> List[Dict]:
+        import string
+        unique_stores = {}
 
         def add_stores(stores):
             for s in stores:
                 sid = str(s.get("store_id"))
                 if sid not in unique_stores:
-                    unique_stores[sid] = {
-                        "store_id": sid,
-                        "name": s.get("store_name"),
-                        "type": s.get("parent_store_type", "market"),
-                        "vertical_sub_group": s.get("vertical_sub_group"),
-                        "categories": s.get("categories"),
-                        "tags": s.get("tags")
-                    }
+                    unique_stores[sid] = self._normalize_store(s)
 
         if discovery_mode == "full":
             from collections import deque
@@ -92,7 +116,7 @@ class MerchantDiscovery:
             LIMIT_THRESHOLD = 30
             while queue:
                 query, depth = queue.popleft()
-                stores, err = run_q(query)
+                stores, err = self._run_query_sync(query, lat, lng, report)
                 if err: continue
                 add_stores(stores)
                 if len(stores) >= LIMIT_THRESHOLD and depth < MAX_DEPTH:
@@ -104,7 +128,7 @@ class MerchantDiscovery:
 
             d1_results = []
             for c in string.ascii_lowercase:
-                stores, err = run_q(c)
+                stores, err = self._run_query_sync(c, lat, lng, report)
                 if err: continue
                 add_stores(stores)
                 d1_results.append({"query": c, "raw_count": len(stores)})
@@ -116,7 +140,7 @@ class MerchantDiscovery:
             for item in d1_results[:top_k]:
                 query = item["query"]
                 for c in string.ascii_lowercase:
-                    stores, err = run_q(query + c)
+                    stores, err = self._run_query_sync(query + c, lat, lng, report)
                     if err: continue
                     add_stores(stores)
 
