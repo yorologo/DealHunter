@@ -185,7 +185,9 @@ def runs_start():
         run_id = f"run_{uuid.uuid4().hex[:12]}"
 
         cfg = load_config()
-        lat, lng = cfg.get("location", (19.4326, -99.1332))
+        loc = cfg.get("location", {})
+        lat = loc.get("lat", 19.4326) if isinstance(loc, dict) else 19.4326
+        lng = loc.get("lng", -99.1332) if isinstance(loc, dict) else -99.1332
 
         c.execute('''INSERT INTO runs (run_id, started_at, lat, lng, radius, status)
                      VALUES (?, CURRENT_TIMESTAMP, ?, ?, ?, 'RUNNING')''',
