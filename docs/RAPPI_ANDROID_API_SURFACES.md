@@ -330,3 +330,13 @@ Likely noise or low priority: Flutter `/v3/orders/products?`, payment `v1/mercha
 **B1: POST /api/dynamic/context/resolve**
 - **Contract Reconstructed**: The `state` object must contain `store_id`, `lat`, `lng`. But it still returns HTTP 400 demanding valid `component`, `limit` and `offset` configurations that we cannot easily guess.
 - **Value**: CONTRACT_UNRESOLVED.
+
+
+### Phase 4B.3F: A5 Integration & Shadow Test
+- **Status**: INTEGRATED (Primary CPG Discovery)
+- **Results**: 
+  - 1 single GET request returned 218 CPG stores.
+  - Replaced the CPG portion of `unified-search` BFS, reducing CPG discovery requests from ~300 to 1.
+  - `unified-search` is now retained purely as a fallback mechanism and for Restaurant discovery.
+  - Successfully preserved the semantic taxonomy (`vertical_sub_group` and categories) from A5 into the local SQLite store metadata.
+  - Found 85 new CPG stores that were invisible to the old Unified Search BFS!

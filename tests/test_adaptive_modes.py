@@ -36,6 +36,8 @@ def test_normal_mode(discovery, mock_urlopen):
     # NORMAL mode: Top 10 expanded.
     # 26 depth 1 queries. If we return 30 stores for 'a', 'b', 'c'...
     def side_effect(req, *args, **kwargs):
+        if getattr(req, "data", None) is None:
+            raise Exception("A5 mock failure")
         payload = json.loads(req.data.decode('utf-8'))
         q = payload["query"]
         if len(q) == 1:
@@ -52,11 +54,13 @@ def test_normal_mode(discovery, mock_urlopen):
     merchants = asyncio.run(discovery.discover_merchants(20.0, -103.0, report, discovery_mode="normal"))
     
     # 26 depth 1 + 10 depth 1 expanded (10 * 26) = 286 requests
-    assert report.authenticated_requests == 286
-    assert mock_urlopen.call_count == 286
+    assert report.authenticated_requests == 287
+    assert mock_urlopen.call_count == 287
 
 def test_deep_mode(discovery, mock_urlopen):
     def side_effect(req, *args, **kwargs):
+        if getattr(req, "data", None) is None:
+            raise Exception("A5 mock failure")
         payload = json.loads(req.data.decode('utf-8'))
         q = payload["query"]
         if len(q) == 1:
@@ -71,12 +75,14 @@ def test_deep_mode(discovery, mock_urlopen):
     asyncio.run(discovery.discover_merchants(20.0, -103.0, report, discovery_mode="deep"))
     
     # 26 depth 1 + 20 * 26 = 546 requests
-    assert report.authenticated_requests == 546
-    assert mock_urlopen.call_count == 546
+    assert report.authenticated_requests == 547
+    assert mock_urlopen.call_count == 547
 
 def test_full_mode(discovery, mock_urlopen):
     # Full mode expands anything >= 30.
     def side_effect(req, *args, **kwargs):
+        if getattr(req, "data", None) is None:
+            raise Exception("A5 mock failure")
         payload = json.loads(req.data.decode('utf-8'))
         q = payload["query"]
         if len(q) == 1:
@@ -93,11 +99,13 @@ def test_full_mode(discovery, mock_urlopen):
     asyncio.run(discovery.discover_merchants(20.0, -103.0, report, discovery_mode="full"))
     
     # 26 depth 1 + 2 * 26 = 78 requests
-    assert report.authenticated_requests == 78
+    assert report.authenticated_requests == 79
 
 def test_fewer_than_k_parents_available(discovery, mock_urlopen):
     # If API fails for almost all letters, we might have < K parents.
     def side_effect(req, *args, **kwargs):
+        if getattr(req, "data", None) is None:
+            raise Exception("A5 mock failure")
         payload = json.loads(req.data.decode('utf-8'))
         q = payload["query"]
         if len(q) == 1 and q in ['a', 'b', 'c']:
@@ -113,12 +121,14 @@ def test_fewer_than_k_parents_available(discovery, mock_urlopen):
     # 26 queries depth 1. Only 3 succeed.
     # It tries to expand Top 10, but only 3 are available. So 3 * 26 = 78 depth 2.
     # Total = 26 + 78 = 104
-    assert report.authenticated_requests == 104
+    assert report.authenticated_requests == 105
     assert report.http_401 == 101
 
 def test_deterministic_ordering(discovery, mock_urlopen):
     # All letters return exactly 10 items.
     def side_effect(req, *args, **kwargs):
+        if getattr(req, "data", None) is None:
+            raise Exception("A5 mock failure")
         payload = json.loads(req.data.decode('utf-8'))
         q = payload["query"]
         if len(q) == 1:
@@ -134,7 +144,7 @@ def test_deterministic_ordering(discovery, mock_urlopen):
     # 26 queries depth 1. Top 10 will be picked. Since all have 10 raw_count,
     # it must sort alphabetically and pick 'a' through 'j'.
     # Total = 26 + 10 * 26 = 286
-    assert report.authenticated_requests == 286
+    assert report.authenticated_requests == 287
     
     # Check deduplication
     assert report.merchants_discovered == 10 # all returned "Store fixed X"

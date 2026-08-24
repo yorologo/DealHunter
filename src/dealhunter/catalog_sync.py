@@ -48,6 +48,41 @@ class MerchantDiscovery:
             "tags": s.get("tags")
         }
 
+    def _run_context_stores_sync(self, lat: float, lng: float, report: CoverageReport) -> tuple[list[dict], Exception]:
+        import urllib.request, json
+        from dealhunter.auth import RappiSessionProvider
+        url = f"https://services.mxgrability.rappi.com/api/dynamic/context/stores?lat={lat}&lng={lng}"
+        headers = {
+            "Accept": "application/json",
+            "Content-Type": "application/json",
+            "User-Agent": "Mozilla/5.0",
+            "language": "es-MX"
+        }
+        prov = RappiSessionProvider()
+        if prov.context and prov.context._access_token:
+            headers["Authorization"] = f"Bearer {prov.context._access_token}"
+
+        report.authenticated_requests += 1
+        req = urllib.request.Request(url, headers=headers, method='GET')
+        try:
+            with urllib.request.urlopen(req, timeout=15) as response:
+                data = json.loads(response.read().decode('utf-8'))
+                stores = []
+                for group in data.get("stores", []):
+                    group_name = group.get("name", "Otras").strip()
+                    for s in group.get("stores", []):
+                        if "vertical_sub_group" not in s or not s["vertical_sub_group"]:
+                            s["vertical_sub_group"] = group_name
+                        stores.append(s)
+                return stores, None
+        except Exception as e:
+            status = getattr(e, 'code', 0)
+            if status == 401: report.http_401 += 1
+            elif status == 403: report.http_403 += 1
+            elif status == 429: report.http_429 += 1
+            elif status >= 500: report.http_5xx += 1
+            return [], e
+
     def _run_query_sync(self, query: str, lat: float, lng: float, report: CoverageReport) -> tuple[List[Dict], Exception]:
         import urllib.request, json
         from dealhunter.auth import RappiSessionProvider
@@ -109,40 +144,47 @@ class MerchantDiscovery:
                 if sid not in unique_stores:
                     unique_stores[sid] = self._normalize_store(s)
 
-        if discovery_mode == "full":
-            from collections import deque
-            queue = deque([(c, 1) for c in string.ascii_lowercase])
-            MAX_DEPTH = 2
-            LIMIT_THRESHOLD = 30
-            while queue:
-                query, depth = queue.popleft()
-                stores, err = self._run_query_sync(query, lat, lng, report)
-                if err: continue
-                add_stores(stores)
-                if len(stores) >= LIMIT_THRESHOLD and depth < MAX_DEPTH:
-                    for c in string.ascii_lowercase:
-                        queue.append((query + c, depth + 1))
-        else:
-            # Top-K Adaptive Modes
-            top_k = 10 if discovery_mode == "normal" else 20
+        # 1. Primary CPG Discovery (A5 Context Stores)
+        a5_stores, a5_err = self._run_context_stores_sync(lat, lng, report)
+        if not a5_err and a5_stores:
+            add_stores(a5_stores)
 
-            d1_results = []
-            for c in string.ascii_lowercase:
-                stores, err = self._run_query_sync(c, lat, lng, report)
-                if err: continue
-                add_stores(stores)
-                d1_results.append({"query": c, "raw_count": len(stores)})
-
-            # Sort descending by raw_count, then alphabetically for deterministic tie-breaking
-            d1_results.sort(key=lambda x: (-x["raw_count"], x["query"]))
-
-            # Expand Top-K
-            for item in d1_results[:top_k]:
-                query = item["query"]
-                for c in string.ascii_lowercase:
-                    stores, err = self._run_query_sync(query + c, lat, lng, report)
+        # 2. Unified Search Fallback (if A5 fails or we need missing surfaces)
+        if a5_err or not a5_stores:
+            if discovery_mode == "full":
+                from collections import deque
+                queue = deque([(c, 1) for c in string.ascii_lowercase])
+                MAX_DEPTH = 2
+                LIMIT_THRESHOLD = 30
+                while queue:
+                    query, depth = queue.popleft()
+                    stores, err = self._run_query_sync(query, lat, lng, report)
                     if err: continue
                     add_stores(stores)
+                    if len(stores) >= LIMIT_THRESHOLD and depth < MAX_DEPTH:
+                        for c in string.ascii_lowercase:
+                            queue.append((query + c, depth + 1))
+            else:
+                # Top-K Adaptive Modes
+                top_k = 10 if discovery_mode == "normal" else 20
+
+                d1_results = []
+                for c in string.ascii_lowercase:
+                    stores, err = self._run_query_sync(c, lat, lng, report)
+                    if err: continue
+                    add_stores(stores)
+                    d1_results.append({"query": c, "raw_count": len(stores)})
+
+                # Sort descending by raw_count, then alphabetically for deterministic tie-breaking
+                d1_results.sort(key=lambda x: (-x["raw_count"], x["query"]))
+
+                # Expand Top-K
+                for item in d1_results[:top_k]:
+                    query = item["query"]
+                    for c in string.ascii_lowercase:
+                        stores, err = self._run_query_sync(query + c, lat, lng, report)
+                        if err: continue
+                        add_stores(stores)
 
         merchants = list(unique_stores.values())
         report.merchants_discovered = len(merchants)

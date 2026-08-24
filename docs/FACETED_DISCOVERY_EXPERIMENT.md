@@ -299,3 +299,10 @@ Si no aporta beneficio demostrable, no se incorpora.
 - **D1 (CPG Products V2)**: Fails to dump full catalogs without a keyword. Classified as `CONFIRMED_LOW_VALUE` for ingestion.
 - **A5 (Context Stores)** & **B1 (Context Resolve)**: Both return 400/500 HTTP errors due to undocumented parameters (e.g., `language`). Classified as `NEEDS_MORE_CONTRACT_INFO`.
 - **Decision**: No immediate Android replacements for discovery/ingestion. Current methods (`unified-search` and Web SSR) remain the optimal stable paths.
+
+## Phase 4B.3F: A5 Integration & Shadow Validation
+- We integrated `GET api/dynamic/context/stores` into `MerchantDiscovery` inside `catalog_sync.py`.
+- **Contract**: Sent `lat`, `lng`, and `Accept-Language: es-MX`. (Note: header must be exactly `language: es-MX` or similar to avoid 400 Bad Request, our validation verified `language` is the exact header expected by backend).
+- **Fallback**: The `unified-search` engine remains completely intact as a fallback (FAIL-OPEN), preserving all adaptive modes (NORMAL, DEEP, FULL). If A5 fails, or if we need coverage for surfaces not covered by A5 (like Restaurants), the system gracefully cascades back to the Unified Search BFS.
+- **Data Retention**: A5 does not overwrite legacy stores or restaurants, avoiding DB corruption or data loss for out-of-scope surfaces.
+- **Live Shadow Test**: Validated natively in Termux. Resulted in 218 unique CPG store IDs from a single request. 85 of these were novel CPG stores not previously discovered by Unified Search in this zone. Turbo was successfully discovered.
