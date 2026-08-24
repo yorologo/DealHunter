@@ -95,3 +95,8 @@ When automating alerts for a new provider:
 3. **STABLE PROMOTION**: Only if soak passes, a clean metadata-only release commit promotes the software to stable.
 
 *Key Lesson:* Never develop new features on top of an unproven RC. Always preserve RC tags immutably, and revalidate the final stable commit before tagging.
+
+## Multiprovider Expansion Rules
+
+- Freeze and certify the existing provider UX baseline before introducing a second provider.
+- Every multiprovider phase must prove no regression against the reference provider.

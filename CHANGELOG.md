@@ -1,5 +1,16 @@
 # Changelog
 
+## v3.0.1 - 2026-08-24
+### Fixed
+- Prevented admin crawler start without explicit valid location.
+- Hidden catalog-empty stores from default store directory while preserving direct empty-state pages.
+- Fixed original-price strike-through rendering.
+- Added regression coverage for UX hardening.
+
+### Documentation
+- Revalidated Very Very Easy Quick Start.
+- Aligned current provider roadmap to Uber Eats planning.
+
 ## v3.0.0 - 2026-08-24
 
 *Primera release estable de la nueva integración Rappi (Phase 4 finalizada).* 
