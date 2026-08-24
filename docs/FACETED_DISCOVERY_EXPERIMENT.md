@@ -231,3 +231,12 @@ Si no aporta beneficio demostrable, no se incorpora.
 - **Absent vs Empty y Reconciliación:** Comprobado vía tests. Si una observación parcial (`discover_merchants` parcial o ausente) no reporta metadatos, los `store_facets` previos se conservan de forma defensiva para no destruir taxonomía.
 - **Prueba Live (Muestra actual de Rappi):** El endpoint productivo `unified-search` actualmente expone correctamente `parent_store_type` y `vertical_sub_group`, cumpliendo el Level A. Sin embargo, para la mayoría de tiendas (incluyendo restaurantes de Sushi), Rappi ha dejado de enviar los arrays `tags` y `categories` en esta respuesta, dejándolos ausentes. DealHunter maneja esto correctamente: popula el Level A (`stores.vertical`) y deja vacío el Level B si Rappi no expone facetas.
 - **Queries verificadas:** El diseño soporta perfectamente las consultas transversales (ej. "Restaurantes AND Sushi") una vez poblada la base de datos a través de una ejecución normal del pipeline V2 (`dealhunter update` / `crawler_zone.py`).
+
+## Phase 4B.1 — Production schema v11 migration
+
+- **Objetivo:** Migración canónica `v10 -> v11` en `rappi-deals.db` de producción, sin crawlers, requests a Rappi, ni reescritura de datos funcionales.
+- **Backup Verificado:** Se creó el backup `rappi-deals-pre-v11-20260824-001647.db` (SHA256 pre/post = `811e40832a62abf70e04468af2220c1970efc6321af57404adec54ec28d09195`). La base mantenía conteos idénticos al original.
+- **Proceso:** La migración se disparó por `dealhunter.db.setup_db`. Se comprobó offline con 0 requests realizadas a Rappi.
+- **Resultados:** `schema_version = 11`. El `integrity_check` fue `ok` y los FK check fueron 0 violations.
+- **Datos Preservados:** Los 869 stores, 24752 products y 80298 observaciones se mantuvieron intactos sin pérdida de precisión. La tabla `product_memberships` y `store_facets` fueron creadas limpias y `stores.vertical` disponible sin alterar los datos legacy existentes (`0 -> 0` porque la fase poblacional aún no se dispara productivamente).
+- **Rolback Plan:** Se documentó que para revertir bastaría restaurar el backup `pre-v11` con el nombre `rappi-deals.db` tras detener cualquier escritor activo de DealHunter, verificando la integridad posteriormente.
