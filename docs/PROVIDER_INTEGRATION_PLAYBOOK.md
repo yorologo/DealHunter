@@ -88,3 +88,10 @@ When automating alerts for a new provider:
 - **Idempotency Before Automation**: Before configuring a cron, replay the exact same run twice and assert `0` new duplicate alerts are generated.
 - **Scheduler Singleton Protection**: Enforce a strict OS-level lock (e.g. `flock`) so two crawlers never write to the DB simultaneously.
 - **Delivery Failure Isolation**: If the notification provider (e.g., Termux:API) crashes, the core crawler must gracefully continue and the database should track the failed delivery attempt.
+
+## Final Stage: Release Promotion Pipeline
+1. **RELEASE CANDIDATE (RC)**: Branch integration creates RC1.
+2. **OPERATIONAL SOAK**: The precise RC artifact is monitored in a live scheduled environment to guarantee no alert floods or memory leaks.
+3. **STABLE PROMOTION**: Only if soak passes, a clean metadata-only release commit promotes the software to stable.
+
+*Key Lesson:* Never develop new features on top of an unproven RC. Always preserve RC tags immutably, and revalidate the final stable commit before tagging.

@@ -1,6 +1,8 @@
 # Changelog
 
-## v3.0.0-rc1 - 2026-08-24
+## v3.0.0 - 2026-08-24
+
+*Primera release estable de la nueva integración Rappi (Phase 4 finalizada).* 
 
 ### Merchant Discovery
 - A5 primary CPG discovery
