@@ -187,10 +187,17 @@ async def _run_zone_inventory_async(config, lat, lng, conn, run_id, dry_run=Fals
 
     # Stores not seen in a full discovery should be marked STALE
     if global_state == "COMPLETED" and not dry_run:
-        c.execute('SELECT store_id FROM stores WHERE status = "ACTIVE"')
+        # A5 covers CPG only. Reconcile only CPG. Leave Restaurants untouched unless explicitly covered.
+        # So we only mark STALE if it is not a Restaurant.
+        c.execute('SELECT store_id, vertical, type FROM stores WHERE status = "ACTIVE"')
         for row in c.fetchall():
-            if row[0] not in seen_store_ids:
-                c.execute('UPDATE stores SET status = "STALE" WHERE store_id = ?', (row[0],))
+            sid = row[0]
+            vertical = row[1]
+            stype = row[2]
+            if sid not in seen_store_ids:
+                is_restaurant = (vertical == 'Restaurantes') or (stype == 'restaurants')
+                if not is_restaurant:
+                    c.execute('UPDATE stores SET status = "STALE" WHERE store_id = ?', (sid,))
         conn.commit()
 
     import json
