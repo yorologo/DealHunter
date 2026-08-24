@@ -11,7 +11,7 @@ from .output import print_results
 from .doctor import run_doctor, format_doctor_output
 from datetime import datetime
 
-VERSION = "2.9.1"
+VERSION = "3.0.0-rc1"
 LOCATION_CHANGE_WARNING_METERS = 500.0
 
 
