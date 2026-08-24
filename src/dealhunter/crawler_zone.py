@@ -174,12 +174,21 @@ async def _run_zone_inventory_async(config, lat, lng, conn, run_id, dry_run=Fals
             for kpid in all_known:
                 if kpid not in seen_products_in_store:
                     # Mark unavailable in observations
-                    c.execute('''INSERT OR IGNORE INTO observations
-                                 (run_id, store_id, product_id, price, original_price, stock, timestamp,
-                                 discount_price, discount_promotion, discount_effective, discount_source, promotion_type, promotion_label, query_term, availability)
-                                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
-                                 (run_id, s_id, kpid, 0, 0, 0, datetime.now().isoformat(),
-                                  0, 0, 0, "", "", "", "*", "UNAVAILABLE"))
+                    try:
+                        c.execute('''INSERT OR IGNORE INTO observations
+                                     (run_id, store_id, product_id, price, original_price, stock, timestamp,
+                                     discount_price, discount_promotion, discount_effective, discount_source, promotion_type, promotion_label, query_term, availability,
+                                     is_pro_exclusive, pro_price, limit_info)
+                                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
+                                     (run_id, s_id, kpid, 0, 0, 0, datetime.now().isoformat(),
+                                      0, 0, 0, "", "", "", "*", "UNAVAILABLE", 0, None, None))
+                    except Exception:
+                        c.execute('''INSERT OR IGNORE INTO observations
+                                     (run_id, store_id, product_id, price, original_price, stock, timestamp,
+                                     discount_price, discount_promotion, discount_effective, discount_source, promotion_type, promotion_label, query_term, availability)
+                                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
+                                     (run_id, s_id, kpid, 0, 0, 0, datetime.now().isoformat(),
+                                      0, 0, 0, "", "", "", "*", "UNAVAILABLE"))
             conn.commit()
 
         if not dry_run:

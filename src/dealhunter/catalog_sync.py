@@ -298,7 +298,7 @@ class CPGCatalogAdapter:
                     else:
                         existing = unique[pid]
                         
-                        promo_fields = ["real_price", "discount", "discount_effective", "discounts_bundle", "deal", "promotion_value", "units_condition"]
+                        promo_fields = ["real_price", "discount", "discount_effective", "discounts_bundle", "deal", "promotion_value", "units_condition", "is_prime_exclusive", "is_pro_exclusive", "PrimeDiscount", "complex_discounts"]
                         new_has_promo = any(i.get(f) for f in promo_fields)
                         ex_has_promo = any(existing.get(f) for f in promo_fields)
                         
@@ -435,7 +435,7 @@ class RestaurantMenuAdapter:
                     else:
                         existing = unique[pid]
                         
-                        promo_fields = ["real_price", "discount", "discount_effective", "discounts_bundle", "deal", "promotion_value", "units_condition"]
+                        promo_fields = ["real_price", "discount", "discount_effective", "discounts_bundle", "deal", "promotion_value", "units_condition", "is_prime_exclusive", "is_pro_exclusive", "PrimeDiscount", "complex_discounts"]
                         new_has_promo = any(i.get(f) for f in promo_fields)
                         ex_has_promo = any(existing.get(f) for f in promo_fields)
                         

@@ -4,7 +4,7 @@ import datetime
 import shutil
 import sys
 
-CURRENT_SCHEMA_VERSION = 11
+CURRENT_SCHEMA_VERSION = 12 if __import__('os').environ.get('DEALHUNTER_ENABLE_V12') == '1' else 11
 
 def get_default_db_path():
     return os.environ.get("RAPPI_DB_PATH", os.path.expanduser("~/rappi-deal-hunter/rappi-deals.db"))
@@ -181,6 +181,14 @@ def migrate(conn, db_path):
                 c.execute("ALTER TABLE product_memberships ADD COLUMN semantic_reason TEXT DEFAULT 'not_classified'")
             except sqlite3.OperationalError:
                 pass # Already exists
+
+        if version < 12:
+            try:
+                c.execute("ALTER TABLE observations ADD COLUMN is_pro_exclusive INTEGER DEFAULT 0")
+                c.execute("ALTER TABLE observations ADD COLUMN pro_price REAL")
+                c.execute("ALTER TABLE observations ADD COLUMN limit_info TEXT")
+            except sqlite3.OperationalError:
+                pass
 
         c.execute('UPDATE schema_version SET version = ?', (CURRENT_SCHEMA_VERSION,))
         conn.commit()

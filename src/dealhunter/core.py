@@ -101,7 +101,7 @@ def process_and_insert_product(p, run_id, s_id, s_name, config, q, conn, seen_in
         
     availability = "AVAILABLE" if is_in_stock else "UNAVAILABLE"
         
-    d_price, d_promo, d_eff, d_src, p_type, p_label, eff_price, eff_real = calculate_discount(p)
+    d_price, d_promo, d_eff, d_src, p_type, p_label, eff_price, eff_real, comm_extra = calculate_discount(p)
     
     if not matches_filters(pname, brand, s_name, cat, config, d_eff, p_type, eff_price):
         return False
@@ -173,9 +173,22 @@ def process_and_insert_product(p, run_id, s_id, s_name, config, q, conn, seen_in
                  WHERE store_id=? AND product_id=? AND last_seen != ?''', 
               (s_id, p_id, now))
     
-    c.execute('''INSERT OR IGNORE INTO observations (run_id, store_id, product_id, price, original_price, stock, timestamp, 
-                 discount_price, discount_promotion, discount_effective, discount_source, promotion_type, promotion_label, query_term, availability)
-                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''', 
-                 (run_id, s_id, p_id, eff_price, eff_real, stock_val, datetime.now().isoformat(), 
-                  d_price, d_promo, d_eff, d_src, p_type, p_label, q, availability))
+    # Dynamic insert to gracefully support v11 and v12
+    try:
+        c.execute('''INSERT OR IGNORE INTO observations (run_id, store_id, product_id, price, original_price, stock, timestamp, 
+                     discount_price, discount_promotion, discount_effective, discount_source, promotion_type, promotion_label, query_term, availability,
+                     is_pro_exclusive, pro_price, limit_info)
+                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''', 
+                     (run_id, s_id, p_id, eff_price, eff_real, stock_val, datetime.now().isoformat(), 
+                      d_price, d_promo, d_eff, d_src, p_type, p_label, q, availability,
+                      1 if comm_extra.get("is_pro_exclusive") else 0,
+                      comm_extra.get("pro_price"),
+                      str(comm_extra.get("limit")) if comm_extra.get("limit") is not None else None))
+    except Exception:
+        # Fallback for v11 DBs
+        c.execute('''INSERT OR IGNORE INTO observations (run_id, store_id, product_id, price, original_price, stock, timestamp, 
+                     discount_price, discount_promotion, discount_effective, discount_source, promotion_type, promotion_label, query_term, availability)
+                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''', 
+                     (run_id, s_id, p_id, eff_price, eff_real, stock_val, datetime.now().isoformat(), 
+                      d_price, d_promo, d_eff, d_src, p_type, p_label, q, availability))
     return True
