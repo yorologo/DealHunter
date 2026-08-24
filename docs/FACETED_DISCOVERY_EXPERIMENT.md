@@ -312,3 +312,10 @@ Si no aporta beneficio demostrable, no se incorpora.
 - **Previous logic:** Assumed that any `non-Restaurant` was covered by A5. This unsafe broad condition threatened stores out of A5's natural scope (like `liquor_store` limits or `rappimall_parent`).
 - **New logic:** `crawler_zone.py` now explicitly protects unsupported or tangentially supported verticals. A store is marked `STALE` only if it belongs to a verified covered type (`market`, `chiper_home`, `chiper_extended`, `express_parent`, `pets_cpgs`, `Farmatodo`).
 - **Clarification:** `A5_SCOPE_COMPLETE != ALL_NON_RESTAURANT_COMPLETE`. A5 completes its specific CPG subset safely without polluting legacy restaurants, malls, or liquor stores outside its local payload radius.
+
+## Phase 4B.4: Commercial Promotion Intelligence
+- Added parsing for `percentage_unit` and `progressive` discounts.
+- Added extraction for `is_pro_exclusive`, `is_prime_exclusive`, and `PrimeDiscount`.
+- Commercial merges are now order-independent (e.g., if NxM and progressive both exist on a product, the best is evaluated).
+- `rappi-deals.db` remains strictly at v11 to avoid production migration. Test environments safely migrate to v12 (`DEALHUNTER_ENABLE_V12=1`) to assert column extraction.
+- Documentation created at `docs/PROMOTION_MODEL.md`.
