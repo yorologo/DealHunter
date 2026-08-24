@@ -80,7 +80,15 @@
 </div>
 
 <div id="catalog-grid">
-    {% include 'partials/catalog_grid.html' %}
+    {% if detail.products == 0 %}
+        <div class="alert alert-warning text-center py-5 shadow-sm border-0">
+            <div class="fs-1 mb-3">📭</div>
+            <h4>Esta tienda aún no tiene datos suficientes</h4>
+            <p class="text-secondary mb-0">Es posible que sea un restaurante (o un vertical no soportado) y no haya sido rastreado en detalle, o el último crawl fue parcial. Ejecuta una captura específica para obtener datos.</p>
+        </div>
+    {% else %}
+        {% include 'partials/catalog_grid.html' %}
+    {% endif %}
 </div>
 
 {% endblock %}

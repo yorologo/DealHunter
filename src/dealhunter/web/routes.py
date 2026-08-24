@@ -175,8 +175,9 @@ def register_routes(app):
     @app.route('/stores')
     def stores():
         db_path = current_app.config['DATABASE']
-        stores_list = get_stores(db_path)
-        return render_template('stores.html', stores=stores_list, current_path='/stores')
+        show_all = request.args.get('all', '0') == '1'
+        stores_list = get_stores(db_path, hide_empty=not show_all)
+        return render_template('stores.html', stores=stores_list, current_path='/stores', show_all=show_all)
         
     @app.route('/stores/<store_id>')
     def store_detail(store_id):

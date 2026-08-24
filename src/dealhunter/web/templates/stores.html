@@ -7,7 +7,16 @@
   </ol>
 </nav>
 
-<h3 class="fw-bold mb-4">🏪 Tiendas</h3>
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h3 class="fw-bold m-0">🏪 Tiendas</h3>
+    <div>
+        {% if show_all %}
+            <a href="/stores" class="btn btn-sm btn-primary">Ocultar tiendas vacías</a>
+        {% else %}
+            <a href="/stores?all=1" class="btn btn-sm btn-outline-secondary">Mostrar todas ({{ stores|length }} activas)</a>
+        {% endif %}
+    </div>
+</div>
 
 <div class="row row-cols-1 row-cols-sm-2 row-cols-md-3 row-cols-lg-4 g-4">
     {% for store in stores %}
