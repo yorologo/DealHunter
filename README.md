@@ -17,9 +17,9 @@ DealHunter es un motor local-first de inteligencia de precios y oportunidades or
 
 ## Estado Actual
 
-- **Versión**: `v2.9.5`
-- **Schema DB**: `9`
-- **Tests**: `308 passed`
+- **Versión**: `v3.0.0-rc2`
+- **Schema DB**: `14`
+- **Tests**: `393 passed`
 - **Integración API**: 0 endpoints bloqueados, fallback local en diagnósticos.
 
 ### Experiencia Web
@@ -111,7 +111,7 @@ Para mantener DealHunter Web activo en Android/Termux, DealHunter adquiere el `t
 DealHunter Phase 4I supports automated background execution and push notifications via `termux-notification`.
 See [docs/SCHEDULER.md](docs/SCHEDULER.md) for instructions on setting up `cron`, configuring the DealWatcher, and managing Termux battery optimizations.
 
-## DealHunter v3.0.0-rc1 
+## DealHunter v3.0.0-rc2 
 
 DealHunter has evolved to **schema v14**.
 

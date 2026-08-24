@@ -47,13 +47,14 @@
 - **Universal Extraction Contract**: Refactorizado el parser de catálogos y menús de Rappi en `CPGCatalogAdapter` y `RestaurantMenuAdapter`. La nueva búsqueda recursiva (`is_product`) detecta estructuralmente cualquier producto válido en todo el árbol JSON (aisles, components, fallback), eliminando el 100% de los falsos *parser misses* reportados.
 - **CSR Bypass**: Se fuerza la carga de SSR inicial mediante `?csr=false` para cadenas masivas como City Market y Farmacias Benavides.
 - **Unavailable Detection**: El crawler detecta y clasifica correctamente redirecciones como `tipo/market` o `restaurantNotFound` marcando los stores como `LEGITIMATE_EMPTY` o `UNAVAILABLE`.
+- Corrección del `RestaurantMenuAdapter` confirmada mediante validación End-to-End para extraer correctamente los menús de restaurantes como Popeyes y Popeyes Turbo sin fallar ni omitir productos.
+- Mejoras a la observabilidad en la página de detalle de Run: se reporta por separado el número de tiendas procesadas vs los productos insertados vs las tiendas fallidas/saltadas.
+- Integración de `run_metadata` en SQLite para registrar internamente estadísticas detalladas de descubrimiento (merchants discovered, attempted, completed, failed, y requests generadas).
+- Sistema de automatización diaria (Daily Sweep) programable a las 10:00 a.m., integrado con `cron` y la interfaz Web (Catalog Sync), e implementando bloqueos (`flock`) para evitar concurrencia.
 
-
-
-## v2.9.4 (Unreleased)
+## v2.9.4 - 2026-08-22
 
 Patch release enfocado en la estabilización de la interfaz de administración web y comportamiento del crawler asíncrono:
-
 - La página de detalle del run (Run Detail) muestra el modo del crawler de forma explícita y su nivel de cobertura.
 - Se implementó HTMX para refrescar la lista de ejecuciones y el detalle automáticamente cada 3 a 5 segundos mientras el crawler está activo.
 - Se previenen ejecuciones múltiples simultáneas del crawler web (`double-submit` a nivel servidor y JS).
@@ -63,15 +64,6 @@ Patch release enfocado en la estabilización de la interfaz de administración w
 - Mejor manejo del token CSRF con un mensaje claro humano para errores CSRF genuinos (y preservando otros errores HTTP 400).
 - Fallback a redirección HTTP normal cuando las peticiones como la creación de runs o syncs provienen de clientes que no envían cabeceras de HTMX.
 - Corregida etiqueta de métricas a "Tiendas conocidas en inventario" para clarificar semántica vs tiendas descubiertas.
-
-## v2.9.5 (Unreleased)
-
-Patch release enfocado en la validación del problema de Popeyes y la transparencia del inventario:
-
-- Corrección del `RestaurantMenuAdapter` confirmada mediante validación End-to-End para extraer correctamente los menús de restaurantes como Popeyes y Popeyes Turbo sin fallar ni omitir productos.
-- Mejoras a la observabilidad en la página de detalle de Run: se reporta por separado el número de tiendas procesadas vs los productos insertados vs las tiendas fallidas/saltadas.
-- Integración de `run_metadata` en SQLite para registrar internamente estadísticas detalladas de descubrimiento (merchants discovered, attempted, completed, failed, y requests generadas).
-- Sistema de automatización diaria (Daily Sweep) programable a las 10:00 a.m., integrado con `cron` y la interfaz Web (Catalog Sync), e implementando bloqueos (`flock`) para evitar concurrencia.
 
 ## v2.9.3
 
