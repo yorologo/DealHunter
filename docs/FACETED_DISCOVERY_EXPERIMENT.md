@@ -255,3 +255,10 @@ Si no aporta beneficio demostrable, no se incorpora.
 - **Validación 1 (Sushi Central - Aviación):** Con `expected_store_id="1923201805"` devolvió exitosamente `MATCH_EXACT_STORE_ID` con su metadata real (`parent_store_type=restaurants`, `vertical_sub_group=restaurants`), ausente de categories/tags por defecto de la plataforma. Costo: 1 HTTP Request.
 - **Validación 2 (Turbo Market):** Con `expected_store_id="1930266218"` devolvió `NOT_FOUND`, demostrando que el fallback para falsos positivos o comercios cerrados corta la ejecución sin disparar "Adaptive Modes" perjudiciales a la cuota. Costo: 1 HTTP Request.
 - **Conclusión:** Se comprobó cero mutación de DB (`SHA256_BEFORE == SHA256_AFTER`), total autonomía funcional, sin side-effects negativos sobre la DB, preservación total del metadata y un performance de red estrictamente controlado.
+
+## Phase 4B.2b.1 — Pre-write normalization + CPG target gate
+
+- **Normalización de Metadata (Sushi Central):** Se comprobó offline que el flujo de inserción real traduce correctamente la metadata raw de Rappi (`vertical_sub_group="restaurants"`) hacia nuestro catálogo canónico como `stores.vertical="Restaurantes"`, demostrando que `discover_targeted()` extrae correctamente la información sin duplicar la lógica de persistencia.
+- **Resolución CPG Positiva (City Market):** Dado que el ID anterior de Turbo resultó obsoleto (stale target), se utilizó 1 HTTP request dirigida para aislar "City Market" (`id=990006029`). Retornó `MATCH_EXACT_STORE_ID`, exponiendo `vertical_sub_group="Super"`, que el pipeline convierte exitosamente en `stores.vertical="Super"`.
+- **Integridad DB:** Se probaron todas las simulaciones offline/en-memoria garantizando 0 mutaciones en la DB productiva (SHA256 idéntico antes y después, `DELTA=0` en las tablas).
+- **Decisión:** La primitiva `discover_targeted` y el pipeline de normalización están en perfecto estado de conexión. Autorizado el primer write productivo (Phase 4B.2c).
