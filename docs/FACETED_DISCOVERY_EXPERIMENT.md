@@ -248,3 +248,10 @@ Si no aporta beneficio demostrable, no se incorpora.
 - **Fallbacks:** Si no encuentra la tienda por nombre o ID, retorna explícitamente `NOT_FOUND` sin disparar ningún modo adaptativo, aislando el budget a 1 HTTP Request garantizada.
 - **Compatibilidad:** Los modos existentes (`NORMAL`, `DEEP`, `FULL`) funcionan sin modificaciones. El nuevo método es exclusivamente para consumos programáticos.
 - **Validación:** Completada offline mediante tests mockeados. Suite pasó con éxito (`353 passed`).
+
+## Phase 4B.2b — Live TARGETED validation
+
+- **Objetivo:** Validar en entorno productivo real, respetando un estricto presupuesto de 2 peticiones HTTP, la efectividad del nuevo mecanismo de descubrimiento por objetivo.
+- **Validación 1 (Sushi Central - Aviación):** Con `expected_store_id="1923201805"` devolvió exitosamente `MATCH_EXACT_STORE_ID` con su metadata real (`parent_store_type=restaurants`, `vertical_sub_group=restaurants`), ausente de categories/tags por defecto de la plataforma. Costo: 1 HTTP Request.
+- **Validación 2 (Turbo Market):** Con `expected_store_id="1930266218"` devolvió `NOT_FOUND`, demostrando que el fallback para falsos positivos o comercios cerrados corta la ejecución sin disparar "Adaptive Modes" perjudiciales a la cuota. Costo: 1 HTTP Request.
+- **Conclusión:** Se comprobó cero mutación de DB (`SHA256_BEFORE == SHA256_AFTER`), total autonomía funcional, sin side-effects negativos sobre la DB, preservación total del metadata y un performance de red estrictamente controlado.
