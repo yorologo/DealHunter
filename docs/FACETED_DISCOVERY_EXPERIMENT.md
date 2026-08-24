@@ -269,3 +269,10 @@ Si no aporta beneficio demostrable, no se incorpora.
 - **Resolución Canonical (KISS):** Se confirmó de forma offline la equivalencia conceptual entre los RAW values "Market" y "Super". Se añadió el alias explícito (`v_lower == "super"`) en el helper canónico de `crawler_zone.py`. 
 - **Preservación RAW:** La primitiva `discover_targeted()` sigue devolviendo intacto `vertical_sub_group=Super`. La traducción a "Supermercado" se ejecuta de forma exclusiva al insertar el registro en SQLite (`stores.vertical`).
 - **Simulación Exitosa:** El fix se validó 100% offline (0 peticiones HTTP). El merchant de City Market termina ahora con `stores.vertical = Supermercado` y Sushi Central con `Restaurantes`. El schema v11 permaneció intacto.
+
+## Phase 4B.2c — First controlled production Faceted write
+
+- **Mecanismo:** Piloto controlado sobre la base de datos de producción (schema v11). Se aislaron exactamente dos tiendas (Sushi Central y City Market) usando la primitiva `discover_targeted()`.
+- **Read-before-write:** El ciclo consumió un presupuesto estricto de 4 HTTP requests, descargando la metadata y catálogos completos en memoria, y comprobando la inexistencia de *root leaks* o excepciones antes de autorizar las escrituras.
+- **Normalización y Persistencia:** La capa canónica funcionó impecablemente, asignando `Restaurantes` y `Supermercado` de forma precisa, y persistiendo un total de 230 membresías sin mutar ni afectar a los 867 stores restantes de la base de datos (Scope audit: 100% aislado).
+- **Resultados:** `stores.vertical` fue exitosamente activado con datos reales. Las relaciones de productos fueron poblando la nueva tabla de `product_memberships`. Las consultas probadas respondieron de forma performante (<15ms) sin necesidad de reindexación inmediata. El baseline de 354 tests se mantuvo verde (cero regresiones funcionales) y las revisiones de integridad SQLite pasaron en limpio. La validación end-to-end de la migración y la captura adaptada queda certificada.
