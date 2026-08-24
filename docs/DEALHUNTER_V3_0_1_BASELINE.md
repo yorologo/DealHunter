@@ -2,9 +2,9 @@
 
 ## METADATA
 - **VERSION**: v3.0.1
-- **COMMIT**: (will be set during release)
+- **COMMIT**: 4f270876bf41edd26ec1f96c830350e91b49baa3
 - **TAG**: v3.0.1
-- **CI RUN**: (to be recorded)
+- **CI RUN**: 32778166523
 - **SCHEMA**: 14
 - **TEST COUNT**: 395 passed
 
