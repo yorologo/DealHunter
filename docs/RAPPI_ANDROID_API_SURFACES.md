@@ -313,3 +313,20 @@ Likely noise or low priority: Flutter `/v3/orders/products?`, payment `v1/mercha
 - **Usefulness**: Unknown.
 - **Limitations**: The exact JSON contract is complex and requires undocumented fields (likely context vectors or device descriptors).
 - **Recommended Role**: Stick to Web fallback or `unified-search` for store resolution until contract is proven.
+
+## Phase 4B.3E Deep Validation Updates
+
+**A5: GET api/dynamic/context/stores**
+- **Contract Reconstructed**: Requires HTTP Header `Accept-Language: es-MX`. Also expects `lat` and `lng` as query parameters.
+- **Validation**: SUCCESS (HTTP 200).
+- **Value**: CONFIRMED_HIGH_VALUE. It returns all CPG stores for the current zone in a single request, grouped by categories (Supermercados, Mascotas, Express, Farmacias, etc.).
+- **Recommended Role**: This should replace `unified-search` for CPG store discovery, reducing discovery requests from ~30 down to 1.
+
+**D1: POST api/cpgs/search/v2/store/{store_id}/products**
+- **Contract Reconstructed**: Requires a non-empty `query` and `size` in the JSON payload.
+- **Validation**: SUCCESS (HTTP 200 for valid queries like "coca cola").
+- **Value**: CONFIRMED_LOW_VALUE for full ingestion. Useful only for TARGETED_PRODUCT_SEARCH.
+
+**B1: POST /api/dynamic/context/resolve**
+- **Contract Reconstructed**: The `state` object must contain `store_id`, `lat`, `lng`. But it still returns HTTP 400 demanding valid `component`, `limit` and `offset` configurations that we cannot easily guess.
+- **Value**: CONTRACT_UNRESOLVED.
