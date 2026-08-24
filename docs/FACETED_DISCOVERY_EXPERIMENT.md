@@ -210,3 +210,14 @@ Si no aporta beneficio demostrable, no se incorpora.
 - **Ciclo de vida en Upsert:** Las filas son re-clasificadas dinámicamente en cada observación. Un membership catalogado como `UNKNOWN` transitará a `CATEGORY` en cuanto el payload provea evidencia fuerte del proveedor. Del mismo modo, retornará a `UNKNOWN` si la evidencia desaparece, garantizando reproducibilidad continua sin estados "zombies".
 - **Multi-membership y Colecciones:** Un solo producto puede poseer simultáneamente relaciones `CATEGORY` (ej. "Cervezas") y `COLLECTION` (ej. "Ofertas"). El clasificador opera individualmente por cada relación `product_id -> membership`. Si ocurre un conflicto de evidencia (por ejemplo, una sección llamada "Ofertas" intentando catalogarse erróneamente como category root), se cataloga protectoramente como `UNKNOWN` con razón `conflicting_evidence`. 
 - **Compatibilidad Legacy:** La taxonomía legacy (`products.category`, `stores.vertical`, heurísticas legacy, etc.) permanece intacta sin modificaciones, cumpliendo con la regla de transición conservadora dictada para este experimento.
+
+## Phase 4A — Isolated live v11 population
+
+- **DB Aislada:** Se creó una copia temporal de `rappi-deals.db` en un directorio separado. La DB de producción permaneció intacta y su SHA256 se validó idéntico al iniciar y finalizar la prueba.
+- **Muestra y Requests:** Se analizaron 4 sucursales (Velma Box, City Market, Turbo, Farmacias Benavides) en un entorno offline-first y acotado. Total HTTP requests utilizadas: 4.
+- **Verticales y Facets:** Las variables de facetas y tipo (`type`) de tienda se mantuvieron legadas (ej. `restaurants`, `market`, `chiper_extended`, `Farmatodo`) y accesibles para las consultas.
+- **Distribución Semántica:** De 339 relaciones "membership" extraídas en la muestra, 15 fueron clasificadas como `CATEGORY`, 30 como `COLLECTION` (ej. "Ofertas") y 294 con default seguro a `UNKNOWN` (todas por `insufficient_evidence`). Ninguna clasificación devolvió `conflicting_evidence`. Las filas heredadas pasaron de `not_classified` a ser clasificadas correctamente usando datos actuales.
+- **Deals:** La lógica promocional no fue impactada. Se detectaron al menos 10 promociones `discount_effective >= 50%` en la muestra y 1 evento `NxM`. Las métricas comerciales (`price`, `real_price`, `discount`) de los "golden deals" de validación (ej. California especial a $63) se mantuvieron consistentes.
+- **Consultas (Queries):** Las consultas cruzadas Facetadas (ej. "Vertical = Turbo AND semantic_type = COLLECTION AND raw_name = Ofertas") generaron planes de ejecución efectivos y retornaron resultados con precisión.
+- **Performance:** Las consultas demoraron menos de 1ms de ejecución end-to-end; no requieren índices agregados en esta fase y la tabla combinada funciona ágilmente gracias al diseño N:M normalizado de Schema V11. 
+- **Producción Intacta:** Completamente validada.
