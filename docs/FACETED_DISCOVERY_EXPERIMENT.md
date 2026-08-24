@@ -286,3 +286,11 @@ Si no aporta beneficio demostrable, no se incorpora.
   - **CPG/Supermercados**: La lista `aisles_tree_response` expone explícitamente los pasillos.
 - **Mejoras descubiertas**: El JSON incluye explícitamente el stock, el `pum` (precio unitario), `discounts_bundle` (para ofertas NxM / Pro), y deeplinks a Android. Además, la web resuelve IDs obsoletos (como el de Turbo) a sus representaciones actuales de forma inmediata.
 - **Conclusión**: La web es altamente valiosa para validar y transformar los nodos de taxonomía `UNKNOWN` a `CATEGORY`. No debe reemplazar al crawler Android, sino actuar como oráculo secundario con 0 requests adicionales a las necesarias, sin riesgo para el crawler base.
+
+## Phase 4B.3D-A — Android Call Surface Discovery
+
+- **Alcance:** inventario exclusivamente estático de la APK Android de Rappi (`8.36.20260806-88868`), su código nativo DEX, manifest, recursos, `libapp.so`, assets Flutter y el uso actual en DealHunter. No se probaron endpoints, no se hicieron requests directas, no hubo navegación dinámica y no se modificó la base de datos.
+- **Resultado:** 41 superficies accionables documentadas, más 2 señales separadas como probable ruido. DealHunter ya usa 2, usa parcialmente 7 y no usa 32.
+- **Hallazgos principales:** contratos explícitos para unified search, búsqueda CPG por tienda, enumeración/resolución de tiendas, store configuration, guided search, offers, Prime exclusive products, stockout y recomendaciones; superficies/modelos claros para aisle/category/corridor, product detail, `pum`, stock, `discounts.prime`, `discounts_bundle`, global offers y deeplinks.
+- **Límite de evidencia:** el surface de Product Detail está confirmado pero su endpoint Market dedicado permanece `UNKNOWN`; Turbo/chiper está confirmado como surface/tipo pero no se encontró un endpoint de catálogo exclusivamente Turbo.
+- **Inventario completo:** `docs/RAPPI_ANDROID_API_SURFACES.md`.
