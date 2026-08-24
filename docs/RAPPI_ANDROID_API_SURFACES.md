@@ -287,3 +287,29 @@ No validation was performed here. If a separately authorized read-only validatio
 10. L1/L2 recommendations: useful only after core catalog/detail coverage is understood.
 
 Likely noise or low priority: Flutter `/v3/orders/products?`, payment `v1/merchants/`, recent-search history, banner surfaces, payment-method discounts, Prime subscription writes, and category-restriction UI calls.
+
+## Phase 4B.3D-B1 Validation Results
+
+**D1: POST api/cpgs/search/v2/store/{store_id}/products**
+- **Validation Status**: NEEDS_MORE_CONTRACT_INFO / CONFIRMED_LOW_VALUE
+- **Actual Request Behavior**: Requires a non-empty `query` and `size` parameter. Empty queries return HTTP 400 "Keyword Empty". Wildcards like `*` return empty product arrays. 
+- **Fields Observed**: N/A (requires valid keyword to return items).
+- **Usefulness**: Very low for DealHunter's ingestion. It cannot dump a full catalog, acting strictly as an in-store text search.
+- **Limitations**: Impossible to perform a 1-request full catalog sweep.
+- **Recommended Role**: Ignore for Inventory mode. Web SSR (`catalog_sync.py`) remains the vastly superior oracle for dumping CPG catalogs.
+
+**A5: GET api/dynamic/context/stores**
+- **Validation Status**: NEEDS_MORE_CONTRACT_INFO
+- **Actual Request Behavior**: HTTP 400 with `Invalid Parameters : [language]`.
+- **Fields Observed**: N/A
+- **Usefulness**: Unknown until the precise Android headers or query string parameters (language, country, app version) are reverse-engineered.
+- **Limitations**: Cannot be invoked safely without guessing parameters.
+- **Recommended Role**: Pending deeper reverse engineering (APK inspection).
+
+**B1: POST /api/dynamic/context/resolve**
+- **Validation Status**: NEEDS_MORE_CONTRACT_INFO
+- **Actual Request Behavior**: HTTP 500 Internal Server Error with payload `{"lat": lat, "lng": lng, "store_id": "..."}`.
+- **Fields Observed**: N/A
+- **Usefulness**: Unknown.
+- **Limitations**: The exact JSON contract is complex and requires undocumented fields (likely context vectors or device descriptors).
+- **Recommended Role**: Stick to Web fallback or `unified-search` for store resolution until contract is proven.

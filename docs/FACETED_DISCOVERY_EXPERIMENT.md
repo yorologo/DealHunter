@@ -294,3 +294,8 @@ Si no aporta beneficio demostrable, no se incorpora.
 - **Hallazgos principales:** contratos explícitos para unified search, búsqueda CPG por tienda, enumeración/resolución de tiendas, store configuration, guided search, offers, Prime exclusive products, stockout y recomendaciones; superficies/modelos claros para aisle/category/corridor, product detail, `pum`, stock, `discounts.prime`, `discounts_bundle`, global offers y deeplinks.
 - **Límite de evidencia:** el surface de Product Detail está confirmado pero su endpoint Market dedicado permanece `UNKNOWN`; Turbo/chiper está confirmado como surface/tipo pero no se encontró un endpoint de catálogo exclusivamente Turbo.
 - **Inventario completo:** `docs/RAPPI_ANDROID_API_SURFACES.md`.
+
+### Android Priorities Validation (Phase 4B.3D-B1)
+- **D1 (CPG Products V2)**: Fails to dump full catalogs without a keyword. Classified as `CONFIRMED_LOW_VALUE` for ingestion.
+- **A5 (Context Stores)** & **B1 (Context Resolve)**: Both return 400/500 HTTP errors due to undocumented parameters (e.g., `language`). Classified as `NEEDS_MORE_CONTRACT_INFO`.
+- **Decision**: No immediate Android replacements for discovery/ingestion. Current methods (`unified-search` and Web SSR) remain the optimal stable paths.
