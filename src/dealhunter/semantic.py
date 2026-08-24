@@ -20,7 +20,7 @@ def normalize_name(name: str) -> str:
         return ""
     return re.sub(r'\s+', ' ', name).strip().casefold()
 
-def classify_membership(membership_raw_name: str, product_category: str, product_category_source: str) -> Tuple[str, str]:
+def classify_membership(membership_raw_name: str, product_category: str, product_category_source: str, raw_type: str = "") -> Tuple[str, str]:
     """
     Classifies a single membership conservatively based on provided evidence.
     Returns: (SEMANTIC_TYPE, reason)
@@ -29,7 +29,14 @@ def classify_membership(membership_raw_name: str, product_category: str, product
     if not norm_name:
         return UNKNOWN, "empty_name"
 
+
+    if raw_type == "generic":
+        return CATEGORY, "web_exact_category_id"
+    if raw_type in ["seasonal", "collection_view"]:
+        return COLLECTION, "web_exact_collection_id"
+
     # Evidence for CATEGORY: product official category matches the membership name
+
     is_cat = False
     if product_category_source in ("provider", "rappi") and product_category:
         norm_product_cat = normalize_name(product_category)

@@ -272,9 +272,13 @@ class CPGCatalogAdapter:
                                 
                             new_ancestors = list(ancestors)
                             if is_container and cat_name:
+                                final_type = d.get("aisle_type", cat_type if cat_type else "unknown")
+                                if "view_config" in d:
+                                    final_type = "collection_view"
+                                
                                 anc_node = {
                                     "raw_name": cat_name,
-                                    "raw_type": cat_type if cat_type else "unknown",
+                                    "raw_type": final_type,
                                     "raw_id": d.get("id", d.get("corridor_id", d.get("aisle_id", None))),
                                     "source": "provider",
                                     "path": [a["raw_name"] for a in ancestors] + [cat_name]
@@ -409,9 +413,13 @@ class RestaurantMenuAdapter:
                                 
                             new_ancestors = list(ancestors)
                             if is_container and cat_name:
+                                final_type = d.get("aisle_type", cat_type if cat_type else "unknown")
+                                if "view_config" in d:
+                                    final_type = "collection_view"
+                                
                                 anc_node = {
                                     "raw_name": cat_name,
-                                    "raw_type": cat_type if cat_type else "unknown",
+                                    "raw_type": final_type,
                                     "raw_id": d.get("id", d.get("corridor_id", d.get("aisle_id", None))),
                                     "source": "provider",
                                     "path": [a["raw_name"] for a in ancestors] + [cat_name]

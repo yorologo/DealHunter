@@ -157,7 +157,7 @@ def process_and_insert_product(p, run_id, s_id, s_name, config, q, conn, seen_in
         raw_id = str(m.get("raw_id", ""))
         path_str = json.dumps(m.get("path", []))
         # Re-classify membership on every observation
-        stype, sreason = classify_membership(raw_name, cat, cat_source)
+        stype, sreason = classify_membership(raw_name, cat, cat_source, raw_type)
         
         c.execute('''INSERT INTO product_memberships
                      (store_id, product_id, raw_type, raw_name, raw_id, path, source, last_seen, semantic_type, semantic_reason)
