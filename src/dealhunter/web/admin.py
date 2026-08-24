@@ -186,8 +186,12 @@ def runs_start():
 
         cfg = load_config()
         loc = cfg.get("location", {})
-        lat = loc.get("lat", 19.4326) if isinstance(loc, dict) else 19.4326
-        lng = loc.get("lng", -99.1332) if isinstance(loc, dict) else -99.1332
+        if not isinstance(loc, dict) or "lat" not in loc or "lng" not in loc:
+            conn.close()
+            return "Ubicación (lat/lng) no configurada. Edite su configuración (config.toml) local primero.", 400
+            
+        lat = loc["lat"]
+        lng = loc["lng"]
 
         c.execute('''INSERT INTO runs (run_id, started_at, lat, lng, radius, status)
                      VALUES (?, CURRENT_TIMESTAMP, ?, ?, ?, 'RUNNING')''',

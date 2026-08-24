@@ -33,7 +33,7 @@
                     <div class="fs-4 fw-bold text-success lh-1">${{ "%.2f"|format(p.current_price) }}</div>
                     {% set op = p.metrics.original_price if p.metrics else None %}
                     {% if op and op > p.current_price %}
-                        <div class="fs-6 text-decoration-line-through text-secondary mt-1">~${{ "%.2f"|format(op) }}~
+                        <div class="fs-6 text-decoration-line-through text-secondary mt-1">${{ "%.2f"|format(op) }}
                         {% if p.metrics and p.metrics.is_suspicious_reference %}
                             <span class="badge bg-warning text-dark border ms-1" title="Precio original sospechoso">⚠️</span>
                         {% endif %}

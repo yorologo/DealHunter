@@ -467,16 +467,21 @@ def get_categories(db_path):
     conn.close()
     return cats
     
-def get_stores(db_path):
+def get_stores(db_path, hide_empty=True):
+    import sqlite3
     conn = sqlite3.connect(db_path)
     c = conn.cursor()
-    c.execute('''
-        SELECT s.store_id, s.name, s.type, COUNT(DISTINCT p.product_id)
+    query = '''
+        SELECT s.store_id, s.name, s.type, COUNT(DISTINCT p.product_id) as prod_count
         FROM stores s
         LEFT JOIN products p ON s.store_id = p.store_id
         GROUP BY s.store_id
-        ORDER BY s.name ASC
-    ''')
+    '''
+    if hide_empty:
+        query += ' HAVING prod_count > 0'
+    query += ' ORDER BY s.name ASC'
+    
+    c.execute(query)
     stores = [{"store_id": r[0], "name": r[1], "type": r[2], "products": r[3]} for r in c.fetchall()]
     conn.close()
     return stores
@@ -531,7 +536,10 @@ def get_restaurants_home(db_path):
         LEFT JOIN observations o ON p.product_id = o.product_id AND p.store_id = o.store_id
         WHERE s.type = 'restaurants'
         GROUP BY s.store_id
-        ORDER BY s.name ASC
+        '
+    if hide_empty:
+        query += ' HAVING COUNT(DISTINCT p.product_id) > 0'
+    query += ' ORDER BY s.name ASC
     ''')
     
     stores = []
