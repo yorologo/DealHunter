@@ -21,7 +21,7 @@ def db_conn():
     c.execute('''CREATE TABLE observations (id INTEGER PRIMARY KEY, run_id TEXT, store_id TEXT, product_id TEXT, 
                  price REAL, original_price REAL, stock INTEGER, timestamp DATETIME, discount_price REAL, 
                  discount_promotion REAL, discount_effective REAL, discount_source TEXT, promotion_type TEXT, 
-                 promotion_label TEXT, query_term TEXT, availability TEXT, UNIQUE(run_id, store_id, product_id))''')
+                 promotion_label TEXT, query_term TEXT, availability TEXT, has_pro_offer INTEGER DEFAULT 0, pro_price REAL, pro_discount_effective REAL, limit_info TEXT, UNIQUE(run_id, store_id, product_id))''')
     conn.commit()
     return conn
 

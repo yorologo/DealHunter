@@ -56,8 +56,11 @@ def calculate_discount(p):
 
     if bundle and bundle.get("deal"):
         for deal in bundle["deal"]:
-            p_val = float(deal.get("promotion_value") or 0)
-            u_cond = float(deal.get("units_condition") or 0)
+            try:
+                p_val = float(deal.get("promotion_value") or 0)
+                u_cond = float(deal.get("units_condition") or 0)
+            except (ValueError, TypeError):
+                continue
             if p_val > 0 and u_cond > 0 and p_val > u_cond:
                 d = (1 - (u_cond / p_val)) * 100.0
                 is_pro = deal.get("is_pro_exclusive") or deal.get("is_prime_exclusive") or False
@@ -73,8 +76,11 @@ def calculate_discount(p):
 
     if bundle and bundle.get("percentage_unit"):
         for deal in bundle["percentage_unit"]:
-            p_val = float(deal.get("promotion_value") or 0)
-            u_cond = float(deal.get("units_condition") or 0)
+            try:
+                p_val = float(deal.get("promotion_value") or 0)
+                u_cond = float(deal.get("units_condition") or 0)
+            except (ValueError, TypeError):
+                continue
             if p_val > 0 and u_cond > 0:
                 total_cost = (u_cond - 1) + (1.0 - (p_val / 100.0))
                 d = (1 - (total_cost / u_cond)) * 100.0
