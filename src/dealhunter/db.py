@@ -4,7 +4,7 @@ import datetime
 import shutil
 import sys
 
-CURRENT_SCHEMA_VERSION = 12 if __import__('os').environ.get('DEALHUNTER_ENABLE_V12') == '1' else 11
+CURRENT_SCHEMA_VERSION = 12
 
 def get_default_db_path():
     return os.environ.get("RAPPI_DB_PATH", os.path.expanduser("~/rappi-deal-hunter/rappi-deals.db"))
@@ -183,7 +183,7 @@ def migrate(conn, db_path):
                 pass # Already exists
 
         if version < 12:
-            c.execute("ALTER TABLE observations ADD COLUMN has_pro_offer INTEGER DEFAULT 0")
+            c.execute("ALTER TABLE observations ADD COLUMN has_pro_offer INTEGER DEFAULT NULL")
             c.execute("ALTER TABLE observations ADD COLUMN pro_price REAL")
             c.execute("ALTER TABLE observations ADD COLUMN pro_discount_effective REAL")
             c.execute("ALTER TABLE observations ADD COLUMN limit_info TEXT")

@@ -326,3 +326,10 @@ Si no aporta beneficio demostrable, no se incorpora.
 - Extracted `has_pro_offer`, `pro_price`, `pro_discount_effective` for independent filtering.
 - Prevented Pro-exclusive promotions (>=50%) from inflating public Deal Scores.
 - Replaced schema migration SQL-error fallbacks with deterministic `CURRENT_SCHEMA_VERSION` checks.
+
+## Phase 4B.4.2: Production Schema V12 Migration
+- Formalized `CURRENT_SCHEMA_VERSION = 12`, removing `DEALHUNTER_ENABLE_V12`.
+- Maintained legacy `UNKNOWN` logic via `has_pro_offer INTEGER DEFAULT NULL`.
+- Safely migrated production database (pre-v12 hashed safely to backup).
+- DB integrity and test coverage maintained perfectly (369 tests).
+- Ready for Phase 4C backend/frontend enhancements.

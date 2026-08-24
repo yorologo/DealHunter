@@ -20,6 +20,8 @@ Multiple promotions can exist on the same product (e.g. a 3x2 deal AND a 50% sec
 
 ## Persistence (Schema v12)
 
+*Note: Schema V12 is now fully active in production. `has_pro_offer = NULL` represents legacy unclassified observations. `0` means verified no Pro offer, `1` means verified Pro offer.*
+
 The `observations` table supports SQL-level filtering via:
 - `is_pro_exclusive` (INTEGER)
 - `pro_price` (REAL)
