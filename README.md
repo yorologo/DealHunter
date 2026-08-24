@@ -110,3 +110,16 @@ Para mantener DealHunter Web activo en Android/Termux, DealHunter adquiere el `t
 ## Automated Alerts
 DealHunter Phase 4I supports automated background execution and push notifications via `termux-notification`.
 See [docs/SCHEDULER.md](docs/SCHEDULER.md) for instructions on setting up `cron`, configuring the DealWatcher, and managing Termux battery optimizations.
+
+## DealHunter v3.0.0-rc1 
+
+DealHunter has evolved to **schema v14**.
+
+### Key Features
+- **A5** endpoint for primary CPG discovery with safe fallback.
+- **Faceted Taxonomy** with M:N memberships (CATEGORY/COLLECTION/UNKNOWN) and structured `aisle_type` enrichment.
+- **Commercial Intelligence**: **PUBLIC/PRO** separation, **Progressive**, **NxM**, and high price integrity.
+- **Web Faceted Query Layer**: dynamic facets and multiselect.
+- **Alerts Engine**: Temporal transitions, idempotent `alert_events`, canary Watch, and **termux-notification** delivery.
+- **Operations**: Robust background **scheduler 07/10/13/19** with **flock** to prevent overlapping crawls, automatic SQLite **backup/restore**, and longitudinal validation.
+- Safe **historical cutover** from v9 to v14 schemas.

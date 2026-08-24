@@ -1,5 +1,45 @@
 # Changelog
 
+## v3.0.0-rc1 - 2026-08-24
+
+### Merchant Discovery
+- A5 primary CPG discovery
+- safe fallback
+- scope-safe reconciliation
+
+### Faceted Taxonomy
+- M:N memberships
+- CATEGORY/COLLECTION/UNKNOWN
+- structured aisle_type enrichment
+
+### Commercial Intelligence
+- PUBLIC/PRO separation
+- NxM
+- Progressive
+- price integrity
+
+### Web
+- dynamic facets
+- multiselect
+- PUBLIC/PRO
+- optimized queries
+
+### Alerts
+- temporal transitions
+- idempotent alert_events
+- canary Watch
+- Termux delivery
+
+### Operations
+- scheduler 07/10/13/19
+- flock
+- backups
+- longitudinal validation
+
+### Database
+- schema evolution 9 → 14
+
+
 ## v2.9.5 - 2026-08-23
 
 ### Added
