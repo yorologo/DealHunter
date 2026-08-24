@@ -182,7 +182,7 @@ async def _run_zone_inventory_async(config, lat, lng, conn, run_id, dry_run=Fals
                                      has_pro_offer, pro_price, pro_discount_effective, limit_info)
                                      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
                                      (run_id, s_id, kpid, 0, 0, 0, datetime.now().isoformat(),
-                                      0, 0, 0, "", "", "", "*", "UNAVAILABLE", 0, None, None, None))
+                                      0, 0, 0, "", "", "", "*", "UNAVAILABLE", None, None, None, None))
                     else:
                         c.execute('''INSERT OR IGNORE INTO observations
                                      (run_id, store_id, product_id, price, original_price, stock, timestamp,

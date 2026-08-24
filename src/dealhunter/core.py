@@ -181,7 +181,7 @@ def process_and_insert_product(p, run_id, s_id, s_name, config, q, conn, seen_in
                      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''', 
                      (run_id, s_id, p_id, eff_price, eff_real, stock_val, datetime.now().isoformat(), 
                       d_price, d_promo, d_eff, d_src, p_type, p_label, q, availability,
-                      1 if comm_extra.get("has_pro_offer") else 0,
+                      1 if comm_extra.get("has_pro_offer") else (None if availability == "UNAVAILABLE" else 0),
                       comm_extra.get("pro_price"),
                       comm_extra.get("pro_discount_effective"),
                       str(comm_extra.get("limit")) if comm_extra.get("limit") is not None else None))
