@@ -11,7 +11,7 @@ from .output import print_results
 from .doctor import run_doctor, format_doctor_output
 from datetime import datetime
 
-VERSION = "2.9.1"
+VERSION = "3.0.0-rc1"
 LOCATION_CHANGE_WARNING_METERS = 500.0
 
 
@@ -116,6 +116,7 @@ def build_parser():
     group_crawler = base_parser.add_argument_group("Crawler Control")
     group_crawler.add_argument('--dry-run', action='store_true', help="Do not execute requests")
     group_crawler.add_argument('--max-requests', type=int, help="Stop after N requests")
+    group_crawler.add_argument('--discovery-mode', choices=['normal', 'deep', 'full'], help="Adaptive discovery policy (normal: exploración parcial optimizada, deep: exploración parcial más profunda, full: máxima exploración soportada)")
     group_crawler.add_argument('--max-runtime', type=int, help="Stop after N seconds")
     group_crawler.add_argument('--run-id', type=str, help="Specific run ID to use")
 

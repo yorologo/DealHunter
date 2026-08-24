@@ -1,3 +1,4 @@
+from dealhunter.semantic import classify_membership
 from datetime import datetime
 from .discounts import calculate_discount
 from .normalization import parse_product_name, generate_fingerprint
@@ -100,7 +101,7 @@ def process_and_insert_product(p, run_id, s_id, s_name, config, q, conn, seen_in
         
     availability = "AVAILABLE" if is_in_stock else "UNAVAILABLE"
         
-    d_price, d_promo, d_eff, d_src, p_type, p_label, eff_price, eff_real = calculate_discount(p)
+    d_price, d_promo, d_eff, d_src, p_type, p_label, eff_price, eff_real, comm_extra = calculate_discount(p)
     
     if not matches_filters(pname, brand, s_name, cat, config, d_eff, p_type, eff_price):
         return False
@@ -145,9 +146,49 @@ def process_and_insert_product(p, run_id, s_id, s_name, config, q, conn, seen_in
                norm["normalized_quantity"], norm["normalized_unit"], fingerprint,
                norm["pack_count"], cat, has_toppings, cat_source))
     
-    c.execute('''INSERT OR IGNORE INTO observations (run_id, store_id, product_id, price, original_price, stock, timestamp, 
-                 discount_price, discount_promotion, discount_effective, discount_source, promotion_type, promotion_label, query_term, availability)
-                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''', 
-                 (run_id, s_id, p_id, eff_price, eff_real, stock_val, datetime.now().isoformat(), 
-                  d_price, d_promo, d_eff, d_src, p_type, p_label, q, availability))
+    # Phase 3A: Persist RAW memberships
+    import json
+    from datetime import datetime as _dt
+    memberships = p.get("memberships", [])
+    now = _dt.now().isoformat()
+    for m in memberships:
+        raw_type = m.get("raw_type", "")
+        raw_name = m.get("raw_name", "")
+        raw_id = str(m.get("raw_id", ""))
+        path_str = json.dumps(m.get("path", []))
+        # Re-classify membership on every observation
+        stype, sreason = classify_membership(raw_name, cat, cat_source, raw_type)
+        
+        c.execute('''INSERT INTO product_memberships
+                     (store_id, product_id, raw_type, raw_name, raw_id, path, source, last_seen, semantic_type, semantic_reason)
+                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                     ON CONFLICT(store_id, product_id, raw_type, raw_name, path) DO UPDATE SET
+                     last_seen=excluded.last_seen, raw_id=excluded.raw_id,
+                     semantic_type=excluded.semantic_type, semantic_reason=excluded.semantic_reason
+                  ''', (s_id, p_id, raw_type, raw_name, raw_id, path_str, "catalog_sync", now, stype, sreason))
+    
+    # Phase 3A.1: Safe Facet Reconciliation
+    # Remove stale memberships for this product that were not seen in this complete observation
+    c.execute('''DELETE FROM product_memberships 
+                 WHERE store_id=? AND product_id=? AND last_seen != ?''', 
+              (s_id, p_id, now))
+    
+    from dealhunter.db import CURRENT_SCHEMA_VERSION
+    if CURRENT_SCHEMA_VERSION >= 12:
+        c.execute('''INSERT OR IGNORE INTO observations (run_id, store_id, product_id, price, original_price, stock, timestamp, 
+                     discount_price, discount_promotion, discount_effective, discount_source, promotion_type, promotion_label, query_term, availability,
+                     has_pro_offer, pro_price, pro_discount_effective, limit_info)
+                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''', 
+                     (run_id, s_id, p_id, eff_price, eff_real, stock_val, datetime.now().isoformat(), 
+                      d_price, d_promo, d_eff, d_src, p_type, p_label, q, availability,
+                      1 if comm_extra.get("has_pro_offer") else (None if availability == "UNAVAILABLE" else 0),
+                      comm_extra.get("pro_price"),
+                      comm_extra.get("pro_discount_effective"),
+                      str(comm_extra.get("limit")) if comm_extra.get("limit") is not None else None))
+    else:
+        c.execute('''INSERT OR IGNORE INTO observations (run_id, store_id, product_id, price, original_price, stock, timestamp, 
+                     discount_price, discount_promotion, discount_effective, discount_source, promotion_type, promotion_label, query_term, availability)
+                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''', 
+                     (run_id, s_id, p_id, eff_price, eff_real, stock_val, datetime.now().isoformat(), 
+                      d_price, d_promo, d_eff, d_src, p_type, p_label, q, availability))
     return True

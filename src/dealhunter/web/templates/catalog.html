@@ -59,6 +59,38 @@
                             </label>
                         </div>
                     </div>
+                    
+                    {% if av_collections %}
+                    <div class="col-md-3">
+                        <label class="form-label small text-secondary fw-bold">Colecciones</label>
+                        {% set formatted_colls = [] %}
+                        {% for c in av_collections %}
+                            {% set _ = formatted_colls.append({'id': c, 'name': c}) %}
+                        {% endfor %}
+                        {{ multiselect('collections', 'Colecciones', formatted_colls, filters.collections, 'Buscar colección...', None, None) }}
+                    </div>
+                    {% endif %}
+                    
+                    {% if av_store_facets %}
+                    <div class="col-md-3">
+                        <label class="form-label small text-secondary fw-bold">Atributos de Tienda</label>
+                        {% set formatted_facets = [] %}
+                        {% for c in av_store_facets %}
+                            {% set _ = formatted_facets.append({'id': c, 'name': c}) %}
+                        {% endfor %}
+                        {{ multiselect('store_facets', 'Atributos', formatted_facets, filters.store_facets, 'Buscar...', None, None) }}
+                    </div>
+                    {% endif %}
+                    
+                    <div class="col-md-3">
+                        <label class="form-label small text-secondary fw-bold">Tipo de Oferta</label>
+                        <select name="channel" class="form-select form-select-sm" onchange="document.getElementById('filter-form').dispatchEvent(new Event('submit'))">
+                            <option value="PUBLIC" {% if not filters.channel or filters.channel == 'PUBLIC' %}selected{% endif %}>Públicas (Default)</option>
+                            <option value="PRO" {% if filters.channel == 'PRO' %}selected{% endif %}>Pro Exclusivo</option>
+                            <option value="ALL" {% if filters.channel == 'ALL' %}selected{% endif %}>Todas (Ambas)</option>
+                        </select>
+                    </div>
+
                     <div class="col-md-auto ms-auto">
                         <button type="submit" class="btn btn-sm btn-primary">Filtrar</button>
                     </div>

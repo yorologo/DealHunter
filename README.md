@@ -106,3 +106,20 @@ El índice completo de documentación, cubriendo arquitectura, flujos de datos, 
 ### Ejecución en Segundo Plano (Android)
 Para mantener DealHunter Web activo en Android/Termux, DealHunter adquiere el `termux-wake-lock` automáticamente al iniciar. Nota: dado que el Wake Lock es compartido (app-wide) en Termux, DealHunter NO lo libera automáticamente al salir para no interrumpir otros procesos. Utiliza `termux-wake-unlock` manualmente cuando desees liberarlo.
 - DealHunter ahora usa **Zone Inventory** si tienes sesión válida, y **Search Discovery** como fallback.
+
+## Automated Alerts
+DealHunter Phase 4I supports automated background execution and push notifications via `termux-notification`.
+See [docs/SCHEDULER.md](docs/SCHEDULER.md) for instructions on setting up `cron`, configuring the DealWatcher, and managing Termux battery optimizations.
+
+## DealHunter v3.0.0-rc1 
+
+DealHunter has evolved to **schema v14**.
+
+### Key Features
+- **A5** endpoint for primary CPG discovery with safe fallback.
+- **Faceted Taxonomy** with M:N memberships (CATEGORY/COLLECTION/UNKNOWN) and structured `aisle_type` enrichment.
+- **Commercial Intelligence**: **PUBLIC/PRO** separation, **Progressive**, **NxM**, and high price integrity.
+- **Web Faceted Query Layer**: dynamic facets and multiselect.
+- **Alerts Engine**: Temporal transitions, idempotent `alert_events`, canary Watch, and **termux-notification** delivery.
+- **Operations**: Robust background **scheduler 07/10/13/19** with **flock** to prevent overlapping crawls, automatic SQLite **backup/restore**, and longitudinal validation.
+- Safe **historical cutover** from v9 to v14 schemas.

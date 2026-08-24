@@ -29,6 +29,17 @@ def app():
     c.execute("INSERT INTO observations (run_id, store_id, product_id, price, timestamp, query_term) VALUES ('r1', 's2', 'p2', 50.0, '2026-08-01T00:00:00', 'farmacia')")
     
     conn.commit()
+    from dealhunter.db import migrate
+    migrate(conn, db_path)
+
+    
+    try:
+        from dealhunter.db import migrate
+        if 'db_path' in locals(): migrate(conn, db_path)
+        elif 'test_db' in locals() and isinstance(test_db, str): migrate(conn, test_db)
+    except Exception as e:
+        print('MIGRATE ERROR:', e)
+    
     conn.close()
     
     app = create_app({'DATABASE': db_path, 'TESTING': True})

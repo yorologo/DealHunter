@@ -42,6 +42,7 @@ def test_db(tmp_path):
         has_toppings INTEGER
     )''')
     conn.commit()
+
     
     # Store A: Café, Té
     c.execute("INSERT INTO stores (store_id, name, brand, type) VALUES ('A', 'Store A', 'Brand A', 'restaurants')")
@@ -58,6 +59,15 @@ def test_db(tmp_path):
     c.execute("INSERT INTO observations VALUES ('p4', 'B', 50, 100, '2023-01-01', 50, '', '', 1, 0)")
     
     conn.commit()
+
+    
+    try:
+        from dealhunter.db import migrate
+        if 'db_path' in locals(): migrate(conn, db_path)
+        elif 'test_db' in locals() and isinstance(test_db, str): migrate(conn, test_db)
+    except Exception as e:
+        print('MIGRATE ERROR:', e)
+    
     conn.close()
     return str(db_path)
 

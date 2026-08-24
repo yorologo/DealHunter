@@ -28,61 +28,110 @@ async def _run_zone_inventory_async(config, lat, lng, conn, run_id, dry_run=Fals
     seen_in_run = set()
     requests_count = 0
     start_time = time.time()
-    
+
     checkpoint = RunCheckpoint(run_id=run_id, mode="zone_inventory", status="RUNNING")
-    
+
     provider = RappiSessionProvider()
     if not await provider.is_authenticated():
-        # Double check, shouldn't happen if router did its job
         return "SESSION_INVALID", 0
-        
+
     client = AuthenticatedHttpClient(provider)
     discovery = MerchantDiscovery(client)
     cpg_adapter = CPGCatalogAdapter(client)
     rest_adapter = RestaurantMenuAdapter(client)
-    
+
     report = CoverageReport()
-    
-    print("[*] Zone Inventory Mode started", file=sys.stderr)
+    discovery_mode = config.get("discovery_mode", "full")
     try:
-        merchants = await discovery.discover_merchants(lat, lng, report)
+        merchants = await discovery.discover_merchants(lat, lng, report, discovery_mode=discovery_mode)
     except Exception as e:
         if "401" in str(e):
             return "SESSION_EXPIRED", report.authenticated_requests
         raise e
-        
+
     print(f"[*] Found {len(merchants)} merchants in zone", file=sys.stderr)
-    
+
     global_state = "COMPLETED"
-    
+
     # Store reconciliation:
     # First, mark all known stores as STALE temporarily? Wait, the prompt says:
     # "Si una tienda aparece en este run: last_seen_at = now, status = ACTIVE"
     # "Si una tienda conocida no aparece en un discovery COMPLETO: marcar como temporal/stale"
-    
+
     # Let's get all known stores for this area? Or just mark all currently ACTIVE stores to UNKNOWN/STALE if they weren't seen?
-    # Better: we know what we saw. 
+    # Better: we know what we saw.
     seen_store_ids = set()
-    
+
     for idx, m in enumerate(merchants):
         if time.time() - start_time > config.get("max_runtime", 3600):
             global_state = "PARTIAL"
             break
-            
+
         s_id = str(m.get("store_id", ""))
         s_name = m.get("name", "")
         seen_store_ids.add(s_id)
+
+        # Phase 3A: Vertical normalization
+        raw_vsg = m.get("vertical_sub_group")
+        parent_type = m.get("type", "supermercado")
         
-        c.execute('''INSERT INTO stores (store_id, name, brand, type, status, last_seen_at) 
-                     VALUES (?, ?, ?, ?, ?, ?)
-                     ON CONFLICT(store_id) DO UPDATE SET 
-                     name = COALESCE(excluded.name, name), 
+        vertical = None
+        if raw_vsg:
+            v_lower = raw_vsg.lower()
+            if "restaurant" in v_lower: vertical = "Restaurantes"
+            elif "market" in v_lower or v_lower == "super": vertical = "Supermercado"
+            elif "turbo" in v_lower: vertical = "Turbo"
+            elif "farmacia" in v_lower: vertical = "Farmacia"
+            else: vertical = raw_vsg
+        else:
+            p_lower = parent_type.lower()
+            if "restaurant" in p_lower: vertical = "Restaurantes"
+            elif "market" in p_lower or p_lower == "super": vertical = "Supermercado"
+            elif "turbo" in p_lower: vertical = "Turbo"
+            elif "farma" in p_lower: vertical = "Farmacia"
+            else: vertical = parent_type
+
+        c.execute('''INSERT INTO stores (store_id, name, brand, type, status, last_seen_at, vertical)
+                     VALUES (?, ?, ?, ?, ?, ?, ?)
+                     ON CONFLICT(store_id) DO UPDATE SET
+                     name = COALESCE(excluded.name, name),
                      type = COALESCE(excluded.type, type),
+                     vertical = COALESCE(excluded.vertical, vertical),
                      status = 'ACTIVE',
                      last_seen_at = excluded.last_seen_at''',
-                  (s_id, s_name, m.get("brand", ""), m.get("type", "supermercado"), "ACTIVE", datetime.now().isoformat()))
-        conn.commit()
+                  (s_id, s_name, m.get("brand", ""), parent_type, "ACTIVE", datetime.now().isoformat(), vertical))
+                  
+        # Phase 3A: Store Facets
+        facets = set()
         
+        # tags array
+        tags = m.get("tags")
+        if isinstance(tags, list):
+            for t in tags:
+                if t and isinstance(t, str): facets.add((t.strip(), "tags"))
+                
+        # categories string
+        cats = m.get("categories")
+        if isinstance(cats, str) and cats:
+            for c_str in cats.split("·"):
+                if c_str.strip(): facets.add((c_str.strip(), "categories"))
+                
+        # Phase 3A.1: Store Facets Reconciliation
+        has_metadata = ("tags" in m and m.get("tags") is not None) or ("categories" in m and m.get("categories") is not None)
+        now_store_facets = datetime.now().isoformat()
+        
+        for val, src in facets:
+            c.execute('''INSERT INTO store_facets (store_id, facet_type, raw_value, source, last_seen)
+                         VALUES (?, ?, ?, ?, ?)
+                         ON CONFLICT(store_id, facet_type, raw_value) DO UPDATE SET
+                         last_seen=excluded.last_seen
+                      ''', (s_id, "store_subcategory", val, src, now_store_facets))
+                      
+        if has_metadata:
+            c.execute('DELETE FROM store_facets WHERE store_id=? AND last_seen != ?', (s_id, now_store_facets))
+            
+        conn.commit()
+
         if m.get("type") and "restaurant" in m.get("type").lower():
             if not config.get("restaurants", True):
                 continue
@@ -99,53 +148,81 @@ async def _run_zone_inventory_async(config, lat, lng, conn, run_id, dry_run=Fals
                 if "401" in str(e):
                     return "SESSION_EXPIRED", report.authenticated_requests
                 continue
-                
+
         # Product reconciliation:
         # If catalog was fetched successfully, we can mark absent products as UNAVAILABLE.
         # items is a list of product dicts.
         seen_products_in_store = set()
-        
+
         for p in items:
             if dry_run: continue
             pid = str(p.get("id") or p.get("product_id", ""))
             seen_products_in_store.add(pid)
             process_and_insert_product(p, run_id, s_id, s_name, config, "*", conn, seen_in_run)
-            
+
         conn.commit()
-        
+
         if not dry_run and items:
             # Mark products NOT seen in this store as UNAVAILABLE
             placeholders = ','.join(['?'] * len(seen_products_in_store))
             query = f'''
-                SELECT product_id FROM products WHERE store_id = ? 
+                SELECT product_id FROM products WHERE store_id = ?
             '''
             c.execute(query, (s_id,))
             all_known = [row[0] for row in c.fetchall()]
-            
+
             for kpid in all_known:
                 if kpid not in seen_products_in_store:
                     # Mark unavailable in observations
-                    c.execute('''INSERT OR IGNORE INTO observations 
-                                 (run_id, store_id, product_id, price, original_price, stock, timestamp, 
-                                 discount_price, discount_promotion, discount_effective, discount_source, promotion_type, promotion_label, query_term, availability)
-                                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''', 
-                                 (run_id, s_id, kpid, 0, 0, 0, datetime.now().isoformat(), 
-                                  0, 0, 0, "", "", "", "*", "UNAVAILABLE"))
+                    from dealhunter.db import CURRENT_SCHEMA_VERSION
+                    if CURRENT_SCHEMA_VERSION >= 12:
+                        c.execute('''INSERT OR IGNORE INTO observations
+                                     (run_id, store_id, product_id, price, original_price, stock, timestamp,
+                                     discount_price, discount_promotion, discount_effective, discount_source, promotion_type, promotion_label, query_term, availability,
+                                     has_pro_offer, pro_price, pro_discount_effective, limit_info)
+                                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
+                                     (run_id, s_id, kpid, 0, 0, 0, datetime.now().isoformat(),
+                                      0, 0, 0, "", "", "", "*", "UNAVAILABLE", None, None, None, None))
+                    else:
+                        c.execute('''INSERT OR IGNORE INTO observations
+                                     (run_id, store_id, product_id, price, original_price, stock, timestamp,
+                                     discount_price, discount_promotion, discount_effective, discount_source, promotion_type, promotion_label, query_term, availability)
+                                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
+                                     (run_id, s_id, kpid, 0, 0, 0, datetime.now().isoformat(),
+                                      0, 0, 0, "", "", "", "*", "UNAVAILABLE"))
             conn.commit()
-            
+
         if not dry_run:
             time.sleep(2)
-            
+
     # Stores not seen in a full discovery should be marked STALE
     if global_state == "COMPLETED" and not dry_run:
-        c.execute('SELECT store_id FROM stores WHERE status = "ACTIVE"')
+        # Phase 4B.3F.2 Scope-Safe Reconciliation:
+        # Only stale a store if it belongs to a firmly covered A5 CPG scope.
+        # We explicitly preserve restaurants, liquor, mall (rappimall_parent), and unknowns.
+        c.execute('SELECT store_id, type FROM stores WHERE status = "ACTIVE"')
+        covered_types = {'market', 'chiper_home', 'chiper_extended', 'express_parent', 'pets_cpgs', 'Farmatodo'}
         for row in c.fetchall():
-            if row[0] not in seen_store_ids:
-                c.execute('UPDATE stores SET status = "STALE" WHERE store_id = ?', (row[0],))
+            sid = row[0]
+            stype = row[1]
+            if sid not in seen_store_ids:
+                if stype in covered_types:
+                    c.execute('UPDATE stores SET status = "STALE" WHERE store_id = ?', (sid,))
         conn.commit()
-        
+
     import json
+
+    discovery_mode = config.get("discovery_mode", "full")
+    if discovery_mode == "full":
+        expected_expanded = 26 # Approx
+    else:
+        expected_expanded = 10 if discovery_mode == "normal" else 20
+
     metadata_json = json.dumps({
+        "discovery_mode": discovery_mode,
+        "depth1_queries": 26,
+        "expanded_parents": expected_expanded,
+        "discovery_requests": report.authenticated_requests - report.merchants_attempted,
         "merchants_discovered": report.merchants_discovered,
         "merchants_attempted": report.merchants_attempted,
         "merchants_completed": report.merchants_completed,
@@ -154,9 +231,10 @@ async def _run_zone_inventory_async(config, lat, lng, conn, run_id, dry_run=Fals
         "items_unique": report.items_unique,
         "authenticated_requests": report.authenticated_requests
     })
-        
-    c.execute('''UPDATE runs SET crawler_mode = ?, coverage_complete = ?, status = ?, finished_at = CURRENT_TIMESTAMP, run_metadata = ? WHERE run_id = ?''', 
-              ("ZONE_INVENTORY", 1 if global_state == "COMPLETED" else 0, global_state, metadata_json, run_id))
+
+    cov_comp = 1 if (global_state == "COMPLETED" and discovery_mode == "full") else 0
+    c.execute('''UPDATE runs SET crawler_mode = ?, coverage_complete = ?, status = ?, finished_at = CURRENT_TIMESTAMP, run_metadata = ? WHERE run_id = ?''',
+              ("ZONE_INVENTORY", cov_comp, global_state, metadata_json, run_id))
     conn.commit()
-              
+
     return global_state, report.authenticated_requests
