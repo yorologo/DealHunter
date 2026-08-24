@@ -319,3 +319,10 @@ Si no aporta beneficio demostrable, no se incorpora.
 - Commercial merges are now order-independent (e.g., if NxM and progressive both exist on a product, the best is evaluated).
 - `rappi-deals.db` remains strictly at v11 to avoid production migration. Test environments safely migrate to v12 (`DEALHUNTER_ENABLE_V12=1`) to assert column extraction.
 - Documentation created at `docs/PROMOTION_MODEL.md`.
+
+## Phase 4B.4.1: Commercial Model Hardening
+- Strictly separated PUBLIC vs PRO discount channels.
+- `discount_effective` now guarantees exclusively public discounts.
+- Extracted `has_pro_offer`, `pro_price`, `pro_discount_effective` for independent filtering.
+- Prevented Pro-exclusive promotions (>=50%) from inflating public Deal Scores.
+- Replaced schema migration SQL-error fallbacks with deterministic `CURRENT_SCHEMA_VERSION` checks.

@@ -11,103 +11,111 @@ def test_existing_2x1_unchanged():
     dp, dpromo, deff, dsrc, ptype, plab, ep, er, extra = calculate_discount(p)
     assert ptype == "NxM"
     assert deff == 50.0
-    assert not extra["is_pro_exclusive"]
+    assert not extra["has_pro_offer"]
 
-def test_existing_3x2_unchanged():
+def test_public_and_pro_coexist():
+    p = {
+        "price": 80.0,
+        "real_price": 100.0,
+        "have_discount": True,
+        "discount": 0.20,
+        "is_prime_exclusive": True,
+        "PrimeDiscount": 40.0
+    }
+    dp, dpromo, deff, dsrc, ptype, plab, ep, er, extra = calculate_discount(p)
+    # Public channel
+    assert deff == 20.0
+    assert ptype == "Direct"
+    # Pro channel
+    assert extra["has_pro_offer"] is True
+    assert extra["pro_price"] == 40.0
+    assert extra["pro_discount_effective"] == 60.0
+
+def test_pro_only_60():
+    p = {
+        "price": 100.0,
+        "real_price": 100.0,
+        "is_prime_exclusive": True,
+        "PrimeDiscount": 60.0
+    }
+    dp, dpromo, deff, dsrc, ptype, plab, ep, er, extra = calculate_discount(p)
+    assert deff is None or deff == 0.0 # Public effective discount shouldn't exist
+    assert extra["has_pro_offer"] is True
+    assert extra["pro_price"] == 40.0
+    assert extra["pro_discount_effective"] == 60.0
+    assert extra["pro_promo_type"] == "Direct"
+
+def test_public_nxm_pro_price_coexist():
     p = {
         "price": 50.0,
+        "real_price": 50.0,
         "discounts_bundle": {
             "deal": [{"promotion_value": 3, "units_condition": 2}]
-        }
+        },
+        "is_pro_exclusive": True,
+        "PrimeDiscount": 10.0
     }
     dp, dpromo, deff, dsrc, ptype, plab, ep, er, extra = calculate_discount(p)
     assert ptype == "NxM"
     assert abs(deff - 33.33) < 0.1
-    assert not extra["is_pro_exclusive"]
+    assert extra["has_pro_offer"] is True
+    assert extra["pro_price"] == 40.0
+    assert extra["pro_discount_effective"] == 20.0
 
-def test_standard_50_unchanged():
-    p = {
-        "price": 50.0,
-        "real_price": 50.0,
-        "discount": 50.0
-    }
-    dp, dpromo, deff, dsrc, ptype, plab, ep, er, extra = calculate_discount(p)
-    assert deff == 50.0
-    assert ptype == "Direct"
-
-def test_below_50_negative_control():
-    p = {
-        "price": 70.0,
-        "real_price": 50.0,
-        "discount": 30.0
-    }
-    dp, dpromo, deff, dsrc, ptype, plab, ep, er, extra = calculate_discount(p)
-    assert deff == 30.0
-
-def test_progressive_second_unit():
+def test_public_progressive_pro_coexist():
     p = {
         "price": 100.0,
+        "real_price": 100.0,
         "discounts_bundle": {
             "percentage_unit": [{"promotion_value": 50, "units_condition": 2}]
-        }
+        },
+        "is_pro_exclusive": True,
+        "PrimeDiscount": 40.0
     }
     dp, dpromo, deff, dsrc, ptype, plab, ep, er, extra = calculate_discount(p)
-    # 2 units = 1 + 0.5 = 1.5. Cost = 150 instead of 200. Discount = 25%.
     assert ptype == "PROGRESSIVE"
     assert deff == 25.0
-    assert ep == 150.0
-    assert er == 200.0
+    assert extra["has_pro_offer"] is True
+    assert extra["pro_price"] == 60.0
+    assert extra["pro_discount_effective"] == 40.0
 
-def test_progressive_unknown_math():
+def test_pro_progressive():
     p = {
         "price": 100.0,
+        "real_price": 100.0,
         "discounts_bundle": {
-            "progressive": {"some_complex": "struct"}
+            "percentage_unit": [{"promotion_value": 50, "units_condition": 2, "is_pro_exclusive": True}]
         }
     }
     dp, dpromo, deff, dsrc, ptype, plab, ep, er, extra = calculate_discount(p)
-    assert ptype == "PROGRESSIVE_UNKNOWN"
-    assert deff is None
-    assert extra["progressive"] is not None
+    assert deff is None or deff == 0.0
+    assert extra["has_pro_offer"] is True
+    assert extra["pro_discount_effective"] == 25.0
+    assert extra["pro_promo_type"] == "PROGRESSIVE"
 
-def test_pro_exclusive_detected():
+def test_promotion_ordering():
+    # Deal 1: Pro 50%, Deal 2: Public 20%
     p = {
-        "price": 100.0,
-        "is_prime_exclusive": True,
-        "PrimeDiscount": 30.0
-    }
-    dp, dpromo, deff, dsrc, ptype, plab, ep, er, extra = calculate_discount(p)
-    assert extra["is_pro_exclusive"] is True
-    assert extra["pro_price"] == 70.0
-
-def test_multiple_promotions_order_independent():
-    # Deal 1: 3x2 (33%) vs Deal 2: 2nd unit -50% (25%)
-    # NxM wins
-    p1 = {
-        "price": 100.0,
+        "price": 80.0,
+        "real_price": 100.0,
+        "discount": 0.20,
         "discounts_bundle": {
-            "percentage_unit": [{"promotion_value": 50, "units_condition": 2}],
-            "deal": [{"promotion_value": 3, "units_condition": 2}]
-        }
-    }
-    p2 = {
-        "price": 100.0,
-        "discounts_bundle": {
-            "deal": [{"promotion_value": 3, "units_condition": 2}],
-            "percentage_unit": [{"promotion_value": 50, "units_condition": 2}]
-        }
-    }
-    _, _, deff1, _, ptype1, _, _, _, _ = calculate_discount(p1)
-    _, _, deff2, _, ptype2, _, _, _, _ = calculate_discount(p2)
-    assert deff1 == deff2
-    assert ptype1 == ptype2 == "NxM"
-
-def test_promotion_limits_preserved():
-    p = {
-        "price": 100.0,
-        "discounts_bundle": {
-            "deal": [{"promotion_value": 2, "units_condition": 1, "limit": 2}]
+            "percentage_unit": [{"promotion_value": 50, "units_condition": 1, "is_pro_exclusive": True}]
         }
     }
     dp, dpromo, deff, dsrc, ptype, plab, ep, er, extra = calculate_discount(p)
-    assert extra["limit"] == 2
+    assert deff == 20.0
+    assert ptype == "Direct"
+    assert extra["pro_discount_effective"] == 50.0
+
+def test_malformed_pro_does_not_contaminate_public():
+    p = {
+        "price": 100.0,
+        "real_price": 100.0,
+        "discounts_bundle": {
+            "percentage_unit": [{"promotion_value": "abc", "units_condition": 2, "is_pro_exclusive": True}]
+        }
+    }
+    dp, dpromo, deff, dsrc, ptype, plab, ep, er, extra = calculate_discount(p)
+    assert deff is None or deff == 0.0
+

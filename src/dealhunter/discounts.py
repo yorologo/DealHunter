@@ -35,57 +35,66 @@ def calculate_discount(p):
     discount_promo = 0.0
     
     bundle = p.get("discounts_bundle", {})
-    # 14. MULTIPLE PROMOTIONS: evaluate all available promotions to find the best one order-independently.
-    best_promo = None
-    best_promo_discount = 0.0
     
-    # Evaluate NxM deals
+    # 4B.4.1: Separate PUBLIC vs PRO candidate channels
+    best_public_promo = None
+    best_public_discount = 0.0
+    
+    best_pro_promo = None
+    best_pro_discount = 0.0
+    
+    def add_candidate(promo_dict, discount_val, is_pro):
+        nonlocal best_public_promo, best_public_discount, best_pro_promo, best_pro_discount
+        if is_pro:
+            if discount_val > best_pro_discount:
+                best_pro_discount = discount_val
+                best_pro_promo = promo_dict
+        else:
+            if discount_val > best_public_discount:
+                best_public_discount = discount_val
+                best_public_promo = promo_dict
+
     if bundle and bundle.get("deal"):
         for deal in bundle["deal"]:
             p_val = float(deal.get("promotion_value") or 0)
             u_cond = float(deal.get("units_condition") or 0)
             if p_val > 0 and u_cond > 0 and p_val > u_cond:
                 d = (1 - (u_cond / p_val)) * 100.0
-                if d > best_promo_discount:
-                    best_promo_discount = d
-                    best_promo = {
-                        "type": "NxM",
-                        "label": deal.get("label", f"{int(p_val)}x{int(u_cond)}"),
-                        "p_val": p_val,
-                        "u_cond": u_cond,
-                        "is_pro_exclusive": deal.get("is_pro_exclusive") or deal.get("is_prime_exclusive") or False,
-                        "limit": deal.get("limit") or deal.get("limits") or None
-                    }
+                is_pro = deal.get("is_pro_exclusive") or deal.get("is_prime_exclusive") or False
+                cand = {
+                    "type": "NxM",
+                    "label": deal.get("label", f"{int(p_val)}x{int(u_cond)}"),
+                    "p_val": p_val,
+                    "u_cond": u_cond,
+                    "is_pro_exclusive": is_pro,
+                    "limit": deal.get("limit") or deal.get("limits") or None
+                }
+                add_candidate(cand, d, is_pro)
 
-    # Evaluate percentage_unit deals (e.g., "Segunda unidad -24%")
     if bundle and bundle.get("percentage_unit"):
         for deal in bundle["percentage_unit"]:
-            p_val = float(deal.get("promotion_value") or 0) # e.g. 24
-            u_cond = float(deal.get("units_condition") or 0) # e.g. 2 (second unit)
+            p_val = float(deal.get("promotion_value") or 0)
+            u_cond = float(deal.get("units_condition") or 0)
             if p_val > 0 and u_cond > 0:
-                # Example: 2nd unit -24%. Total cost for 2 units = 1 + (1 - 0.24) = 1.76 units.
-                # Effective discount = (1 - (1.76 / 2)) = 0.12 (12%)
                 total_cost = (u_cond - 1) + (1.0 - (p_val / 100.0))
                 d = (1 - (total_cost / u_cond)) * 100.0
-                if d > best_promo_discount:
-                    best_promo_discount = d
-                    best_promo = {
-                        "type": "PROGRESSIVE",
-                        "label": deal.get("label", f"-{int(p_val)}% en la {int(u_cond)}ª u."),
-                        "p_val": p_val,
-                        "u_cond": u_cond,
-                        "is_pro_exclusive": deal.get("is_pro_exclusive") or deal.get("is_prime_exclusive") or False,
-                        "limit": deal.get("limit") or deal.get("limits") or None
-                    }
+                is_pro = deal.get("is_pro_exclusive") or deal.get("is_prime_exclusive") or False
+                cand = {
+                    "type": "PROGRESSIVE",
+                    "label": deal.get("label", f"-{int(p_val)}% en la {int(u_cond)}ª u."),
+                    "p_val": p_val,
+                    "u_cond": u_cond,
+                    "is_pro_exclusive": is_pro,
+                    "limit": deal.get("limit") or deal.get("limits") or None
+                }
+                add_candidate(cand, d, is_pro)
 
-    # Evaluate progressive explicitly if exists (fallback uncertain)
     progressive_raw = None
     if bundle and bundle.get("progressive"):
         progressive_raw = bundle.get("progressive")
-        # Mark it as progressive but if we can't do the math, discount_effective = UNKNOWN (None).
-        # We handle this by adding it to best_promo if we don't have a better one.
-        if best_promo_discount == 0:
-            best_promo = {
+        # Treat unknown progressive as public candidate by default, but with 0 effective discount
+        if best_public_discount == 0:
+            best_public_promo = {
                 "type": "PROGRESSIVE_UNKNOWN",
                 "label": "Progressive Deal",
                 "is_pro_exclusive": False,
@@ -94,41 +103,57 @@ def calculate_discount(p):
                 "limit": None
             }
 
-    if best_promo:
-        discount_promo = best_promo_discount
+    # discount_effective MUST ONLY REFLECT PUBLIC DEALS
+    discount_effective = 0.0
+    
+    if best_public_promo:
+        discount_promo = best_public_discount
         
-    if best_promo and (best_promo_discount > discount_price or best_promo["type"] == "PROGRESSIVE_UNKNOWN"):
-        discount_effective = discount_promo
+    if best_public_promo and (best_public_discount > discount_price or best_public_promo["type"] == "PROGRESSIVE_UNKNOWN"):
+        discount_effective = best_public_discount
         discount_source = "bundle"
-        promo_type = best_promo["type"]
-        promo_label = best_promo["label"]
+        promo_type = best_public_promo["type"]
+        promo_label = best_public_promo["label"]
         if promo_type == "NxM":
-            eff_real_price = best_promo["p_val"] * (real_price if real_price > 0 else raw_price)
-            eff_price = best_promo["u_cond"] * raw_price
+            eff_real_price = best_public_promo["p_val"] * (real_price if real_price > 0 else raw_price)
+            eff_price = best_public_promo["u_cond"] * raw_price
         elif promo_type == "PROGRESSIVE":
-            eff_real_price = best_promo["u_cond"] * (real_price if real_price > 0 else raw_price)
-            eff_price = ((best_promo["u_cond"] - 1) + (1.0 - (best_promo["p_val"]/100.0))) * (real_price if real_price > 0 else raw_price)
+            eff_real_price = best_public_promo["u_cond"] * (real_price if real_price > 0 else raw_price)
+            eff_price = ((best_public_promo["u_cond"] - 1) + (1.0 - (best_public_promo["p_val"]/100.0))) * (real_price if real_price > 0 else raw_price)
     else:
         discount_effective = discount_price
         if discount_price > 0:
             promo_type = "Direct"
             
-    is_pro = p.get("is_prime_exclusive") or p.get("is_pro_exclusive") or False
-    if best_promo and best_promo.get("is_pro_exclusive"):
-        is_pro = True
+    has_pro_offer = p.get("is_prime_exclusive") or p.get("is_pro_exclusive") or False
+    if best_pro_promo:
+        has_pro_offer = True
         
     pro_price = None
-    if is_pro and p.get("PrimeDiscount"):
+    if has_pro_offer and p.get("PrimeDiscount"):
         pro_price = raw_price - float(p.get("PrimeDiscount"))
+        
+    # Calculate pro_discount_effective
+    pro_discount_effective = 0.0
+    # Pro price discount vs real price
+    if pro_price is not None and real_price > 0 and pro_price < real_price:
+        pro_discount_effective = (1 - (pro_price / real_price)) * 100.0
+        
+    # If there is a pro bundle that beats the pro price direct discount
+    if best_pro_promo and best_pro_discount > pro_discount_effective:
+        pro_discount_effective = best_pro_discount
 
     # Commercial Extra metadata dict
     commercial_extra = {
-        "is_pro_exclusive": is_pro,
-        "pro_price": pro_price,
+        "has_pro_offer": has_pro_offer,
+        "pro_price": round(pro_price, 2) if pro_price is not None else None,
+        "pro_discount_effective": round(pro_discount_effective, 2) if pro_discount_effective > 0 else None,
         "progressive": progressive_raw,
-        "limit": best_promo.get("limit") if best_promo else None,
-        "bundle_promotion_value": best_promo.get("p_val") if best_promo else None,
-        "bundle_units_condition": best_promo.get("u_cond") if best_promo else None
+        "limit": best_public_promo.get("limit") if best_public_promo else None,
+        "bundle_promotion_value": best_public_promo.get("p_val") if best_public_promo else None,
+        "bundle_units_condition": best_public_promo.get("u_cond") if best_public_promo else None,
+        "pro_promo_type": best_pro_promo["type"] if best_pro_promo else ("Direct" if pro_price else None),
+        "pro_promo_label": best_pro_promo["label"] if best_pro_promo else None
     }
 
     eff_price = round(eff_price, 2)

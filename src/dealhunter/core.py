@@ -173,19 +173,19 @@ def process_and_insert_product(p, run_id, s_id, s_name, config, q, conn, seen_in
                  WHERE store_id=? AND product_id=? AND last_seen != ?''', 
               (s_id, p_id, now))
     
-    # Dynamic insert to gracefully support v11 and v12
-    try:
+    from dealhunter.db import CURRENT_SCHEMA_VERSION
+    if CURRENT_SCHEMA_VERSION >= 12:
         c.execute('''INSERT OR IGNORE INTO observations (run_id, store_id, product_id, price, original_price, stock, timestamp, 
                      discount_price, discount_promotion, discount_effective, discount_source, promotion_type, promotion_label, query_term, availability,
-                     is_pro_exclusive, pro_price, limit_info)
-                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''', 
+                     has_pro_offer, pro_price, pro_discount_effective, limit_info)
+                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''', 
                      (run_id, s_id, p_id, eff_price, eff_real, stock_val, datetime.now().isoformat(), 
                       d_price, d_promo, d_eff, d_src, p_type, p_label, q, availability,
-                      1 if comm_extra.get("is_pro_exclusive") else 0,
+                      1 if comm_extra.get("has_pro_offer") else 0,
                       comm_extra.get("pro_price"),
+                      comm_extra.get("pro_discount_effective"),
                       str(comm_extra.get("limit")) if comm_extra.get("limit") is not None else None))
-    except Exception:
-        # Fallback for v11 DBs
+    else:
         c.execute('''INSERT OR IGNORE INTO observations (run_id, store_id, product_id, price, original_price, stock, timestamp, 
                      discount_price, discount_promotion, discount_effective, discount_source, promotion_type, promotion_label, query_term, availability)
                      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''', 

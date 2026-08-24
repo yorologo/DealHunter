@@ -183,12 +183,10 @@ def migrate(conn, db_path):
                 pass # Already exists
 
         if version < 12:
-            try:
-                c.execute("ALTER TABLE observations ADD COLUMN is_pro_exclusive INTEGER DEFAULT 0")
-                c.execute("ALTER TABLE observations ADD COLUMN pro_price REAL")
-                c.execute("ALTER TABLE observations ADD COLUMN limit_info TEXT")
-            except sqlite3.OperationalError:
-                pass
+            c.execute("ALTER TABLE observations ADD COLUMN has_pro_offer INTEGER DEFAULT 0")
+            c.execute("ALTER TABLE observations ADD COLUMN pro_price REAL")
+            c.execute("ALTER TABLE observations ADD COLUMN pro_discount_effective REAL")
+            c.execute("ALTER TABLE observations ADD COLUMN limit_info TEXT")
 
         c.execute('UPDATE schema_version SET version = ?', (CURRENT_SCHEMA_VERSION,))
         conn.commit()
