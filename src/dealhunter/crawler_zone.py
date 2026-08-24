@@ -79,14 +79,14 @@ async def _run_zone_inventory_async(config, lat, lng, conn, run_id, dry_run=Fals
         if raw_vsg:
             v_lower = raw_vsg.lower()
             if "restaurant" in v_lower: vertical = "Restaurantes"
-            elif "market" in v_lower: vertical = "Supermercado"
+            elif "market" in v_lower or v_lower == "super": vertical = "Supermercado"
             elif "turbo" in v_lower: vertical = "Turbo"
             elif "farmacia" in v_lower: vertical = "Farmacia"
             else: vertical = raw_vsg
         else:
             p_lower = parent_type.lower()
             if "restaurant" in p_lower: vertical = "Restaurantes"
-            elif "market" in p_lower: vertical = "Supermercado"
+            elif "market" in p_lower or p_lower == "super": vertical = "Supermercado"
             elif "turbo" in p_lower: vertical = "Turbo"
             elif "farma" in p_lower: vertical = "Farmacia"
             else: vertical = parent_type

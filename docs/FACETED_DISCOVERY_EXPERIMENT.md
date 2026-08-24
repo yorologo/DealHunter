@@ -262,3 +262,10 @@ Si no aporta beneficio demostrable, no se incorpora.
 - **Resolución CPG Positiva (City Market):** Dado que el ID anterior de Turbo resultó obsoleto (stale target), se utilizó 1 HTTP request dirigida para aislar "City Market" (`id=990006029`). Retornó `MATCH_EXACT_STORE_ID`, exponiendo `vertical_sub_group="Super"`, que el pipeline convierte exitosamente en `stores.vertical="Super"`.
 - **Integridad DB:** Se probaron todas las simulaciones offline/en-memoria garantizando 0 mutaciones en la DB productiva (SHA256 idéntico antes y después, `DELTA=0` en las tablas).
 - **Decisión:** La primitiva `discover_targeted` y el pipeline de normalización están en perfecto estado de conexión. Autorizado el primer write productivo (Phase 4B.2c).
+
+## Phase 4B.2b.2 — Canonical Level-A vertical normalization
+
+- **Inconsistencia detectada:** En la validación live, City Market presentó el atributo RAW `vertical_sub_group=Super`, el cual no contaba con una regla explícita de normalización hacia la vertical canónica "Supermercado".
+- **Resolución Canonical (KISS):** Se confirmó de forma offline la equivalencia conceptual entre los RAW values "Market" y "Super". Se añadió el alias explícito (`v_lower == "super"`) en el helper canónico de `crawler_zone.py`. 
+- **Preservación RAW:** La primitiva `discover_targeted()` sigue devolviendo intacto `vertical_sub_group=Super`. La traducción a "Supermercado" se ejecuta de forma exclusiva al insertar el registro en SQLite (`stores.vertical`).
+- **Simulación Exitosa:** El fix se validó 100% offline (0 peticiones HTTP). El merchant de City Market termina ahora con `stores.vertical = Supermercado` y Sushi Central con `Restaurantes`. El schema v11 permaneció intacto.

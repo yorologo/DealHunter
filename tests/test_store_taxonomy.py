@@ -17,14 +17,14 @@ def persist_merchant_mock(conn, m):
     if raw_vsg:
         v_lower = raw_vsg.lower()
         if "restaurant" in v_lower: vertical = "Restaurantes"
-        elif "market" in v_lower: vertical = "Supermercado"
+        elif "market" in v_lower or v_lower == "super": vertical = "Supermercado"
         elif "turbo" in v_lower: vertical = "Turbo"
         elif "farmacia" in v_lower: vertical = "Farmacia"
         else: vertical = raw_vsg
     else:
         p_lower = parent_type.lower()
         if "restaurant" in p_lower: vertical = "Restaurantes"
-        elif "market" in p_lower: vertical = "Supermercado"
+        elif "market" in p_lower or p_lower == "super": vertical = "Supermercado"
         elif "turbo" in p_lower: vertical = "Turbo"
         elif "farma" in p_lower: vertical = "Farmacia"
         else: vertical = parent_type
@@ -192,3 +192,21 @@ def test_non_restaurant_without_tags_keeps_vertical(tmp_path):
     assert c.fetchone() == ("market", "Supermercado")
     c.execute("SELECT COUNT(*) FROM store_facets WHERE store_id='7'")
     assert c.fetchone()[0] == 0
+
+def test_merchant_vertical_super_alias_normalizes_to_supermercado(tmp_path):
+    db_path = str(tmp_path / "test.db")
+    setup_db(db_path)
+    conn = sqlite3.connect(db_path)
+    
+    m = {
+        "store_id": "8",
+        "type": "market",
+        "vertical_sub_group": "Super",
+        "tags": [],
+        "categories": ""
+    }
+    persist_merchant_mock(conn, m)
+    
+    c = conn.cursor()
+    c.execute("SELECT type, vertical FROM stores WHERE store_id='8'")
+    assert c.fetchone() == ("market", "Supermercado")
