@@ -94,8 +94,10 @@ def calculate_discount(p):
                 "limit": None
             }
 
-    if best_promo and (best_promo_discount > discount_price or best_promo["type"] == "PROGRESSIVE_UNKNOWN"):
+    if best_promo:
         discount_promo = best_promo_discount
+        
+    if best_promo and (best_promo_discount > discount_price or best_promo["type"] == "PROGRESSIVE_UNKNOWN"):
         discount_effective = discount_promo
         discount_source = "bundle"
         promo_type = best_promo["type"]
