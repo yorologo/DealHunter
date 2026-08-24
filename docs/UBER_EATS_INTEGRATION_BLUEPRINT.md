@@ -31,12 +31,12 @@
 - Do **not** build a universal `APIClient`. Let `uber_api.py` manage its own HTTP requests, headers, and rate limiting (Cloudflare/WAF).
 - Do **not** rename `has_pro_offer` or `pro_price` in the DB. Treat them as `CONDITIONAL` conceptually at the presentation layer.
 
-## Evidence Needed from Uber Eats (Phase 5B Requirements)
-1. **Catalog Completeness**: Can we fetch a full store catalog, or does Uber enforce search-based pagination?
-2. **Identity Format**: What does a `store_id` and `product_id` look like? UUIDs? Integers?
-3. **Pricing Model**: How does Uber One pricing reflect in the payload?
-4. **Auth Mechanism**: Can Termux `curl` / `requests` easily replicate the session, or is it heavily blocked by Akamai/Cloudflare?
-5. **Rate Limiting**: What is the threshold for 429 errors?
+## Evidence Gathered from Uber Eats (Phase 5B Recon)
+1. **Catalog Completeness**: [STILL_UNKNOWN] LIKELY COMPLETE via `getStoreV1`.
+2. **Identity Format**: [CONFIRMED] UUID-like Base64 string.
+3. **Pricing Model**: [STILL_UNKNOWN] Uber One impact requires auth.
+4. **Auth Mechanism**: [CONFIRMED] Highly WAF blocked (Cloudflare), requires real session cookies.
+5. **Rate Limiting**: [STILL_UNKNOWN] 429 threshold pending.
 
 ## Namespace Guidelines
 - All Uber Eats Stores must be ingested as `store_id = "UE-xxxx"`.
