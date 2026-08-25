@@ -1,0 +1,183 @@
+#!/usr/bin/env python3
+"""
+Uber Eats Session Probe — Test session-aware requests against Uber Eats.
+
+Usage:
+    bin/uber-session-probe store <store-slug-or-uuid>
+    bin/uber-session-probe api <operationName>
+    bin/uber-session-probe compare <store-slug-or-uuid>
+
+Never prints secrets. Only sanitized HTTP status / metadata.
+"""
+
+import sys, os, json, time, argparse
+import urllib.request
+import urllib.error
+import importlib.util
+
+UBER_BASE = "https://www.ubereats.com"
+
+def load_store():
+    spec = importlib.util.spec_from_file_location(
+        "bridge", os.path.join(os.path.dirname(__file__), "uber-session-import"))
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod.UberSessionStore()
+
+def load_auth_context():
+    store = load_store()
+    data = store.load()
+    if not data:
+        print("[!] No Uber session stored. Run bin/uber-session-import first.", file=sys.stderr)
+        sys.exit(1)
+    return data.get('auth_context', {})
+
+def build_headers(ctx, extra=None):
+    """Build request headers from stored auth context."""
+    headers = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36',
+        'Accept': 'application/json',
+        'Accept-Language': 'es-MX,es;q=0.9',
+        'Content-Type': 'application/json',
+    }
+
+    # Replay captured headers (auth, csrf, etc.)
+    for k, v in ctx.get('headers', {}).items():
+        headers[k] = v
+
+    # Explicit overrides
+    if ctx.get('authorization'):
+        headers['Authorization'] = ctx['authorization']
+    if ctx.get('csrf_token'):
+        headers['x-csrf-token'] = ctx['csrf_token']
+    if ctx.get('cookies'):
+        headers['Cookie'] = ctx['cookies']
+
+    if extra:
+        headers.update(extra)
+
+    return headers
+
+def sanitize_result(status_code, headers_dict, body_bytes, latency):
+    """Produce a sanitized report of the HTTP result."""
+    result = {
+        'http_status': status_code,
+        'latency_ms': round(latency * 1000),
+        'content_type': headers_dict.get('Content-Type', 'unknown'),
+        'content_length': len(body_bytes),
+    }
+
+    # Check for challenge
+    if b'challenge' in body_bytes[:2000].lower() or b'botdefense' in body_bytes[:2000].lower():
+        result['challenge'] = True
+    else:
+        result['challenge'] = False
+
+    # Try JSON parse for structure
+    try:
+        data = json.loads(body_bytes)
+        result['json_valid'] = True
+        result['top_keys'] = list(data.keys())[:10]
+        if 'data' in data and isinstance(data['data'], dict):
+            result['data_keys'] = list(data['data'].keys())[:10]
+    except Exception:
+        result['json_valid'] = False
+
+    return result
+
+def probe_store_page(slug_or_uuid, ctx):
+    """GET a store page and check if SSR is served."""
+    url = f"{UBER_BASE}/mx/store/{slug_or_uuid}"
+    headers = build_headers(ctx, {'Accept': 'text/html,application/xhtml+xml'})
+    headers.pop('Content-Type', None)
+
+    req = urllib.request.Request(url, headers=headers)
+    start = time.time()
+    try:
+        resp = urllib.request.urlopen(req, timeout=15)
+        body = resp.read()
+        latency = time.time() - start
+        hdrs = dict(resp.getheaders())
+        return sanitize_result(resp.status, hdrs, body, latency)
+    except urllib.error.HTTPError as e:
+        latency = time.time() - start
+        body = e.read() if hasattr(e, 'read') else b''
+        return sanitize_result(e.code, {}, body, latency)
+
+def probe_api(operation, ctx, variables=None):
+    """POST to /_p/api/... and check response."""
+    url = f"{UBER_BASE}/_p/api/{operation}"
+    headers = build_headers(ctx)
+
+    payload = json.dumps(variables or {}).encode()
+    req = urllib.request.Request(url, data=payload, headers=headers, method='POST')
+    start = time.time()
+    try:
+        resp = urllib.request.urlopen(req, timeout=15)
+        body = resp.read()
+        latency = time.time() - start
+        hdrs = dict(resp.getheaders())
+        return sanitize_result(resp.status, hdrs, body, latency)
+    except urllib.error.HTTPError as e:
+        latency = time.time() - start
+        body = e.read() if hasattr(e, 'read') else b''
+        return sanitize_result(e.code, {}, body, latency)
+
+def probe_compare(slug_or_uuid, ctx):
+    """Compare public vs session-aware for the same store."""
+    print("--- PUBLIC (no session) ---")
+    pub_result = probe_store_page(slug_or_uuid, {})
+    for k, v in pub_result.items():
+        print(f"  {k}: {v}")
+
+    time.sleep(2)
+
+    print("\n--- SESSION-AWARE ---")
+    sess_result = probe_store_page(slug_or_uuid, ctx)
+    for k, v in sess_result.items():
+        print(f"  {k}: {v}")
+
+    print("\n--- COMPARISON ---")
+    pub_status = pub_result['http_status']
+    sess_status = sess_result['http_status']
+    print(f"  PUBLIC:        HTTP {pub_status} {'CHALLENGE' if pub_result.get('challenge') else 'OK'}")
+    print(f"  SESSION-AWARE: HTTP {sess_status} {'CHALLENGE' if sess_result.get('challenge') else 'OK'}")
+    improvement = sess_status == 200 and pub_status != 200
+    print(f"  IMPROVEMENT:   {improvement}")
+
+
+def main():
+    parser = argparse.ArgumentParser(description="Uber Eats Session Probe")
+    sub = parser.add_subparsers(dest='command')
+
+    p_store = sub.add_parser('store', help='Probe a store page')
+    p_store.add_argument('slug', help='Store slug or slug/uuid path')
+
+    p_api = sub.add_parser('api', help='Probe an API endpoint')
+    p_api.add_argument('operation', help='API operation name (e.g. getStoreV1)')
+
+    p_cmp = sub.add_parser('compare', help='Compare public vs session-aware')
+    p_cmp.add_argument('slug', help='Store slug or slug/uuid path')
+
+    args = parser.parse_args()
+
+    if not args.command:
+        parser.print_help()
+        return
+
+    ctx = load_auth_context()
+
+    if args.command == 'store':
+        result = probe_store_page(args.slug, ctx)
+        for k, v in result.items():
+            print(f"  {k}: {v}")
+    elif args.command == 'api':
+        result = probe_api(args.operation, ctx)
+        for k, v in result.items():
+            print(f"  {k}: {v}")
+    elif args.command == 'compare':
+        probe_compare(args.slug, ctx)
+
+
+if __name__ == '__main__':
+    main()
