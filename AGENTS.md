@@ -3131,3 +3131,18 @@ These remain future work unless explicitly requested.
   - `READY != SYNCHRONIZED`. A valid session means the crawler is `READY`, but it is only `SYNCHRONIZED / ACTIVE` if the last `ZONE_INVENTORY` run finished with `COMPLETED` and `coverage_complete=1`.
   - `PARTIAL`: If the last zone run was interrupted (`PARTIAL`) or `coverage_complete=0`, the UI marks it as partially synced.
   - `coverage_complete` controls whether store and product reconciliation (marking things unavailable or stale) occurs.
+
+## Test Infrastructure Rules
+
+CURRENT-SCHEMA TESTS MUST NOT REIMPLEMENT CURRENT DDL.
+
+Prefer canonical test DB factory (`current_schema_db` fixture or `create_current_schema_db`).
+
+Use explicit column lists for test inserts (via `tests/helpers/db.py` when applicable).
+
+Manual DDL is reserved for:
+- legacy migration fixtures
+- negative/corrupt schema tests
+- intentional minimal component fixtures
+
+Do not hardcode current schema physical layout (column counts, positions) without justification. Tests should depend on semantics, not physical layout.

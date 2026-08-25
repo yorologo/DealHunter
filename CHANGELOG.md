@@ -1,6 +1,8 @@
 # Changelog
 
 ## Unreleased / experimental
+- Decoupled test infrastructure from physical v14 schema layout.
+- Prepared schema evolution safely with centralized test fixtures.
 - Uber Eats structured shadow adapter
 - Browser-native payload research
 - Parser # Changelog Normalizer implemented with deduplication

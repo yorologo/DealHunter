@@ -8,10 +8,10 @@ def create_current_schema_db(db_path):
     conn.execute("PRAGMA foreign_keys = ON")
     return conn
 
-def insert_store(conn, store_id, name="Test Store", type="market", brand=None, vertical=None):
+def insert_store(conn, store_id, name="Test Store", type="market", brand=None, vertical=None, status="ACTIVE"):
     conn.execute(
-        "INSERT INTO stores (store_id, name, type, brand, vertical) VALUES (?, ?, ?, ?, ?)",
-        (store_id, name, type, brand, vertical)
+        "INSERT INTO stores (store_id, name, type, brand, vertical, status) VALUES (?, ?, ?, ?, ?, ?)",
+        (store_id, name, type, brand, vertical, status)
     )
 
 def insert_product(conn, product_id, store_id, name="Test Product", brand=None, 
@@ -59,14 +59,12 @@ def insert_membership(conn, store_id, product_id, raw_type, raw_name, raw_id=Non
         (store_id, product_id, raw_type, raw_name, raw_id, path, source, last_seen, semantic_type, semantic_reason)
     )
 
-def insert_run(conn, run_id, started_at, completed_at=None, status="SUCCESS", run_type="update", command="test", 
-               requests_made=0, products_discovered=0, products_updated=0, errors_count=0, location_source="unknown"):
+def insert_run(conn, run_id, started_at, finished_at=None, lat=None, lng=None, radius=None, vertical=None, status="SUCCESS", crawler_mode=None, coverage_complete=0, run_metadata=None, source="CLI"):
     conn.execute(
         """INSERT INTO runs (
-            run_id, started_at, completed_at, status, run_type, command, requests_made,
-            products_discovered, products_updated, errors_count, location_source
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-        (run_id, started_at, completed_at, status, run_type, command, requests_made, products_discovered, products_updated, errors_count, location_source)
+            run_id, started_at, finished_at, lat, lng, radius, vertical, status, crawler_mode, coverage_complete, run_metadata, source
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+        (run_id, started_at, finished_at, lat, lng, radius, vertical, status, crawler_mode, coverage_complete, run_metadata, source)
     )
 
 def insert_alert(conn, product_id, store_id, alert_type, triggered_at="2024-01-01T12:00:00Z"):

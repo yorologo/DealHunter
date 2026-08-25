@@ -1,24 +1,18 @@
 import pytest
-import sqlite3
 import asyncio
 from unittest.mock import patch
 from dealhunter.crawler_zone import _run_zone_inventory_async
 from dealhunter.catalog_sync import CoverageReport
+from tests.helpers.db import create_current_schema_db, insert_store, insert_run
 
 @pytest.fixture
-def test_db():
-    conn = sqlite3.connect(':memory:')
-    c = conn.cursor()
-    c.execute('''CREATE TABLE runs (run_id TEXT PRIMARY KEY, status TEXT, crawler_mode TEXT, coverage_complete INTEGER, finished_at TIMESTAMP, run_metadata TEXT)''')
-    c.execute('''CREATE TABLE stores (store_id TEXT PRIMARY KEY, name TEXT, brand TEXT, type TEXT, status TEXT, last_seen_at TIMESTAMP, vertical TEXT)''')
-    c.execute('''CREATE TABLE products (product_id TEXT, store_id TEXT, name TEXT)''')
-    c.execute('''CREATE TABLE observations (product_id TEXT, availability TEXT)''')
-    conn.commit()
-    return conn
+def test_db(tmp_path):
+    db_path = str(tmp_path / "scope_reconciliation.db")
+    return create_current_schema_db(db_path)
 
 def test_scope_safe_reconciliation(test_db):
     c = test_db.cursor()
-    test_db.execute("INSERT INTO runs (run_id, status) VALUES ('run1', 'RUNNING')")
+    insert_run(test_db, 'run1', started_at='2024-01-01T12:00:00Z', status='RUNNING')
     
     stores = [
         ('1', 'Rest', 'restaurants'),
@@ -30,7 +24,7 @@ def test_scope_safe_reconciliation(test_db):
         ('7', 'Farm', 'Farmatodo')
     ]
     for s in stores:
-        c.execute("INSERT INTO stores (store_id, name, type, status) VALUES (?, ?, ?, 'ACTIVE')", s)
+        insert_store(test_db, store_id=s[0], name=s[1], type=s[2], status='ACTIVE')
     test_db.commit()
     
     mock_merchants = [
@@ -60,8 +54,8 @@ def test_scope_safe_reconciliation(test_db):
 
 def test_a5_partial_no_stale(test_db):
     c = test_db.cursor()
-    test_db.execute("INSERT INTO runs (run_id, status) VALUES ('run2', 'RUNNING')")
-    c.execute("INSERT INTO stores (store_id, name, type, status) VALUES ('9', 'Super', 'market', 'ACTIVE')")
+    insert_run(test_db, 'run2', started_at='2024-01-01T12:00:00Z', status='RUNNING')
+    insert_store(test_db, '9', name='Super', type='market', status='ACTIVE')
     test_db.commit()
     
     with patch("dealhunter.crawler_zone.RappiSessionProvider.is_authenticated", return_value=True):
@@ -74,8 +68,8 @@ def test_a5_partial_no_stale(test_db):
 
 def test_a5_error_no_stale(test_db):
     c = test_db.cursor()
-    test_db.execute("INSERT INTO runs (run_id, status) VALUES ('run3', 'RUNNING')")
-    c.execute("INSERT INTO stores (store_id, name, type, status) VALUES ('10', 'Super', 'market', 'ACTIVE')")
+    insert_run(test_db, 'run3', started_at='2024-01-01T12:00:00Z', status='RUNNING')
+    insert_store(test_db, '10', name='Super', type='market', status='ACTIVE')
     test_db.commit()
     
     with patch("dealhunter.crawler_zone.RappiSessionProvider.is_authenticated", return_value=True):
