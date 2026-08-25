@@ -21,7 +21,7 @@ def run_zone_inventory(config, lat, lng, conn, run_id, dry_run=False):
         conn.commit()
         raise
 
-async def _run_zone_inventory_async(config, lat, lng, conn, run_id, dry_run=False):
+async def _run_zone_inventory_async(config, lat, lng, conn, run_id, dry_run=False, provider_id="rappi"):
     c = conn.cursor()
     c.execute('UPDATE runs SET crawler_mode = ? WHERE run_id = ?', ('ZONE_INVENTORY', run_id))
     conn.commit()
@@ -91,15 +91,15 @@ async def _run_zone_inventory_async(config, lat, lng, conn, run_id, dry_run=Fals
             elif "farma" in p_lower: vertical = "Farmacia"
             else: vertical = parent_type
 
-        c.execute('''INSERT INTO stores (store_id, name, brand, type, status, last_seen_at, vertical)
-                     VALUES (?, ?, ?, ?, ?, ?, ?)
-                     ON CONFLICT(store_id) DO UPDATE SET
+        c.execute('''INSERT INTO stores (provider, store_id, name, brand, type, status, last_seen_at, vertical)
+                     VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                     ON CONFLICT(provider, store_id) DO UPDATE SET
                      name = COALESCE(excluded.name, name),
                      type = COALESCE(excluded.type, type),
                      vertical = COALESCE(excluded.vertical, vertical),
                      status = 'ACTIVE',
                      last_seen_at = excluded.last_seen_at''',
-                  (s_id, s_name, m.get("brand", ""), parent_type, "ACTIVE", datetime.now().isoformat(), vertical))
+                  (provider_id, s_id, s_name, m.get("brand", ""), parent_type, "ACTIVE", datetime.now().isoformat(), vertical))
                   
         # Phase 3A: Store Facets
         facets = set()
@@ -122,8 +122,8 @@ async def _run_zone_inventory_async(config, lat, lng, conn, run_id, dry_run=Fals
         
         for val, src in facets:
             c.execute('''INSERT INTO store_facets (store_id, facet_type, raw_value, source, last_seen)
-                         VALUES (?, ?, ?, ?, ?)
-                         ON CONFLICT(store_id, facet_type, raw_value) DO UPDATE SET
+                         VALUES (?, ?, ?, ?, ?, ?)
+                         ON CONFLICT(provider, store_id, facet_type, raw_value) DO UPDATE SET
                          last_seen=excluded.last_seen
                       ''', (s_id, "store_subcategory", val, src, now_store_facets))
                       

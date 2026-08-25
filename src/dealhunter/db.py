@@ -4,7 +4,7 @@ import datetime
 import shutil
 import sys
 
-CURRENT_SCHEMA_VERSION = 14
+CURRENT_SCHEMA_VERSION = 15
 
 def get_default_db_path():
     return os.environ.get("RAPPI_DB_PATH", os.path.expanduser("~/rappi-deal-hunter/rappi-deals.db"))
@@ -107,6 +107,7 @@ def migrate(conn, db_path):
         if version < 5:
             c.execute('''CREATE TABLE IF NOT EXISTS alerts (
                          id INTEGER PRIMARY KEY AUTOINCREMENT,
+                         provider TEXT DEFAULT 'rappi',
                          product_id TEXT,
                          store_id TEXT,
                          alert_type TEXT,
@@ -116,7 +117,7 @@ def migrate(conn, db_path):
                          deal_status TEXT,
                          reason TEXT,
                          seen INTEGER DEFAULT 0,
-                         UNIQUE(product_id, store_id, alert_type, price)
+                         UNIQUE(provider, product_id, store_id, alert_type, price)
                          )''')
         
         if version < 6:
@@ -153,14 +154,16 @@ def migrate(conn, db_path):
         if version < 10:
             c.execute("ALTER TABLE stores ADD COLUMN vertical TEXT")
             c.execute('''CREATE TABLE IF NOT EXISTS store_facets (
+                provider TEXT DEFAULT 'rappi',
                 store_id TEXT NOT NULL,
                 facet_type TEXT NOT NULL,
                 raw_value TEXT NOT NULL,
                 source TEXT,
                 last_seen DATETIME,
-                UNIQUE(store_id, facet_type, raw_value)
+                UNIQUE(provider, store_id, facet_type, raw_value)
             )''')
             c.execute('''CREATE TABLE IF NOT EXISTS product_memberships (
+                provider TEXT DEFAULT 'rappi',
                 store_id TEXT NOT NULL,
                 product_id TEXT NOT NULL,
                 raw_type TEXT,
@@ -171,7 +174,7 @@ def migrate(conn, db_path):
                 last_seen DATETIME,
                 semantic_type TEXT DEFAULT 'UNKNOWN',
                 semantic_reason TEXT DEFAULT 'not_classified',
-                UNIQUE(store_id, product_id, raw_type, raw_name, path)
+                UNIQUE(provider, store_id, product_id, raw_type, raw_name, path)
             )''')
 
 
@@ -198,6 +201,7 @@ def migrate(conn, db_path):
         if version < 14:
             c.execute('''CREATE TABLE IF NOT EXISTS alert_events (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
+                provider TEXT DEFAULT 'rappi',
                 event_key TEXT UNIQUE NOT NULL,
                 event_type TEXT NOT NULL,
                 store_id TEXT NOT NULL,
@@ -211,6 +215,82 @@ def migrate(conn, db_path):
                 created_at DATETIME NOT NULL,
                 delivery_status TEXT DEFAULT 'pending'
             )''')
+
+        
+        if version < 15:
+            # Multi-provider Schema v15
+            
+            # STORES
+            c.execute('''CREATE TABLE stores_v15 (
+                provider TEXT DEFAULT 'rappi', store_id TEXT, name TEXT, brand TEXT, type TEXT, status TEXT DEFAULT 'UNKNOWN', last_seen_at DATETIME, vertical TEXT, PRIMARY KEY(provider, store_id)
+            )''')
+            c.execute('''INSERT INTO stores_v15 (provider, store_id, name, brand, type, status, last_seen_at, vertical)
+                         SELECT 'rappi', store_id, name, brand, type, status, last_seen_at, vertical FROM stores''')
+            c.execute('DROP TABLE stores')
+            c.execute('ALTER TABLE stores_v15 RENAME TO stores')
+            
+            # PRODUCTS
+            c.execute('''CREATE TABLE products_v15 (
+                provider TEXT DEFAULT 'rappi', product_id TEXT, store_id TEXT, name TEXT, brand TEXT, image TEXT, 
+                normalized_name TEXT, quantity REAL, unit TEXT, normalized_quantity REAL, normalized_unit TEXT, 
+                fingerprint TEXT, pack_count INTEGER, category TEXT, has_toppings INTEGER, category_source TEXT DEFAULT 'unknown',
+                PRIMARY KEY (provider, store_id, product_id)
+            )''')
+            c.execute('''INSERT INTO products_v15 (
+                provider, product_id, store_id, name, brand, image, normalized_name, quantity, unit, normalized_quantity, normalized_unit, fingerprint, pack_count, category, has_toppings, category_source
+            ) SELECT 'rappi', product_id, store_id, name, brand, image, normalized_name, quantity, unit, normalized_quantity, normalized_unit, fingerprint, pack_count, category, has_toppings, category_source FROM products''')
+            c.execute('DROP TABLE products')
+            c.execute('ALTER TABLE products_v15 RENAME TO products')
+            
+            # OBSERVATIONS
+            c.execute('''CREATE TABLE observations_v15 (
+                id INTEGER PRIMARY KEY AUTOINCREMENT, run_id TEXT, provider TEXT DEFAULT 'rappi', store_id TEXT, product_id TEXT, 
+                price REAL, original_price REAL, stock INTEGER, timestamp DATETIME, 
+                discount_price REAL, discount_promotion REAL, discount_effective REAL, 
+                discount_source TEXT, promotion_type TEXT, promotion_label TEXT, 
+                query_term TEXT, availability TEXT, has_pro_offer INTEGER DEFAULT NULL, pro_price REAL, pro_discount_effective REAL, limit_info TEXT, UNIQUE(run_id, provider, store_id, product_id)
+            )''')
+            c.execute('''INSERT INTO observations_v15 (
+                id, run_id, provider, store_id, product_id, price, original_price, stock, timestamp, discount_price, discount_promotion, discount_effective, discount_source, promotion_type, promotion_label, query_term, availability, has_pro_offer, pro_price, pro_discount_effective, limit_info
+            ) SELECT id, run_id, 'rappi', store_id, product_id, price, original_price, stock, timestamp, discount_price, discount_promotion, discount_effective, discount_source, promotion_type, promotion_label, query_term, availability, has_pro_offer, pro_price, pro_discount_effective, limit_info FROM observations''')
+            c.execute('DROP TABLE observations')
+            c.execute('ALTER TABLE observations_v15 RENAME TO observations')
+            
+            # FACETS
+            c.execute('''CREATE TABLE store_facets_v15 (
+                provider TEXT DEFAULT 'rappi', store_id TEXT NOT NULL, facet_type TEXT NOT NULL, raw_value TEXT NOT NULL, source TEXT, last_seen DATETIME, UNIQUE(provider, store_id, facet_type, raw_value)
+            )''')
+            c.execute('''INSERT INTO store_facets_v15 (provider, store_id, facet_type, raw_value, source, last_seen)
+                         SELECT 'rappi', store_id, facet_type, raw_value, source, last_seen FROM store_facets''')
+            c.execute('DROP TABLE store_facets')
+            c.execute('ALTER TABLE store_facets_v15 RENAME TO store_facets')
+            
+            # MEMBERSHIPS
+            c.execute('''CREATE TABLE product_memberships_v15 (
+                provider TEXT DEFAULT 'rappi', store_id TEXT NOT NULL, product_id TEXT NOT NULL, raw_type TEXT, raw_name TEXT NOT NULL, raw_id TEXT, path TEXT, source TEXT, last_seen DATETIME, semantic_type TEXT DEFAULT 'UNKNOWN', semantic_reason TEXT DEFAULT 'not_classified', UNIQUE(provider, store_id, product_id, raw_type, raw_name, path)
+            )''')
+            c.execute('''INSERT INTO product_memberships_v15 (provider, store_id, product_id, raw_type, raw_name, raw_id, path, source, last_seen, semantic_type, semantic_reason)
+                         SELECT 'rappi', store_id, product_id, raw_type, raw_name, raw_id, path, source, last_seen, semantic_type, semantic_reason FROM product_memberships''')
+            c.execute('DROP TABLE product_memberships')
+            c.execute('ALTER TABLE product_memberships_v15 RENAME TO product_memberships')
+            
+            # ALERTS
+            c.execute('''CREATE TABLE alerts_v15 (
+                id INTEGER PRIMARY KEY AUTOINCREMENT, provider TEXT DEFAULT 'rappi', product_id TEXT, store_id TEXT, alert_type TEXT, triggered_at DATETIME, price REAL, previous_price REAL, deal_status TEXT, reason TEXT, seen INTEGER DEFAULT 0, UNIQUE(provider, product_id, store_id, alert_type, price)
+            )''')
+            c.execute('''INSERT INTO alerts_v15 (id, provider, product_id, store_id, alert_type, triggered_at, price, previous_price, deal_status, reason, seen)
+                         SELECT id, 'rappi', product_id, store_id, alert_type, triggered_at, price, previous_price, deal_status, reason, seen FROM alerts''')
+            c.execute('DROP TABLE alerts')
+            c.execute('ALTER TABLE alerts_v15 RENAME TO alerts')
+            
+            # ALERT EVENTS
+            c.execute('''CREATE TABLE alert_events_v15 (
+                id INTEGER PRIMARY KEY AUTOINCREMENT, provider TEXT DEFAULT 'rappi', event_key TEXT UNIQUE NOT NULL, event_type TEXT NOT NULL, store_id TEXT NOT NULL, product_id TEXT NOT NULL, previous_observation_id INTEGER, current_observation_id INTEGER, channel TEXT NOT NULL, before_value TEXT, after_value TEXT, metadata TEXT, created_at DATETIME NOT NULL, delivery_status TEXT DEFAULT 'pending'
+            )''')
+            c.execute('''INSERT INTO alert_events_v15 (id, provider, event_key, event_type, store_id, product_id, previous_observation_id, current_observation_id, channel, before_value, after_value, metadata, created_at, delivery_status)
+                         SELECT id, 'rappi', event_key, event_type, store_id, product_id, previous_observation_id, current_observation_id, channel, before_value, after_value, metadata, created_at, delivery_status FROM alert_events''')
+            c.execute('DROP TABLE alert_events')
+            c.execute('ALTER TABLE alert_events_v15 RENAME TO alert_events')
 
         c.execute('UPDATE schema_version SET version = ?', (CURRENT_SCHEMA_VERSION,))
         conn.commit()

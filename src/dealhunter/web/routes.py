@@ -6,13 +6,22 @@ from dealhunter.web.queries import (
 )
 
 def register_routes(app):
+    def _base_filters(extra=None):
+        f = {}
+        provider = request.cookies.get('dh_provider', 'all')
+        if provider != 'all':
+            f['providers'] = [provider]
+        if extra:
+            f.update(extra)
+        return f
+
     
     @app.route('/')
     def home():
         db_path = current_app.config['DATABASE']
         metrics = get_home_metrics(db_path)
-        deals = get_home_deals(db_path)
-        watchlist = get_watchlist(db_path)
+        deals = get_home_deals(db_path, _base_filters())
+        watchlist = get_watchlist(db_path, _base_filters())
         return render_template('home.html', metrics=metrics, deals=deals, watchlist=watchlist, current_path='/')
         
     @app.route('/search')
@@ -24,7 +33,7 @@ def register_routes(app):
             return render_template('search_results.html', results={}, q=q, current_path='/search')
             
         db_path = current_app.config['DATABASE']
-        results = search_local(db_path, q)
+        results = search_local(db_path, q, _base_filters())
         
         if request.headers.get('HX-Request'):
             return render_template('partials/search_results.html', results=results, q=q)
@@ -74,7 +83,7 @@ def register_routes(app):
         category = request.args.getlist('category')
         store_type = request.args.get('store_type', '')
         
-        filters = {}
+        filters = _base_filters()
         if category: filters["category"] = category
         if store_type: filters["store_type"] = store_type
         
@@ -93,7 +102,7 @@ def register_routes(app):
         page = int(request.args.get('page', 1))
         sort = request.args.get('sort', 'opportunity')
         tab = request.args.get('tab', 'Todo')
-        data = get_deals(db_path, {"tab": tab}, sort, page)
+        data = get_deals(db_path, _base_filters({"tab": tab}), sort, page)
         if request.headers.get('HX-Request') and not request.headers.get('HX-Boosted'):
             return render_template('partials/catalog_grid.html', data=data, filters=filters, sort=sort, view_mode=request.cookies.get('view_mode', 'cards'))
         return render_template('deals.html', data=data, tab=tab, sort=sort, current_path='/deals')
@@ -140,7 +149,7 @@ def register_routes(app):
     @app.route('/partials/categories')
     def partial_categories():
         db_path = current_app.config['DATABASE']
-        filters = {}
+        filters = _base_filters()
         if request.args.get('vertical'): filters["vertical"] = request.args.get('vertical')
         if request.args.getlist('store'): filters["store"] = request.args.getlist('store')
         facets = get_ui_facets(db_path, filters)
@@ -152,7 +161,7 @@ def register_routes(app):
 
     def categories():
         db_path = current_app.config['DATABASE']
-        cats = get_categories(db_path)
+        cats = get_categories(db_path, _base_filters())
         return render_template('categories.html', cats=cats, current_path='/categories')
         
     @app.route('/categories/<category>')

@@ -31,7 +31,7 @@ def matches_filters(name, brand, store, cat, config, eff_discount, promo_type, e
 
     return True
 
-def process_and_insert_product(p, run_id, s_id, s_name, config, q, conn, seen_in_run):
+def process_and_insert_product(p, run_id, s_id, s_name, config, q, conn, seen_in_run, provider="rappi"):
     c = conn.cursor()
     pname = p.get("name", "")
     p_id = str(p.get("id") or p.get("product_id", ""))
@@ -117,11 +117,11 @@ def process_and_insert_product(p, run_id, s_id, s_name, config, q, conn, seen_in
         norm["pack_count"]
     )
         
-    c.execute('''INSERT INTO products (product_id, store_id, name, brand, image, 
+    c.execute('''INSERT INTO products (provider, product_id, store_id, name, brand, image, 
                  normalized_name, quantity, unit, normalized_quantity, normalized_unit,
                  fingerprint, pack_count, category, has_toppings, category_source)
-                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                 ON CONFLICT(product_id, store_id) DO UPDATE SET
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                 ON CONFLICT(provider, store_id, product_id) DO UPDATE SET
                  brand = COALESCE(NULLIF(brand, ''), excluded.brand),
                  normalized_name = COALESCE(NULLIF(normalized_name, ''), excluded.normalized_name),
                  quantity = COALESCE(quantity, excluded.quantity),
@@ -141,7 +141,7 @@ def process_and_insert_product(p, run_id, s_id, s_name, config, q, conn, seen_in
                     ELSE fingerprint
                  END
                  ''',
-              (p_id, s_id, pname, brand, img,
+              (provider, p_id, s_id, pname, brand, img,
                norm["normalized_name"], norm["quantity"], norm["unit"], 
                norm["normalized_quantity"], norm["normalized_unit"], fingerprint,
                norm["pack_count"], cat, has_toppings, cat_source))
@@ -160,26 +160,26 @@ def process_and_insert_product(p, run_id, s_id, s_name, config, q, conn, seen_in
         stype, sreason = classify_membership(raw_name, cat, cat_source, raw_type)
         
         c.execute('''INSERT INTO product_memberships
-                     (store_id, product_id, raw_type, raw_name, raw_id, path, source, last_seen, semantic_type, semantic_reason)
-                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                     ON CONFLICT(store_id, product_id, raw_type, raw_name, path) DO UPDATE SET
+                     (provider, store_id, product_id, raw_type, raw_name, raw_id, path, source, last_seen, semantic_type, semantic_reason)
+                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                     ON CONFLICT(provider, store_id, product_id, raw_type, raw_name, path) DO UPDATE SET
                      last_seen=excluded.last_seen, raw_id=excluded.raw_id,
                      semantic_type=excluded.semantic_type, semantic_reason=excluded.semantic_reason
-                  ''', (s_id, p_id, raw_type, raw_name, raw_id, path_str, "catalog_sync", now, stype, sreason))
+                  ''', (provider, s_id, p_id, raw_type, raw_name, raw_id, path_str, "catalog_sync", now, stype, sreason))
     
     # Phase 3A.1: Safe Facet Reconciliation
     # Remove stale memberships for this product that were not seen in this complete observation
     c.execute('''DELETE FROM product_memberships 
-                 WHERE store_id=? AND product_id=? AND last_seen != ?''', 
-              (s_id, p_id, now))
+                 WHERE provider=? AND store_id=? AND product_id=? AND last_seen != ?''', 
+              (provider, s_id, p_id, now))
     
     from dealhunter.db import CURRENT_SCHEMA_VERSION
     if CURRENT_SCHEMA_VERSION >= 12:
-        c.execute('''INSERT OR IGNORE INTO observations (run_id, store_id, product_id, price, original_price, stock, timestamp, 
+        c.execute('''INSERT OR IGNORE INTO observations (run_id, provider, store_id, product_id, price, original_price, stock, timestamp, 
                      discount_price, discount_promotion, discount_effective, discount_source, promotion_type, promotion_label, query_term, availability,
                      has_pro_offer, pro_price, pro_discount_effective, limit_info)
-                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''', 
-                     (run_id, s_id, p_id, eff_price, eff_real, stock_val, datetime.now().isoformat(), 
+                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''', 
+                     (run_id, provider, s_id, p_id, eff_price, eff_real, stock_val, datetime.now().isoformat(), 
                       d_price, d_promo, d_eff, d_src, p_type, p_label, q, availability,
                       1 if comm_extra.get("has_pro_offer") else (None if availability == "UNAVAILABLE" else 0),
                       comm_extra.get("pro_price"),
@@ -188,7 +188,7 @@ def process_and_insert_product(p, run_id, s_id, s_name, config, q, conn, seen_in
     else:
         c.execute('''INSERT OR IGNORE INTO observations (run_id, store_id, product_id, price, original_price, stock, timestamp, 
                      discount_price, discount_promotion, discount_effective, discount_source, promotion_type, promotion_label, query_term, availability)
-                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''', 
-                     (run_id, s_id, p_id, eff_price, eff_real, stock_val, datetime.now().isoformat(), 
+                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''', 
+                     (run_id, provider, s_id, p_id, eff_price, eff_real, stock_val, datetime.now().isoformat(), 
                       d_price, d_promo, d_eff, d_src, p_type, p_label, q, availability))
     return True

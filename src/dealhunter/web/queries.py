@@ -20,11 +20,12 @@ def get_home_metrics(db_path):
         "new_alerts": new_alerts
     }
 
-def get_home_deals(db_path):
+def get_home_deals(db_path, filters=None):
+    if filters is None: filters = {}
     # Using analyze_history from historico
-    new_lows = analyze_history(db_path, {"status": ["NEW_LOW"], "sort": "discount"})
-    real_deals = analyze_history(db_path, {"status": ["REAL_DEAL"], "sort": "discount"})
-    good_prices = analyze_history(db_path, {"status": ["GOOD_PRICE"], "sort": "discount"})
+    new_lows = analyze_history(db_path, {**filters, "status": ["NEW_LOW"], "sort": "discount"})
+    real_deals = analyze_history(db_path, {**filters, "status": ["REAL_DEAL"], "sort": "discount"})
+    good_prices = analyze_history(db_path, {**filters, "status": ["GOOD_PRICE"], "sort": "discount"})
     
     # Top 5 for each category to show on home
     return {
@@ -33,7 +34,7 @@ def get_home_deals(db_path):
         "good_prices": good_prices[:5],
     }
 
-def get_watchlist(db_path):
+def get_watchlist(db_path, filters=None):
     c = sqlite3.connect(db_path).cursor()
     try:
         c.execute("SELECT query, store_filter, target_price FROM watchlist WHERE enabled = 1")
@@ -94,7 +95,7 @@ from datetime import datetime
 def get_product_detail(db_path, store_id, product_id):
     c = sqlite3.connect(db_path).cursor()
     c.execute('''
-        SELECT p.product_id, p.store_id, p.name, s.name, s.type as store_type, p.brand, 
+        SELECT p.provider, p.product_id, p.store_id, p.name, s.name, s.type as store_type, p.brand, 
                p.category, p.quantity, p.unit, p.normalized_quantity, p.normalized_unit, p.pack_count
         FROM products p
         JOIN stores s ON p.store_id = s.store_id
@@ -105,18 +106,19 @@ def get_product_detail(db_path, store_id, product_id):
         return None
         
     p = {
-        "product_id": row[0],
-        "store_id": row[1],
-        "product_name": row[2],
-        "store_name": row[3],
-        "store_type": row[4],
-        "brand": row[5],
-        "category": row[6],
-        "quantity": row[7],
-        "unit": row[8],
-        "normalized_quantity": row[9],
-        "normalized_unit": row[10],
-        "pack_count": row[11]
+        "provider": row[0],
+        "product_id": row[1],
+        "store_id": row[2],
+        "product_name": row[3],
+        "store_name": row[4],
+        "store_type": row[5],
+        "brand": row[6],
+        "category": row[7],
+        "quantity": row[8],
+        "unit": row[9],
+        "normalized_quantity": row[10],
+        "normalized_unit": row[11],
+        "pack_count": row[12]
     }
     
     # Get obs
@@ -450,7 +452,7 @@ def get_catalog(db_path, filters, sort, page, per_page=25):
 
 
 
-def get_categories(db_path):
+def get_categories(db_path, filters=None):
     conn = sqlite3.connect(db_path)
     c = conn.cursor()
     # Use real category from products, fallback to Uncategorized
@@ -467,7 +469,7 @@ def get_categories(db_path):
     conn.close()
     return cats
     
-def get_stores(db_path, hide_empty=True):
+def get_stores(db_path, hide_empty=True, filters=None):
     import sqlite3
     conn = sqlite3.connect(db_path)
     c = conn.cursor()
@@ -522,7 +524,7 @@ def get_store_detail(db_path, store_id):
     }
 
 
-def get_restaurants_home(db_path):
+def get_restaurants_home(db_path, filters=None):
     conn = sqlite3.connect(db_path)
     c = conn.cursor()
     
@@ -648,7 +650,8 @@ def get_restaurant_detail(db_path, store_id):
     return res
 
 
-def search_local(db_path, query, limit=50):
+def search_local(db_path, query, filters=None):
+    limit = 50
     conn = sqlite3.connect(db_path)
     c = conn.cursor()
     
@@ -707,7 +710,7 @@ def search_local(db_path, query, limit=50):
         "products": p_results
     }
 
-def get_available_stores(db_path, vertical=None):
+def get_available_stores(db_path, vertical=None, filters=None):
     conn = sqlite3.connect(db_path)
     c = conn.cursor()
     if vertical:
@@ -721,7 +724,7 @@ def get_available_stores(db_path, vertical=None):
         c.execute("SELECT store_id, name FROM stores ORDER BY name")
     return [{"id": r[0], "name": r[1]} for r in c.fetchall()]
 
-def get_available_categories(db_path, vertical=None, store_ids=None):
+def get_available_categories(db_path, vertical=None, store_ids=None, filters=None):
     conn = sqlite3.connect(db_path)
     c = conn.cursor()
     query = "SELECT DISTINCT category FROM products p JOIN stores s ON p.store_id = s.store_id WHERE category IS NOT NULL AND category != ''"

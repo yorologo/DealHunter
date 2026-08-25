@@ -4,7 +4,25 @@ def _build_where(filters: dict, exclude_dim=None):
     where_clauses = []
     params = []
     
+
+    # 0. Provider
+    providers = filters.get("providers")
+    if providers and exclude_dim != "providers":
+        placeholders = ",".join(["?"] * len(providers))
+        where_clauses.append(f"p.provider IN ({placeholders})")
+        params.extend(providers)
+        
+
+    # 0. Provider
+    providers = filters.get("providers")
+    if providers and exclude_dim != "providers":
+        placeholders = ",".join(["?"] * len(providers))
+        where_clauses.append(f"p.provider IN ({placeholders})")
+        params.extend(providers)
+        
     # 1. Verticals
+
+
     verticals = filters.get("verticals")
     if verticals and exclude_dim != "verticals":
         placeholders = ",".join(["?"] * len(verticals))
