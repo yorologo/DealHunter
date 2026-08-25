@@ -42,7 +42,7 @@ def register_routes(app):
     @app.route('/products')
     def products():
         db_path = current_app.config['DATABASE']
-        results = search_local(db_path, "", limit=50)
+        results = search_local(db_path, "")
         return render_template('products.html', results=results, current_path='/products')
 
     @app.route('/products/<store_id>/<product_id>')
