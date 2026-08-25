@@ -47,14 +47,10 @@ def test_migration_v10_to_v11(tmp_path):
     assert row[1] == 'not_classified'
     conn.close()
 
-def test_semantic_persistence_rules(tmp_path):
-    db_path = str(tmp_path / "test_persistence.db")
-    setup_db(db_path)
-    conn = sqlite3.connect(db_path)
+def test_semantic_persistence_rules(current_schema_db):
+    conn = current_schema_db
     
     c = conn.cursor()
-    c.execute('''CREATE TABLE IF NOT EXISTS observations (id INTEGER PRIMARY KEY, store_id TEXT)''')
-    c.execute('''CREATE TABLE IF NOT EXISTS products (product_id TEXT PRIMARY KEY, store_id TEXT)''')
     
     seen = set()
     now = get_now()
