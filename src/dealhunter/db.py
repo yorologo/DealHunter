@@ -4,7 +4,7 @@ import datetime
 import shutil
 import sys
 
-CURRENT_SCHEMA_VERSION = 14
+CURRENT_SCHEMA_VERSION = 15
 
 def get_default_db_path():
     return os.environ.get("RAPPI_DB_PATH", os.path.expanduser("~/rappi-deal-hunter/rappi-deals.db"))
@@ -18,17 +18,18 @@ def setup_db(db_path=None):
     # Ensure backward compatibility by creating existing tables if they don't exist
     c = conn.cursor()
     c.execute('''CREATE TABLE IF NOT EXISTS stores
-                 (store_id TEXT PRIMARY KEY, name TEXT, brand TEXT, type TEXT)''')
+                 (provider TEXT NOT NULL DEFAULT 'rappi', store_id TEXT, name TEXT, brand TEXT, type TEXT,
+                  PRIMARY KEY (provider, store_id))''')
     
     c.execute('''CREATE TABLE IF NOT EXISTS products
-                 (product_id TEXT, store_id TEXT, name TEXT, brand TEXT, image TEXT,
+                 (provider TEXT NOT NULL DEFAULT 'rappi', product_id TEXT, store_id TEXT, name TEXT, brand TEXT, image TEXT,
                   normalized_name TEXT, quantity REAL, unit TEXT, 
                   normalized_quantity REAL, normalized_unit TEXT, fingerprint TEXT,
                   pack_count INTEGER,
                   category TEXT,
                   has_toppings INTEGER,
                   category_source TEXT DEFAULT 'unknown',
-                  PRIMARY KEY (store_id, product_id))''')
+                  PRIMARY KEY (provider, store_id, product_id))''')
                   
     c.execute('''CREATE TABLE IF NOT EXISTS runs (
                  run_id TEXT PRIMARY KEY, 
@@ -42,12 +43,12 @@ def setup_db(db_path=None):
                  
     # Base creation logic for v2
     c.execute('''CREATE TABLE IF NOT EXISTS observations
-                 (id INTEGER PRIMARY KEY AUTOINCREMENT, run_id TEXT, store_id TEXT, product_id TEXT, 
+                 (id INTEGER PRIMARY KEY AUTOINCREMENT, run_id TEXT, provider TEXT NOT NULL DEFAULT 'rappi', store_id TEXT, product_id TEXT, 
                   price REAL, original_price REAL, stock INTEGER, timestamp DATETIME, 
                   discount_price REAL, discount_promotion REAL, discount_effective REAL,
                   discount_source TEXT, promotion_type TEXT, promotion_label TEXT,
                   query_term TEXT, availability TEXT,
-                  UNIQUE(run_id, store_id, product_id))''')
+                  UNIQUE(run_id, provider, store_id, product_id))''')
 
     # Migrations
     migrate(conn, db_path)
@@ -107,6 +108,7 @@ def migrate(conn, db_path):
         if version < 5:
             c.execute('''CREATE TABLE IF NOT EXISTS alerts (
                          id INTEGER PRIMARY KEY AUTOINCREMENT,
+                         provider TEXT NOT NULL DEFAULT 'rappi',
                          product_id TEXT,
                          store_id TEXT,
                          alert_type TEXT,
@@ -116,7 +118,7 @@ def migrate(conn, db_path):
                          deal_status TEXT,
                          reason TEXT,
                          seen INTEGER DEFAULT 0,
-                         UNIQUE(product_id, store_id, alert_type, price)
+                         UNIQUE(provider, product_id, store_id, alert_type, price)
                          )''')
         
         if version < 6:
@@ -137,30 +139,40 @@ def migrate(conn, db_path):
         if version < 8:
             try:
                 c.execute("ALTER TABLE stores ADD COLUMN status TEXT DEFAULT 'UNKNOWN'")
+            except Exception: pass
+            try:
                 c.execute("ALTER TABLE stores ADD COLUMN last_seen_at DATETIME")
+            except Exception: pass
+            try:
                 c.execute("ALTER TABLE runs ADD COLUMN crawler_mode TEXT")
+            except Exception: pass
+            try:
                 c.execute("ALTER TABLE runs ADD COLUMN coverage_complete INTEGER DEFAULT 0")
-            except Exception:
-                pass
+            except Exception: pass
                 
         if version < 9:
             try:
                 c.execute("ALTER TABLE runs ADD COLUMN run_metadata TEXT")
+            except Exception: pass
+            try:
                 c.execute("ALTER TABLE runs ADD COLUMN source TEXT DEFAULT 'CLI'")
-            except Exception:
-                pass
+            except Exception: pass
 
         if version < 10:
-            c.execute("ALTER TABLE stores ADD COLUMN vertical TEXT")
+            try:
+                c.execute("ALTER TABLE stores ADD COLUMN vertical TEXT")
+            except Exception: pass
             c.execute('''CREATE TABLE IF NOT EXISTS store_facets (
+                provider TEXT NOT NULL DEFAULT 'rappi',
                 store_id TEXT NOT NULL,
                 facet_type TEXT NOT NULL,
                 raw_value TEXT NOT NULL,
                 source TEXT,
                 last_seen DATETIME,
-                UNIQUE(store_id, facet_type, raw_value)
+                UNIQUE(provider, store_id, facet_type, raw_value)
             )''')
             c.execute('''CREATE TABLE IF NOT EXISTS product_memberships (
+                provider TEXT NOT NULL DEFAULT 'rappi',
                 store_id TEXT NOT NULL,
                 product_id TEXT NOT NULL,
                 raw_type TEXT,
@@ -171,7 +183,7 @@ def migrate(conn, db_path):
                 last_seen DATETIME,
                 semantic_type TEXT DEFAULT 'UNKNOWN',
                 semantic_reason TEXT DEFAULT 'not_classified',
-                UNIQUE(store_id, product_id, raw_type, raw_name, path)
+                UNIQUE(provider, store_id, product_id, raw_type, raw_name, path)
             )''')
 
 
@@ -199,6 +211,7 @@ def migrate(conn, db_path):
             c.execute('''CREATE TABLE IF NOT EXISTS alert_events (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 event_key TEXT UNIQUE NOT NULL,
+                provider TEXT NOT NULL DEFAULT 'rappi',
                 event_type TEXT NOT NULL,
                 store_id TEXT NOT NULL,
                 product_id TEXT NOT NULL,
@@ -211,6 +224,87 @@ def migrate(conn, db_path):
                 created_at DATETIME NOT NULL,
                 delivery_status TEXT DEFAULT 'pending'
             )''')
+
+        
+        if version < 15:
+            def table_exists(t):
+                c.execute(f"SELECT name FROM sqlite_master WHERE type='table' AND name='{t}'")
+                return c.fetchone() is not None
+
+            def get_cols(t):
+                c.execute(f"PRAGMA table_info({t})")
+                return [row[1] for row in c.fetchall()]
+
+            def migrate_table(old_name, new_ddl):
+                if not table_exists(old_name): return
+                new_name = f"_{old_name}_new"
+                c.execute(new_ddl)
+                
+                # Get existing columns in old table
+                old_cols = get_cols(old_name)
+                # Get columns in new table
+                new_cols = get_cols(new_name)
+                
+                # Intersection
+                common_cols = [col for col in old_cols if col in new_cols]
+                
+                if common_cols:
+                    cols_str = ", ".join(common_cols)
+                    c.execute(f"INSERT INTO {new_name} ({cols_str}) SELECT {cols_str} FROM {old_name}")
+                
+                c.execute(f"DROP TABLE {old_name}")
+                c.execute(f"ALTER TABLE {new_name} RENAME TO {old_name}")
+
+            # STORES
+            migrate_table('stores', "CREATE TABLE _stores_new (provider TEXT NOT NULL DEFAULT 'rappi', store_id TEXT, name TEXT, brand TEXT, type TEXT, status TEXT DEFAULT 'UNKNOWN', last_seen_at DATETIME, vertical TEXT, PRIMARY KEY (provider, store_id))")
+
+            # PRODUCTS
+            migrate_table('products', """CREATE TABLE _products_new (
+                  provider TEXT NOT NULL DEFAULT 'rappi', product_id TEXT, store_id TEXT, name TEXT, brand TEXT, image TEXT,
+                  normalized_name TEXT, quantity REAL, unit TEXT, 
+                  normalized_quantity REAL, normalized_unit TEXT, fingerprint TEXT,
+                  pack_count INTEGER, category TEXT, has_toppings INTEGER, category_source TEXT DEFAULT 'unknown',
+                  PRIMARY KEY (provider, store_id, product_id))""")
+
+            # OBSERVATIONS
+            migrate_table('observations', """CREATE TABLE _observations_new (
+                  id INTEGER PRIMARY KEY AUTOINCREMENT, run_id TEXT, provider TEXT NOT NULL DEFAULT 'rappi', store_id TEXT, product_id TEXT, 
+                  price REAL, original_price REAL, stock INTEGER, timestamp DATETIME, 
+                  discount_price REAL, discount_promotion REAL, discount_effective REAL,
+                  discount_source TEXT, promotion_type TEXT, promotion_label TEXT,
+                  query_term TEXT, availability TEXT, has_pro_offer INTEGER DEFAULT NULL,
+                  pro_price REAL, pro_discount_effective REAL, limit_info TEXT,
+                  UNIQUE(run_id, provider, store_id, product_id))""")
+            
+            try:
+                c.execute('CREATE INDEX IF NOT EXISTS idx_obs_history ON observations(provider, store_id, product_id, timestamp DESC, id DESC)')
+                c.execute('DROP INDEX IF EXISTS idx_obs_history') # drop old
+            except Exception:
+                pass
+
+            # STORE_FACETS
+            migrate_table('store_facets', """CREATE TABLE _store_facets_new (
+                provider TEXT NOT NULL DEFAULT 'rappi', store_id TEXT NOT NULL, facet_type TEXT NOT NULL, raw_value TEXT NOT NULL,
+                source TEXT, last_seen DATETIME, UNIQUE(provider, store_id, facet_type, raw_value))""")
+
+            # PRODUCT_MEMBERSHIPS
+            migrate_table('product_memberships', """CREATE TABLE _product_memberships_new (
+                provider TEXT NOT NULL DEFAULT 'rappi', store_id TEXT NOT NULL, product_id TEXT NOT NULL, raw_type TEXT, raw_name TEXT NOT NULL, raw_id TEXT,
+                path TEXT, source TEXT, last_seen DATETIME, semantic_type TEXT DEFAULT 'UNKNOWN', semantic_reason TEXT DEFAULT 'not_classified',
+                UNIQUE(provider, store_id, product_id, raw_type, raw_name, path))""")
+
+            # ALERTS
+            migrate_table('alerts', """CREATE TABLE _alerts_new (
+                         id INTEGER PRIMARY KEY AUTOINCREMENT, provider TEXT NOT NULL DEFAULT 'rappi', product_id TEXT, store_id TEXT,
+                         alert_type TEXT, triggered_at DATETIME, price REAL, previous_price REAL, deal_status TEXT, reason TEXT, seen INTEGER DEFAULT 0,
+                         UNIQUE(provider, product_id, store_id, alert_type, price))""")
+            
+            # ALERT_EVENTS
+            migrate_table('alert_events', """CREATE TABLE _alert_events_new (
+                id INTEGER PRIMARY KEY AUTOINCREMENT, event_key TEXT UNIQUE NOT NULL, provider TEXT NOT NULL DEFAULT 'rappi',
+                event_type TEXT NOT NULL, store_id TEXT NOT NULL, product_id TEXT NOT NULL, previous_observation_id INTEGER,
+                current_observation_id INTEGER, channel TEXT NOT NULL, before_value TEXT, after_value TEXT, metadata TEXT,
+                created_at DATETIME NOT NULL, delivery_status TEXT DEFAULT 'pending')""")
 
         c.execute('UPDATE schema_version SET version = ?', (CURRENT_SCHEMA_VERSION,))
         conn.commit()

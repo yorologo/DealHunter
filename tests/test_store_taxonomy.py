@@ -31,7 +31,7 @@ def persist_merchant_mock(conn, m):
 
     c.execute('''INSERT INTO stores (store_id, name, brand, type, status, last_seen_at, vertical)
                  VALUES (?, ?, ?, ?, ?, ?, ?)
-                 ON CONFLICT(store_id) DO UPDATE SET
+                 ON CONFLICT(provider, store_id) DO UPDATE SET
                  name = COALESCE(excluded.name, name),
                  type = COALESCE(excluded.type, type),
                  vertical = COALESCE(excluded.vertical, vertical),
@@ -56,7 +56,7 @@ def persist_merchant_mock(conn, m):
     for val, src in facets:
         c.execute('''INSERT INTO store_facets (store_id, facet_type, raw_value, source, last_seen)
                      VALUES (?, ?, ?, ?, ?)
-                     ON CONFLICT(store_id, facet_type, raw_value) DO UPDATE SET
+                     ON CONFLICT(provider, store_id, facet_type, raw_value) DO UPDATE SET
                      last_seen=excluded.last_seen
                   ''', (s_id, "store_subcategory", val, src, now_store_facets))
                   

@@ -121,7 +121,7 @@ def process_and_insert_product(p, run_id, s_id, s_name, config, q, conn, seen_in
                  normalized_name, quantity, unit, normalized_quantity, normalized_unit,
                  fingerprint, pack_count, category, has_toppings, category_source)
                  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                 ON CONFLICT(product_id, store_id) DO UPDATE SET
+                 ON CONFLICT(provider, store_id, product_id) DO UPDATE SET
                  brand = COALESCE(NULLIF(brand, ''), excluded.brand),
                  normalized_name = COALESCE(NULLIF(normalized_name, ''), excluded.normalized_name),
                  quantity = COALESCE(quantity, excluded.quantity),
@@ -162,7 +162,7 @@ def process_and_insert_product(p, run_id, s_id, s_name, config, q, conn, seen_in
         c.execute('''INSERT INTO product_memberships
                      (store_id, product_id, raw_type, raw_name, raw_id, path, source, last_seen, semantic_type, semantic_reason)
                      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                     ON CONFLICT(store_id, product_id, raw_type, raw_name, path) DO UPDATE SET
+                     ON CONFLICT(provider, store_id, product_id, raw_type, raw_name, path) DO UPDATE SET
                      last_seen=excluded.last_seen, raw_id=excluded.raw_id,
                      semantic_type=excluded.semantic_type, semantic_reason=excluded.semantic_reason
                   ''', (s_id, p_id, raw_type, raw_name, raw_id, path_str, "catalog_sync", now, stype, sreason))
