@@ -31,11 +31,11 @@ async def _run_zone_inventory_async(config, lat, lng, conn, run_id, dry_run=Fals
 
     checkpoint = RunCheckpoint(run_id=run_id, mode="zone_inventory", status="RUNNING")
 
-    provider = RappiSessionProvider()
-    if not await provider.is_authenticated():
+    session_provider = RappiSessionProvider()
+    if not await session_provider.is_authenticated():
         return "SESSION_INVALID", 0
 
-    client = AuthenticatedHttpClient(provider)
+    client = AuthenticatedHttpClient(session_provider)
     discovery = MerchantDiscovery(client)
     cpg_adapter = CPGCatalogAdapter(client)
     rest_adapter = RestaurantMenuAdapter(client)
@@ -91,15 +91,15 @@ async def _run_zone_inventory_async(config, lat, lng, conn, run_id, dry_run=Fals
             elif "farma" in p_lower: vertical = "Farmacia"
             else: vertical = parent_type
 
-        c.execute('''INSERT INTO stores (store_id, name, brand, type, status, last_seen_at, vertical)
-                     VALUES (?, ?, ?, ?, ?, ?, ?)
+        c.execute('''INSERT INTO stores (provider, store_id, name, brand, type, status, last_seen_at, vertical)
+                     VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                      ON CONFLICT(provider, store_id) DO UPDATE SET
                      name = COALESCE(excluded.name, name),
                      type = COALESCE(excluded.type, type),
                      vertical = COALESCE(excluded.vertical, vertical),
                      status = 'ACTIVE',
                      last_seen_at = excluded.last_seen_at''',
-                  (s_id, s_name, m.get("brand", ""), parent_type, "ACTIVE", datetime.now().isoformat(), vertical))
+                  ("rappi", s_id, s_name, m.get("brand", ""), parent_type, "ACTIVE", datetime.now().isoformat(), vertical))
                   
         # Phase 3A: Store Facets
         facets = set()
@@ -121,14 +121,14 @@ async def _run_zone_inventory_async(config, lat, lng, conn, run_id, dry_run=Fals
         now_store_facets = datetime.now().isoformat()
         
         for val, src in facets:
-            c.execute('''INSERT INTO store_facets (store_id, facet_type, raw_value, source, last_seen)
-                         VALUES (?, ?, ?, ?, ?)
+            c.execute('''INSERT INTO store_facets (provider, store_id, facet_type, raw_value, source, last_seen)
+                         VALUES (?, ?, ?, ?, ?, ?)
                          ON CONFLICT(provider, store_id, facet_type, raw_value) DO UPDATE SET
                          last_seen=excluded.last_seen
-                      ''', (s_id, "store_subcategory", val, src, now_store_facets))
+                      ''', ("rappi", s_id, "store_subcategory", val, src, now_store_facets))
                       
         if has_metadata:
-            c.execute('DELETE FROM store_facets WHERE store_id=? AND last_seen != ?', (s_id, now_store_facets))
+            c.execute('DELETE FROM store_facets WHERE provider=? AND store_id=? AND last_seen != ?', ("rappi", s_id, now_store_facets))
             
         conn.commit()
 

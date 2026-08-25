@@ -1,4 +1,12 @@
 import sqlite3
+
+def add_column_if_not_exists(cursor, table, column, ddl_type):
+    cursor.execute(f"PRAGMA table_info({table})")
+    columns = [row[1] for row in cursor.fetchall()]
+    if column not in columns:
+        cursor.execute(f"ALTER TABLE {table} ADD COLUMN {column} {ddl_type}")
+
+
 import os
 import datetime
 import shutil
@@ -84,25 +92,18 @@ def migrate(conn, db_path):
                          enabled INTEGER DEFAULT 1)''')
                          
         if version < 2:
-            try:
-                c.execute('''ALTER TABLE observations ADD COLUMN availability TEXT''')
-            except sqlite3.OperationalError:
-                pass # Column might exist if creating from scratch using v2 string above
+            add_column_if_not_exists(c, 'observations', 'availability', "TEXT")
                 
         if version < 3:
-            cols = ["normalized_name TEXT", "quantity REAL", "unit TEXT", 
-                    "normalized_quantity REAL", "normalized_unit TEXT", "fingerprint TEXT"]
-            for col in cols:
-                try:
-                    c.execute(f"ALTER TABLE products ADD COLUMN {col}")
-                except sqlite3.OperationalError:
-                    pass
+            add_column_if_not_exists(c, 'products', 'normalized_name', "TEXT")
+            add_column_if_not_exists(c, 'products', 'quantity', "REAL")
+            add_column_if_not_exists(c, 'products', 'unit', "TEXT")
+            add_column_if_not_exists(c, 'products', 'normalized_quantity', "REAL")
+            add_column_if_not_exists(c, 'products', 'normalized_unit', "TEXT")
+            add_column_if_not_exists(c, 'products', 'fingerprint', "TEXT")
 
         if version < 4:
-            try:
-                c.execute("ALTER TABLE products ADD COLUMN pack_count INTEGER")
-            except sqlite3.OperationalError:
-                pass
+            add_column_if_not_exists(c, 'products', 'pack_count', "INTEGER")
                 
 
         if version < 5:
@@ -122,46 +123,26 @@ def migrate(conn, db_path):
                          )''')
         
         if version < 6:
-            try:
-                c.execute("ALTER TABLE products ADD COLUMN category TEXT")
-            except sqlite3.OperationalError:
-                pass
+            add_column_if_not_exists(c, 'products', 'category', "TEXT")
                 
         if version < 7:
-            try:
-                c.execute("ALTER TABLE products ADD COLUMN has_toppings INTEGER")
-                c.execute("ALTER TABLE products ADD COLUMN category_source TEXT DEFAULT 'unknown'")
-            except sqlite3.OperationalError:
-                pass
+            add_column_if_not_exists(c, 'products', 'has_toppings', "INTEGER")
+            add_column_if_not_exists(c, 'products', 'category_source', "TEXT DEFAULT 'unknown'")
         # update version
 
 
         if version < 8:
-            try:
-                c.execute("ALTER TABLE stores ADD COLUMN status TEXT DEFAULT 'UNKNOWN'")
-            except Exception: pass
-            try:
-                c.execute("ALTER TABLE stores ADD COLUMN last_seen_at DATETIME")
-            except Exception: pass
-            try:
-                c.execute("ALTER TABLE runs ADD COLUMN crawler_mode TEXT")
-            except Exception: pass
-            try:
-                c.execute("ALTER TABLE runs ADD COLUMN coverage_complete INTEGER DEFAULT 0")
-            except Exception: pass
+            add_column_if_not_exists(c, 'stores', 'status', "TEXT DEFAULT 'UNKNOWN'")
+            add_column_if_not_exists(c, 'stores', 'last_seen_at', "DATETIME")
+            add_column_if_not_exists(c, 'runs', 'crawler_mode', "TEXT")
+            add_column_if_not_exists(c, 'runs', 'coverage_complete', "INTEGER DEFAULT 0")
                 
         if version < 9:
-            try:
-                c.execute("ALTER TABLE runs ADD COLUMN run_metadata TEXT")
-            except Exception: pass
-            try:
-                c.execute("ALTER TABLE runs ADD COLUMN source TEXT DEFAULT 'CLI'")
-            except Exception: pass
+            add_column_if_not_exists(c, 'runs', 'run_metadata', "TEXT")
+            add_column_if_not_exists(c, 'runs', 'source', "TEXT DEFAULT 'CLI'")
 
         if version < 10:
-            try:
-                c.execute("ALTER TABLE stores ADD COLUMN vertical TEXT")
-            except Exception: pass
+            add_column_if_not_exists(c, 'stores', 'vertical', "TEXT")
             c.execute('''CREATE TABLE IF NOT EXISTS store_facets (
                 provider TEXT NOT NULL DEFAULT 'rappi',
                 store_id TEXT NOT NULL,
@@ -188,11 +169,8 @@ def migrate(conn, db_path):
 
 
         if version < 11:
-            try:
-                c.execute("ALTER TABLE product_memberships ADD COLUMN semantic_type TEXT DEFAULT 'UNKNOWN'")
-                c.execute("ALTER TABLE product_memberships ADD COLUMN semantic_reason TEXT DEFAULT 'not_classified'")
-            except sqlite3.OperationalError:
-                pass # Already exists
+            add_column_if_not_exists(c, 'product_memberships', 'semantic_type', "TEXT DEFAULT 'UNKNOWN'")
+            add_column_if_not_exists(c, 'product_memberships', 'semantic_reason', "TEXT DEFAULT 'not_classified'")
 
         if version < 12:
             c.execute("ALTER TABLE observations ADD COLUMN has_pro_offer INTEGER DEFAULT NULL")
@@ -202,10 +180,7 @@ def migrate(conn, db_path):
 
 
         if version < 13:
-            try:
-                c.execute('CREATE INDEX IF NOT EXISTS idx_obs_history ON observations(store_id, product_id, timestamp DESC, id DESC)')
-            except sqlite3.OperationalError:
-                pass
+            c.execute('CREATE INDEX IF NOT EXISTS idx_obs_history ON observations(store_id, product_id, timestamp DESC, id DESC)')
                 
         if version < 14:
             c.execute('''CREATE TABLE IF NOT EXISTS alert_events (
@@ -276,11 +251,8 @@ def migrate(conn, db_path):
                   pro_price REAL, pro_discount_effective REAL, limit_info TEXT,
                   UNIQUE(run_id, provider, store_id, product_id))""")
             
-            try:
-                c.execute('CREATE INDEX IF NOT EXISTS idx_obs_history ON observations(provider, store_id, product_id, timestamp DESC, id DESC)')
-                c.execute('DROP INDEX IF EXISTS idx_obs_history') # drop old
-            except Exception:
-                pass
+            c.execute('DROP INDEX IF EXISTS idx_obs_history')
+            c.execute('CREATE INDEX IF NOT EXISTS idx_obs_history ON observations(provider, store_id, product_id, timestamp DESC, id DESC)')
 
             # STORE_FACETS
             migrate_table('store_facets', """CREATE TABLE _store_facets_new (
