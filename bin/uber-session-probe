@@ -18,10 +18,9 @@ import importlib.util
 UBER_BASE = "https://www.ubereats.com"
 
 def load_store():
-    spec = importlib.util.spec_from_file_location(
-        "bridge", os.path.join(os.path.dirname(__file__), "uber-session-import"))
-    mod = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(mod)
+    import importlib.machinery
+    loader = importlib.machinery.SourceFileLoader("bridge", os.path.join(os.path.dirname(__file__), "uber-session-import"))
+    mod = loader.load_module()
     return mod.UberSessionStore()
 
 def load_auth_context():
@@ -69,7 +68,7 @@ def sanitize_result(status_code, headers_dict, body_bytes, latency):
 
     # Check for challenge
     if b'challenge' in body_bytes[:2000].lower() or b'botdefense' in body_bytes[:2000].lower():
-        result['challenge'] = True
+        result['challenge'] = True; print('--- BODY SNIPPET ---'); print(body_bytes[:1000]); print('--------------------')
     else:
         result['challenge'] = False
 

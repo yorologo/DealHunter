@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased / experimental
+- Uber Eats structured shadow adapter
+- Browser-native payload research
+- Parser # Changelog Normalizer implemented with deduplication
+- No production ingestion yet (schema remains V14)
+
+
 ## v3.0.1 - 2026-08-24
 ### Fixed
 - Prevented admin crawler start without explicit valid location.

@@ -1,0 +1,148 @@
+#!/usr/bin/env python3
+import sys
+import json
+import uuid
+import os
+from http.server import BaseHTTPRequestHandler, HTTPServer
+import urllib.parse
+
+PORT = 5050
+
+DATA_DIR = os.path.expanduser("~/.local/share/DealHunter/uber-overnight")
+os.makedirs(DATA_DIR, exist_ok=True)
+DATA_FILE = os.path.join(DATA_DIR, "browser_data.jsonl")
+
+def build_data_snippet():
+    return f"""
+(function(){{
+  if (window.__ue_dh_data_cap) {{ console.log('[DH] Data capture already active.'); return; }}
+  window.__ue_dh_data_cap = true;
+  const PORT = {PORT};
+
+  function sendData(url, reqBody, respBody) {{
+    const payload = JSON.stringify({{
+      url: url,
+      request: reqBody,
+      response: respBody
+    }});
+    
+    let iframe = document.getElementById('dh-bridge-frame');
+    if (!iframe) {{
+      iframe = document.createElement('iframe');
+      iframe.id = 'dh-bridge-frame';
+      iframe.name = 'dh-bridge-frame';
+      iframe.style.display = 'none';
+      document.body.appendChild(iframe);
+    }}
+    
+    const form = document.createElement('form');
+    form.method = 'POST';
+    form.action = `http://127.0.0.1:${{PORT}}/commit`;
+    form.target = 'dh-bridge-frame';
+    
+    const input = document.createElement('input');
+    input.type = 'hidden';
+    input.name = 'payload';
+    input.value = encodeURIComponent(payload);
+    form.appendChild(input);
+    
+    document.body.appendChild(form);
+    form.submit();
+    document.body.removeChild(form);
+  }}
+
+  // Intercept fetch
+  const origFetch = window.fetch;
+  window.fetch = async function(...args) {{
+    const url = typeof args[0] === 'string' ? args[0] : args[0]?.url || '';
+    const opts = args[1] || {{}};
+    
+    let reqBody = null;
+    if (opts.body && typeof opts.body === 'string') {{
+      try {{ reqBody = JSON.parse(opts.body); }} catch(e) {{ reqBody = opts.body; }}
+    }}
+    
+    const response = await origFetch.apply(this, args);
+    const clone = response.clone();
+    
+    if (/\\/_p\\/api\\//i.test(url) || /graphql/i.test(url)) {{
+      clone.json().then(data => {{
+        sendData(url, reqBody, data);
+        console.log('[DH] Captured API Response (fetch):', url.split('?')[0]);
+      }}).catch(e => {{}});
+    }}
+    return response;
+  }};
+
+  // Intercept XHR
+  const origOpen = XMLHttpRequest.prototype.open;
+  const origSend = XMLHttpRequest.prototype.send;
+
+  XMLHttpRequest.prototype.open = function(method, url) {{
+    this.__dh_url = url;
+    return origOpen.apply(this, arguments);
+  }};
+
+  XMLHttpRequest.prototype.send = function(body) {{
+    let reqBody = null;
+    if (body && typeof body === 'string') {{
+      try {{ reqBody = JSON.parse(body); }} catch(e) {{ reqBody = body; }}
+    }}
+    
+    this.addEventListener('load', function() {{
+      if (this.__dh_url && (/\\/_p\\/api\\//i.test(this.__dh_url) || /graphql/i.test(this.__dh_url))) {{
+        try {{
+          const respBody = JSON.parse(this.responseText);
+          sendData(this.__dh_url, reqBody, respBody);
+          console.log('[DH] Captured API Response (XHR):', this.__dh_url.split('?')[0]);
+        }} catch (e) {{}}
+      }}
+    }});
+
+    return origSend.apply(this, arguments);
+  }};
+
+  console.log('[DH] Uber Eats Data Interceptor active.');
+  console.log('[DH] ACTION REQUIRED: Scroll down the page or click a category to trigger lazy loading.');
+}})();
+"""
+
+class BridgeHandler(BaseHTTPRequestHandler):
+    def log_message(self, format, *args):
+        pass
+        
+    def do_POST(self):
+        if self.path == '/commit':
+            content_length = int(self.headers['Content-Length'])
+            post_data = self.rfile.read(content_length).decode('utf-8')
+            parsed = urllib.parse.parse_qs(post_data)
+            
+            if 'payload' in parsed:
+                try:
+                    payload_str = urllib.parse.unquote(parsed['payload'][0])
+                    data = json.loads(payload_str)
+                    with open(DATA_FILE, 'a') as f:
+                        f.write(json.dumps(data) + "\n")
+                    url_short = data.get('url', 'unknown').split('?')[0]
+                    print(f"[*] Received data for: {url_short}")
+                except Exception as e:
+                    print(f"[!] Error parsing payload: {e}")
+            
+            self.send_response(204)
+            self.end_headers()
+        else:
+            self.send_response(404)
+            self.end_headers()
+
+def main():
+    print(build_data_snippet())
+    print(f"\n[*] Data Bridge listening on 127.0.0.1:{PORT}...")
+    print(f"[*] Saving to: {DATA_FILE}")
+    server = HTTPServer(('127.0.0.1', PORT), BridgeHandler)
+    try:
+        server.serve_forever()
+    except KeyboardInterrupt:
+        print("\n[*] Shutting down.")
+
+if __name__ == '__main__':
+    main()

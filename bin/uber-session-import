@@ -229,20 +229,9 @@ def build_capture_snippet(nonce: str, port: int) -> str:
   function sendContext(authCtx) {{
     if (sent) return;
     sent = true;
-    fetch(ENDPOINT, {{
-      method: 'POST',
-      headers: {{'Content-Type': 'application/json'}},
-      body: JSON.stringify({{nonce: NONCE, version: 1, auth_context: authCtx}})
-    }}).then(r => r.json()).then(d => {{
-      if (d.status === 'ok') {{
-        console.log('[DH] ✅ Session captured and stored securely.');
-        const overlay = document.createElement('div');
-        overlay.style.cssText = 'position:fixed;top:20px;right:20px;background:#0f9d58;color:white;padding:15px 25px;border-radius:8px;z-index:999999;font:bold 16px sans-serif;box-shadow:0 4px 12px rgba(0,0,0,0.3);';
-        overlay.textContent = '✅ DealHunter: Session captured!';
-        document.body.appendChild(overlay);
-        setTimeout(() => overlay.remove(), 5000);
-      }} else {{ console.error('[DH] ❌ Server rejected:', d.error); }}
-    }}).catch(e => console.error('[DH] ❌ Could not reach DealHunter listener:', e.message));
+    const payload = JSON.stringify({{nonce: NONCE, version: 1, auth_context: authCtx}});
+    const b64 = btoa(encodeURIComponent(payload));
+    window.location.href = 'http://127.0.0.1:{port}/import#' + b64;
   }}
 
   function extractHeaders(headers) {{
@@ -316,6 +305,44 @@ def run_listener(port: int, nonce: str, store: UberSessionStore, timeout: int = 
             self.send_header('Access-Control-Allow-Methods', 'POST, OPTIONS')
             self.send_header('Access-Control-Allow-Headers', 'Content-Type')
             self.end_headers()
+
+        def do_GET(self):
+            if self.path == '/import':
+                self.send_response(200)
+                self.send_header('Content-Type', 'text/html')
+                self.end_headers()
+                html = """<!DOCTYPE html>
+                <html><head><title>Importing...</title></head><body>
+                <h2>✅ DealHunter: Processing Session...</h2>
+                <script>
+                if (window.location.hash.length > 1) {
+                    try {
+                        const b64 = window.location.hash.substring(1);
+                        const payload = decodeURIComponent(atob(b64));
+                        fetch('/commit', {
+                            method: 'POST',
+                            headers: {'Content-Type': 'application/json'},
+                            body: payload
+                        }).then(r => r.json()).then(d => {
+                            if (d.status === 'ok') {
+                                document.body.innerHTML = '<h2 style="color:green">✅ Session Captured and Stored Securely!</h2><p>You can close this tab and return to Termux.</p>';
+                                window.history.replaceState(null, '', '/import');
+                            } else {
+                                document.body.innerHTML = '<h2 style="color:red">❌ Failed: ' + d.error + '</h2>';
+                            }
+                        }).catch(e => {
+                            document.body.innerHTML = '<h2 style="color:red">❌ Error: ' + e + '</h2>';
+                        });
+                    } catch(e) {
+                        document.body.innerHTML = '<h2 style="color:red">❌ Decode error: ' + e + '</h2>';
+                    }
+                }
+                </script>
+                </body></html>"""
+                self.wfile.write(html.encode('utf-8'))
+            else:
+                self.send_response(404)
+                self.end_headers()
 
         def do_POST(self):
             if self.path != '/commit':

@@ -14,6 +14,7 @@ DealHunter es un motor local-first de inteligencia de precios y oportunidades or
 - **Filtros Avanzados**: Permite encontrar ofertas basándose en descuento histórico en lugar de descuentos anunciados engañosos (`--new-low`, `--real-deal`).
 - **Contexto Geográfico Auditable**: Cada run conserva `lat/lng`; el crawler exige una ubicación configurada y advierte cambios significativos sin borrar histórico automáticamente.
 - **Navegación Nativa a Tienda**: “🛵 Abrir en Rappi” usa el deep link nativo con `store_id`, dirigido exclusivamente a `com.grability.rappi`; no tiene fallback a Home, web o navegador.
+- **Soporte Multiprovider Experimental**: (Shadow validated / not enabled by default) Integración aislada para Uber Eats en desarrollo.
 
 ## Estado Actual
 
