@@ -18,7 +18,7 @@ jobs:
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install flask pytest cryptography pytest-asyncio websockets aiohttp
+        pip install -r requirements.txt
     - name: Run offline tests
       run: |
         PYTHONPATH=src pytest
