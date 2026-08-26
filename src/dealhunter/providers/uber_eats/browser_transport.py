@@ -158,13 +158,26 @@ class UberBrowserTransport:
         logger.info("CDP WebSocket connected to dedicated hidden target")
 
     async def ensure_ready(self):
-        """Connect and prepare the transport for catalog capture by navigating to Uber Eats."""
-        if self._ws is None :
+        """Connect and prepare the transport for catalog capture."""
+        if self._ws is None:
             await self.connect()
             
         await self._send_session("Page.navigate", {"url": "https://www.ubereats.com/"})
-        await asyncio.sleep(4) # Wait for page and cookies
         
+        # Readiness gate: wait until document is complete and URL is stable
+        for _ in range(15):
+            await asyncio.sleep(1)
+            try:
+                res = await self._send_session("Runtime.evaluate", {
+                    "expression": "document.readyState === 'complete' && !window.location.href.endsWith('/ubereats.com/')",
+                    "returnByValue": True
+                })
+                if res.get("result", {}).get("value") == True:
+                    break
+            except Exception:
+                pass
+                
+        await asyncio.sleep(1)
         await self._install_csrf_interceptor()
         return await self._check_login_state()
 
@@ -440,7 +453,7 @@ class UberBrowserTransport:
 
 
 
-    async def fetch_feed_v1(self, lat, lng, query="supermercado"):
+    async def fetch_feed_v1(self, lat, lng, query="supermercado", _retry=False):
         js = f'''
         (async () => {{
             const resp = await fetch('/_p/api/getFeedV1?localeCode=mx', {{
@@ -456,13 +469,22 @@ class UberBrowserTransport:
             return await resp.json();
         }})();
         '''
-        res = await self._send_session("Runtime.evaluate", {"expression": js, "awaitPromise": True, "returnByValue": True})
+        try:
+            res = await self._send_session("Runtime.evaluate", {"expression": js, "awaitPromise": True, "returnByValue": True})
+        except Exception as e:
+            if not _retry and "navigated or closed" in str(e):
+                logger.warning(f"Target navigated or closed during fetch_feed_v1. Reconnecting... {e}")
+                await self.close()
+                await self.ensure_ready()
+                return await self.fetch_feed_v1(lat, lng, query, _retry=True)
+            raise
+            
         val = res.get("result", {}).get("value")
         if not val or "error" in val:
             raise RuntimeError(f"Failed to fetch feed: {val}")
         return val
 
-    async def fetch_store_v1(self, store_uuid, offset=0):
+    async def fetch_store_v1(self, store_uuid, offset=0, _retry=False):
         js = f'''
         (async () => {{
             const resp = await fetch('/_p/api/getStoreV1?localeCode=mx', {{
@@ -479,7 +501,16 @@ class UberBrowserTransport:
             return await resp.json();
         }})();
         '''
-        res = await self._send_session("Runtime.evaluate", {"expression": js, "awaitPromise": True, "returnByValue": True})
+        try:
+            res = await self._send_session("Runtime.evaluate", {"expression": js, "awaitPromise": True, "returnByValue": True})
+        except Exception as e:
+            if not _retry and "navigated or closed" in str(e):
+                logger.warning(f"Target navigated or closed during fetch_store_v1. Reconnecting... {e}")
+                await self.close()
+                await self.ensure_ready()
+                return await self.fetch_store_v1(store_uuid, offset, _retry=True)
+            raise
+            
         val = res.get("result", {}).get("value")
         if not val or "error" in val:
             raise RuntimeError(f"Failed to fetch store: {val}")
@@ -500,7 +531,7 @@ class UberBrowserTransport:
             logger.info("Capturing store %d/%d: %s", i + 1, len(store_urls_or_uuids), label)
             try:
                 # Navigate to store page first (establishes context)
-                await self.navigate_to_store(url)
+                # await self.navigate_to_store(url) # REMOVED TO PREVENT TARGET NAVIGATED ERROR
 
                 result = await self.capture_store(uuid)
                 result["label"] = label
