@@ -5,9 +5,9 @@
 - Prepared schema evolution safely with centralized test fixtures.
 - Uber Eats structured shadow adapter
 - Uber Eats generic CDP Browser Transport (Phase 5D.2) using Runtime.evaluate injection.
-- Browser-native payload research and CSRF bypass with x-csrf-token.
+- Browser-native payload research and static placeholder x-csrf-token.
 - Parser # Changelog Normalizer implemented with deduplication
-- No production ingestion yet (schema remains V14)
+- No production ingestion yet (schema is V15)
 
 
 ## v3.0.1 - 2026-08-24
