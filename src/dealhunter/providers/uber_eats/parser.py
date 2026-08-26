@@ -32,12 +32,7 @@ class UberEatsParser:
         sections = payload.get("sections", [])
         catalog_map = payload.get("catalogSectionsMap", {})
         
-        for sec in sections:
-            sec_uuid = sec.get("uuid")
-            if not sec_uuid:
-                continue
-            
-            elements = catalog_map.get(sec_uuid, [])
+        for elements in catalog_map.values():
             for el in elements:
                 el_type = el.get("type")
                 if el_type in ("VERTICAL_GRID", "HORIZONTAL_GRID"):

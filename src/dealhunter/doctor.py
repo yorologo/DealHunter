@@ -263,6 +263,7 @@ def _check_partial_runs(db_path):
 def _check_providers(check_network=False):
     """Check providers status including account and session storage."""
     from .account import get_account_status
+    from .providers.uber_eats.browser_transport import UberBrowserTransport
     
     cfg = load_config()
     res = get_account_status(cfg, check_network=check_network)
@@ -275,11 +276,14 @@ def _check_providers(check_network=False):
     if res["source"] != "SESSION_NOT_CONFIGURED":
         detail = f"Source: {res['source']}"
         
+    uber_health = UberBrowserTransport().health()
+        
     return [
         ("Rappi catalog", "AVAILABLE", None),
         ("Turbo", "AVAILABLE", None),
         ("Restaurants", "AVAILABLE", {"info": "Requires matching keyword"}),
         ("Rappi Session", acc_status, {"info": detail} if detail else None),
+        ("Uber Eats (CDP)", uber_health, {"info": "Requires Chrome with --remote-debugging-port=9222"}),
     ]
 
 

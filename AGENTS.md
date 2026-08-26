@@ -3146,3 +3146,10 @@ Manual DDL is reserved for:
 - intentional minimal component fixtures
 
 Do not hardcode current schema physical layout (column counts, positions) without justification. Tests should depend on semantics, not physical layout.
+
+## Multi-source Intelligence: Uber Eats (Experimental)
+
+DealHunter is actively developing support for Uber Eats as a secondary provider.
+All Uber Eats logic must remain safely isolated in `src/dealhunter/providers/uber_eats/` and must not contaminate the V14 schema until data parity is 100% verified.
+- **Transport Pattern:** CDP (Chrome DevTools Protocol) is the required transport layer for Uber Eats to bypass Cloudflare/bot protections safely. Transport logic runs native JS `fetch` inside an authenticated browser context.
+- **CSRF Bypass:** Uber Eats allows `x-csrf-token: "x"` which bypasses the need for complex DOM token extraction.

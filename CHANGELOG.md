@@ -4,7 +4,8 @@
 - Decoupled test infrastructure from physical v14 schema layout.
 - Prepared schema evolution safely with centralized test fixtures.
 - Uber Eats structured shadow adapter
-- Browser-native payload research
+- Uber Eats generic CDP Browser Transport (Phase 5D.2) using Runtime.evaluate injection.
+- Browser-native payload research and CSRF bypass with x-csrf-token.
 - Parser # Changelog Normalizer implemented with deduplication
 - No production ingestion yet (schema remains V14)
 
