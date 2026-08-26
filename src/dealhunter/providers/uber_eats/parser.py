@@ -55,10 +55,17 @@ class UberEatsParser:
                             tagline_acc = item.get("priceTagline", {}).get("accessibilityText", "")
                             reference_price = self.parse_accessibility_price(tagline_acc)
                             if reference_price is None:
+                                try:
+                                    structured_ref = item["purchaseInfo"]["purchaseOptions"][0]["purchasePriceV2"]["base"]["low"]
+                                    reference_price = structured_ref / 100.0
+                                except (KeyError, IndexError, TypeError):
+                                    pass
+
+                            if reference_price is None:
                                 reference_price = price
                                 reference_price_source = "structured" if price is not None else "unknown"
                             else:
-                                reference_price_source = "accessibility"
+                                reference_price_source = "accessibility_or_structured"
                                 
                             if reference_price and price and reference_price < price:
                                 reference_price = price

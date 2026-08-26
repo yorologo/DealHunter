@@ -275,6 +275,13 @@ class UberBrowserTransport:
 
     async def capture_store(self, store_uuid, max_pages=15):
         """Capture a complete store catalog using browser-context fetch."""
+        
+        if not self._ws:
+            try:
+                await self.connect()
+            except Exception as e:
+                return {"status": "empty", "error": str(e)}
+
         merged_data = {
             "uuid": store_uuid,
             "sections": [],
@@ -293,6 +300,7 @@ class UberBrowserTransport:
                 break
             
             if page_result is None or page_result.get("error"):
+                logger.warning("Page result None or error: %s", page_result)
                 break
 
             pages_fetched += 1

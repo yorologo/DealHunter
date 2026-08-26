@@ -1,0 +1,175 @@
+          Scheme: "uber-wisdom-bugreport"
+          Scheme: "uber_share"
+          Scheme: "uber-dragon-crawl-e2e"
+          Scheme: "braintree-paypal-connect.com.ubercab.eats"
+          Scheme: "braintree-paypal-connect-fallback.com.ubercab.eats"
+          Scheme: "http"
+          Scheme: "https"
+          Authority: "www.ubereats.com": -1
+          Authority: "ubereats.com": -1
+          Authority: "beta.ubereats.com": -1
+          Scheme: "http"
+          Scheme: "https"
+          Authority: "www.uber.com": -1
+          Path: "PatternMatcher{GLOB: /..-../loyalty_points/ubercash_conversion}"
+          Path: "PatternMatcher{GLOB: /..-../loyalty_points/ubercash_conversion/}"
+          Path: "PatternMatcher{GLOB: /loyalty_points/ubercash_conversion}"
+          Path: "PatternMatcher{GLOB: /loyalty_points/ubercash_conversion/.*}"
+          Path: "PatternMatcher{GLOB: /..-../ubercash/cashback/amex_corp}"
+          Path: "PatternMatcher{GLOB: /..-../ubercash/cashback/amex_corp/}"
+          Path: "PatternMatcher{GLOB: /ubercash/cashback/amex_corp}"
+          Path: "PatternMatcher{GLOB: /ubercash/cashback/amex_corp/.*}"
+          Path: "PatternMatcher{GLOB: /..-../ubercash/transaction_detail}"
+          Path: "PatternMatcher{GLOB: /..-../ubercash/transaction_detail/}"
+          Path: "PatternMatcher{GLOB: /ubercash/transaction_detail}"
+          Path: "PatternMatcher{GLOB: /ubercash/transaction_detail/.*}"
+          Scheme: "http"
+          Scheme: "https"
+          Authority: "e.uber.com": -1
+          Scheme: "http"
+          Scheme: "https"
+          Authority: "a.uber.com": -1
+          Scheme: "http"
+          Scheme: "https"
+          Authority: "biz-eats.uber.com": -1
+          Authority: "biz.uber.com": -1
+          Scheme: "http"
+          Scheme: "https"
+          Authority: "auth.uber.com": -1
+          Scheme: "http"
+          Scheme: "https"
+          Authority: "mbiz.uber.com": -1
+          Scheme: "http"
+          Scheme: "https"
+          Authority: "referrals.uber.com": -1
+          Scheme: "http"
+          Scheme: "https"
+          Authority: "accounts.uber.com": -1
+          Scheme: "http"
+          Scheme: "https"
+          Authority: "accounts.uber.com": -1
+          Scheme: "http"
+          Scheme: "https"
+          Authority: "account.uber.com": -1
+          Scheme: "http"
+          Scheme: "https"
+          Authority: "eats.uber.com": -1
+          Scheme: "http"
+          Scheme: "https"
+          Authority: "ubereats.bttn.io": -1
+          Scheme: "uber"
+          Scheme: "https"
+          Authority: "auth.uber.com": -1
+          Scheme: "http"
+          Scheme: "https"
+          Authority: "www.ubereats.com": -1
+          Authority: "ubereats.com": -1
+          Authority: "beta.ubereats.com": -1
+          Scheme: "http"
+          Scheme: "https"
+          Authority: "www.uber.com": -1
+          Path: "PatternMatcher{GLOB: /..-../loyalty_points/ubercash_conversion}"
+          Path: "PatternMatcher{GLOB: /..-../loyalty_points/ubercash_conversion/}"
+          Path: "PatternMatcher{GLOB: /loyalty_points/ubercash_conversion}"
+          Path: "PatternMatcher{GLOB: /loyalty_points/ubercash_conversion/.*}"
+          Path: "PatternMatcher{GLOB: /..-../ubercash/cashback/amex_corp}"
+          Path: "PatternMatcher{GLOB: /..-../ubercash/cashback/amex_corp/}"
+          Path: "PatternMatcher{GLOB: /ubercash/cashback/amex_corp}"
+          Path: "PatternMatcher{GLOB: /ubercash/cashback/amex_corp/.*}"
+          Path: "PatternMatcher{GLOB: /..-../ubercash/transaction_detail}"
+          Path: "PatternMatcher{GLOB: /..-../ubercash/transaction_detail/}"
+          Path: "PatternMatcher{GLOB: /ubercash/transaction_detail}"
+          Path: "PatternMatcher{GLOB: /ubercash/transaction_detail/.*}"
+          Scheme: "http"
+          Scheme: "https"
+          Authority: "e.uber.com": -1
+          Scheme: "http"
+          Scheme: "https"
+          Authority: "a.uber.com": -1
+          Scheme: "https"
+          Authority: "ubereats.app.link": -1
+          Authority: "ubereats-alternate.app.link": -1
+          Scheme: "https"
+          Scheme: "http"
+          Scheme: "https"
+          Authority: "biz-eats.uber.com": -1
+          Authority: "biz.uber.com": -1
+          Scheme: "http"
+          Scheme: "https"
+          Authority: "auth.uber.com": -1
+          Scheme: "http"
+          Scheme: "https"
+          Authority: "mbiz.uber.com": -1
+          Scheme: "http"
+          Scheme: "https"
+          Authority: "referrals.uber.com": -1
+          Scheme: "http"
+          Scheme: "https"
+          Authority: "accounts.uber.com": -1
+          Scheme: "http"
+          Scheme: "https"
+          Authority: "accounts.uber.com": -1
+          Scheme: "http"
+          Scheme: "https"
+          Authority: "account.uber.com": -1
+          Scheme: "http"
+          Scheme: "https"
+          Authority: "eats.uber.com": -1
+          Scheme: "http"
+          Scheme: "https"
+          Authority: "ubereats.bttn.io": -1
+          Scheme: "https"
+          Authority: "www.ubereats.com": -1
+          Scheme: "https"
+          Authority: "payment-providers.uber.com": -1
+          Path: "PatternMatcher{PREFIX: /client_redirect/com.ubercab.eats.payment.provider.callback/unified_onboarding}"
+          Scheme: "https"
+          Authority: "auth3.uber.com": -1
+          Scheme: "https"
+          Authority: "auth.uber.com": -1
+          Scheme: "https"
+          Authority: "auth.uber.com": -1
+          Scheme: "https"
+          Authority: "auth3.uber.com": -1
+          Authority: "auth.uber.com": -1
+          Scheme: "https"
+          Authority: "payment-providers.uber.com": -1
+          Path: "PatternMatcher{PREFIX: /client_redirect/braintree-paypal-connect.com.ubercab.eats/paypal}"
+          Scheme: "https"
+          Authority: "payment-providers.uber.com": -1
+          Path: "PatternMatcher{PREFIX: /client_redirect/braintree-venmo-connect.com.ubercab.eats/venmo}"
+          Scheme: "uber"
+          Scheme: "https"
+          Authority: "auth.uber.com": -1
+          Scheme: "https"
+          Authority: "auth.uber.com": -1
+          Scheme: "com.ubercab.eats.uberpay"
+          Scheme: "uberlogin"
+          Authority: "auth3.uber.com": -1
+          Scheme: "uberlogin"
+          Authority: "auth.uber.com": -1
+          Scheme: "uberlogin"
+          Authority: "auth3.uber.com": -1
+          Scheme: "uberlogin"
+          Authority: "auth3.uber.com": -1
+          Scheme: "uberlogin"
+          Authority: "auth.uber.com": -1
+          Scheme: "uberlogin"
+          Authority: "auth.uber.com": -1
+          Scheme: "uberlogin"
+          Authority: "auth.uber.com": -1
+          Scheme: "ubereatsmembershipredirect"
+          Scheme: "uberauth"
+          Authority: "uber.com": -1
+          Scheme: "ubereats"
+          Scheme: "uberpass"
+          Authority: "com.ubercab.eats": -1
+          Scheme: "com.ubercab.eats.payment.provider.callback"
+          Scheme: "com.ubercab.eats.payment.provider.callback"
+          Scheme: "braintree-venmo-connect.com.ubercab.eats"
+    codePath=/data/app/~~9cq40dkg3mCQfCfPfevTsA==/com.ubercab.eats-g8-IDOeXljtnifRldIaa5A==
+    resourcePath=/data/app/~~9cq40dkg3mCQfCfPfevTsA==/com.ubercab.eats-g8-IDOeXljtnifRldIaa5A==
+    appMetadataFilePath=/data/app/~~9cq40dkg3mCQfCfPfevTsA==/com.ubercab.eats-g8-IDOeXljtnifRldIaa5A==/app.metadata
+    path: /data/app/~~9cq40dkg3mCQfCfPfevTsA==/com.ubercab.eats-g8-IDOeXljtnifRldIaa5A==/base.apk
+    path: /data/app/~~9cq40dkg3mCQfCfPfevTsA==/com.ubercab.eats-g8-IDOeXljtnifRldIaa5A==/split_GooglePaySdk.apk
+    path: /data/app/~~9cq40dkg3mCQfCfPfevTsA==/com.ubercab.eats-g8-IDOeXljtnifRldIaa5A==/split_cubes.apk
