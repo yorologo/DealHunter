@@ -153,10 +153,15 @@ def compare_stores(db_path, query, exact_only=False, no_fuzzy=False):
         provider, pid, sid, price, ts_str, orig_price = r
         key = (pid, sid)
         if key in products_map:
-            try:
-                ts = datetime.fromisoformat(ts_str.replace("Z", ""))
-            except:
-                ts = datetime.now()
+
+            if ts_str:
+                try:
+                    ts = datetime.fromisoformat(ts_str.replace("Z", ""))
+                except:
+                    ts = datetime.now()
+            else:
+                ts = datetime(1970, 1, 1)
+
             products_map[key]["obs"].append({"price": price, "timestamp": ts, "original_price": orig_price})
             
     products = []

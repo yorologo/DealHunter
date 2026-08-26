@@ -133,10 +133,15 @@ def get_product_detail(db_path, store_id, product_id):
     
     obs = []
     for r in obs_rows:
-        try:
-            ts = datetime.fromisoformat(r[1].replace("Z", ""))
-        except:
-            ts = datetime.now()
+
+        if r[1]:
+            try:
+                ts = datetime.fromisoformat(r[1].replace("Z", ""))
+            except:
+                ts = datetime.now()
+        else:
+            ts = datetime(1970, 1, 1)
+
         obs.append({
             "price": r[0],
             "timestamp": ts,
@@ -211,10 +216,15 @@ def enrich_products_with_metrics(db_path, products):
         key = (r[0], r[1])
         if key not in obs_map:
             obs_map[key] = []
-        try:
-            ts = datetime.fromisoformat(r[3].replace("Z", ""))
-        except:
-            ts = datetime.now()
+
+        if r[3]:
+            try:
+                ts = datetime.fromisoformat(r[3].replace("Z", ""))
+            except:
+                ts = datetime.now()
+        else:
+            ts = datetime(1970, 1, 1)
+
         obs_map[key].append({"price": r[2], "timestamp": ts, "original_price": r[4]})
         
     for p in products:

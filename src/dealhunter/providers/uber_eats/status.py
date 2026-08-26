@@ -1,35 +1,96 @@
 import datetime
+import os
 from .runtime import ChromiumRuntime
 from ...db import setup_db
 
+# Provider health states
+READY = "READY"
+NEEDS_LOGIN = "NEEDS_LOGIN"
+NEEDS_LOCATION = "NEEDS_LOCATION"
+STALE = "STALE"
+RUNTIME_ERROR = "RUNTIME_ERROR"
+DISABLED = "DISABLED"
+RUNTIME_STOPPED = "RUNTIME_STOPPED"
+
+
 def get_status():
+    """Get current Uber Eats provider health status.
+
+    Distinguishes between runtime availability, session validity,
+    and overall operational readiness. Does not make network requests.
+    """
     rt = ChromiumRuntime()
     runtime_ready = rt.is_healthy()
-    
-    conn = setup_db()
-    c = conn.cursor()
-    c.execute("SELECT finished_at FROM runs WHERE vertical = 'uber_eats' OR crawler_mode = 'uber_eats' ORDER BY started_at DESC LIMIT 1")
-    row = c.fetchone()
-    last_sync = row[0] if row else "Never"
-    
-    # We could do a deeper check for session, but for now we approximate.
-    # The true test is actually doing a fetch. But we shouldn't fetch during status.
-    # We will assume VALID if we have a directory.
-    import os
+
+    # Check profile existence (necessary but not sufficient for session)
     has_profile = os.path.isdir(rt.profile_path)
-    session_status = "VALID" if has_profile else "NEEDS_LOGIN"
-    
-    overall = "READY" if (runtime_ready or has_profile) else "NEEDS_LOGIN"
-    
+
+    # Session: profile existence is a weak signal. Real check requires network.
+    if not has_profile:
+        session_status = NEEDS_LOGIN
+    else:
+        session_status = "CONFIGURED"  # Profile exists, but validity unknown without network
+
+    # Runtime status
+    if not runtime_ready:
+        runtime_status = RUNTIME_STOPPED
+    else:
+        runtime_status = READY
+
+    # Last sync from runs table
+    last_sync = "Never"
+    last_sync_age_hours = None
+    try:
+        conn = setup_db()
+        c = conn.cursor()
+        # Use provider column which exists in v15 schema
+        c.execute("""SELECT finished_at FROM runs
+                     WHERE run_id IN (
+                         SELECT DISTINCT run_id FROM observations WHERE provider = 'uber_eats'
+                     ) ORDER BY finished_at DESC LIMIT 1""")
+        row = c.fetchone()
+        if row and row[0]:
+            last_sync = row[0]
+            try:
+                last_dt = datetime.datetime.fromisoformat(last_sync)
+                age = datetime.datetime.now() - last_dt
+                last_sync_age_hours = age.total_seconds() / 3600
+            except (ValueError, TypeError):
+                pass
+        conn.close()
+    except Exception:
+        pass
+
+    # Staleness check
+    if last_sync_age_hours is not None and last_sync_age_hours > 48:
+        data_status = STALE
+    elif last_sync == "Never":
+        data_status = "NO_DATA"
+    else:
+        data_status = "CURRENT"
+
+    # Overall status: requires runtime AND session
+    if not runtime_ready and not has_profile:
+        overall = DISABLED
+    elif not runtime_ready:
+        overall = RUNTIME_STOPPED
+    elif not has_profile:
+        overall = NEEDS_LOGIN
+    else:
+        overall = READY
+
     return {
         "provider": "Uber Eats",
-        "runtime": "READY" if runtime_ready else "STOPPED",
+        "runtime": runtime_status,
         "session": session_status,
-        "discovery": "READY",
-        "catalog": "READY",
+        "discovery": "GROCERY_RESTAURANT",
+        "catalog": "AVAILABLE" if runtime_ready else RUNTIME_STOPPED,
         "last_sync": last_sync,
-        "status": overall
+        "last_sync_age_hours": last_sync_age_hours,
+        "data_status": data_status,
+        "status": overall,
     }
+
 
 def print_status():
     st = get_status()
@@ -38,5 +99,9 @@ def print_status():
     print(f"Session ...... {st['session']}")
     print(f"Discovery .... {st['discovery']}")
     print(f"Catalog ...... {st['catalog']}")
+    print(f"Data ......... {st['data_status']}")
     print(f"Last Sync .... {st['last_sync']}")
+    age = st.get('last_sync_age_hours')
+    if age is not None:
+        print(f"  Age ........ {age:.1f}h")
     print(f"Status ....... {st['status']}")

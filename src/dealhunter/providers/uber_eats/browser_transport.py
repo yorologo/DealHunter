@@ -440,21 +440,21 @@ class UberBrowserTransport:
 
 
 
-    async def fetch_feed_v1(self, lat, lng):
-        js = '''
-        (async () => {
-            const resp = await fetch('/_p/api/getFeedV1?localeCode=mx', {
+    async def fetch_feed_v1(self, lat, lng, query="supermercado"):
+        js = f'''
+        (async () => {{
+            const resp = await fetch('/_p/api/getFeedV1?localeCode=mx', {{
                 method: 'POST',
-                headers: {
+                headers: {{
                     'Content-Type': 'application/json',
                     'x-csrf-token': 'x'
-                },
-                body: JSON.stringify({
-                    userQuery: "supermercado"
-                })
-            });
+                }},
+                body: JSON.stringify({{
+                    userQuery: "{query}"
+                }})
+            }});
             return await resp.json();
-        })();
+        }})();
         '''
         res = await self._send_session("Runtime.evaluate", {"expression": js, "awaitPromise": True, "returnByValue": True})
         val = res.get("result", {}).get("value")
