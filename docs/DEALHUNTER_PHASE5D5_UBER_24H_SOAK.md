@@ -1,37 +1,37 @@
-# PHASE 5D.5 — UBER PHONE-ONLY 24H PRODUCTION SOAK
+# Phase 5D.5 — Uber Phone-Only 24H Production Soak
 
-**EXACT HEAD:** 983e5f2db2aca276faa69b9b2aba254b18f8d405
-**CI:** SUCCESS
+## Objective
+Validate for >= 24 real hours that the Uber phone-only crawler can operate automatically alongside DealHunter/Rappi without human intervention, PC, X11, DB corruption, or progressive Chromium degradation.
 
-## Schedules
-- **RAPPI:** 07:00, 10:00, 13:00, 19:00
-- **UBER:** 07:30, 10:30, 13:30, 19:30 (Staggered to prevent overlap/RAM pressure)
+## Checkpoint Baseline
+- **HEAD:** 859ccadd0d1b33ed42e6bc826ad2879a7cdbc7dc
+- **CI:** SUCCESS
+- **Tests:** 433/433 PASS
+- **Root Cause Fixed:** EXECUTION_CONTEXT_RACE (covered by automated test)
+- **Dependencies:** `pytest-asyncio` and `websockets` explicitly tracked in `requirements.txt`.
+- **Pre-Soak Backup:** `~/.local/share/DealHunter/backups/pre-soak-20260826/`
+- **DB Integrity & FK:** PASS
 
-## Runs Summary
+## Baseline Metrics (Pre-Soak)
+**Rappi:**
+- Stores: 945
+- Products: 29723
+- Observations: 147344
 
-### RUN 1 (Pre-Hardening)
-- **DISCOVERED:** 2
-- **FAILED:** 2
-- **TARGET ERRORS:** 2 (Session CDP error: Inspected target navigated or closed)
-- **RESULT:** FAILED_FINAL (Transactions rolled back correctly, no partial snapshots)
+**Uber Eats:**
+- Stores: 84
+- Products: 678
+- Observations: 1483
 
-### RUN 2 (Post-Hardening Lifecycle Test)
-- Simulated locally.
-- Target closed exception triggers a reconnect + 1 retry per store in `BrowserTransport`.
-- Fails gracefully without corrupting DB if retry fails.
+**Resources:**
+- DB Size: 73MB
+- Free Storage: 50GB
+- Chromium Profile Size: 241MB
 
-## Session Persistence
-- **LOGIN REQUIRED:** NO
-- **HUMAN ACTIONS:** 0
+## Experimental Cadence
+- **Rappi:** 07:00, 10:00, 13:00, 19:00
+- **Uber:** 07:30, 10:30, 13:30, 19:30
 
-## RAM & DB
-- RAM: Chromium uses ~216MB RSS per process when stable headless.
-- DB: Zero corruption. `PRAGMA integrity_check` PASS.
-
-## Rappi Coexistence
-- Lock contention (SQLite `BEGIN IMMEDIATE`) verified to naturally queue via 5.0s timeout.
-- Coexistence safe.
-
-## Final Decision
-**UBER_PHONE_ONLY_PRODUCTION_READY = YES**
-Crawler is fully ACID-compliant. If Android navigates or closes the Carbonyl target, DealHunter cleanly rolls back and leaves existing history perfectly intact.
+## Soak Status
+- **START TIME:** 2026-08-26 17:53:21
+- **STATE:** IN PROGRESS (Running autonomously via background scheduler)
