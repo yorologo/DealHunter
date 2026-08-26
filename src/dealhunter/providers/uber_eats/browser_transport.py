@@ -135,63 +135,92 @@ class UberBrowserTransport:
     # ------------------------------------------------------------------
 
     async def connect(self):
-        """Connect to a Chrome tab via CDP WebSocket."""
-        ws_url = self._find_uber_tab()
-        if not ws_url:
-            raise ConnectionError(UBER_NOT_OPEN)
-
-        self._ws = await websockets.connect(
-            ws_url, ping_interval=None, max_size=MAX_WS_SIZE
-        )
+        """Connect to the browser via global CDP and create a dedicated target."""
+        req = urllib.request.urlopen(f"http://{self.cdp_host}:{self.cdp_port}/json/version", timeout=CONNECT_TIMEOUT)
+        version_info = json.loads(req.read())
+        browser_ws_url = version_info["webSocketDebuggerUrl"]
+        
+        self._browser_ws = await websockets.connect(browser_ws_url, max_size=MAX_WS_SIZE)
+        
+        # Create target
+        res = await self._send_global("Target.createTarget", {"url": "about:blank"})
+        self._target_id = res["targetId"]
+        
+        # Attach to target
+        res = await self._send_global("Target.attachToTarget", {"targetId": self._target_id, "flatten": True})
+        self._session_id = res["sessionId"]
+        
+        # Enable page
+        await self._send_session("Page.enable")
+        self._ws = self._browser_ws # Backwards compatibility for _evaluate which now uses _send_session
         self._msg_id = 0
         self._csrf_installed = False
-        logger.info("CDP WebSocket connected")
+        logger.info("CDP WebSocket connected to dedicated hidden target")
 
     async def ensure_ready(self):
-        """Connect and prepare the transport for catalog capture."""
+        """Connect and prepare the transport for catalog capture by navigating to Uber Eats."""
         if self._ws is None or self._ws.closed:
             await self.connect()
+            
+        await self._send_session("Page.navigate", {"url": "https://www.ubereats.com/"})
+        await asyncio.sleep(4) # Wait for page and cookies
+        
         await self._install_csrf_interceptor()
         return await self._check_login_state()
 
     async def close(self):
-        """Close the CDP WebSocket connection."""
-        if self._ws and not self._ws.closed:
-            await self._ws.close()
+        """Close the target and disconnect."""
+        if hasattr(self, '_target_id') and self._target_id:
+            await self._send_global("Target.closeTarget", {"targetId": self._target_id})
+            
+        if hasattr(self, '_browser_ws') and self._browser_ws and not self._browser_ws.closed:
+            await self._browser_ws.close()
+            
         self._ws = None
+        self._browser_ws = None
         self._csrf_installed = False
 
     # ------------------------------------------------------------------
     # CDP messaging
     # ------------------------------------------------------------------
 
-    async def _send(self, method, params=None):
-        """Send a CDP command and wait for its response."""
+    async def _send_global(self, method, params=None):
         msg_id = self._next_id()
         payload = {"id": msg_id, "method": method}
         if params:
             payload["params"] = params
-        await self._ws.send(json.dumps(payload))
-
+        await self._browser_ws.send(json.dumps(payload))
         while True:
-            try:
-                raw = await asyncio.wait_for(self._ws.recv(), timeout=FETCH_TIMEOUT)
-                data = json.loads(raw)
-                if data.get("id") == msg_id:
-                    if "error" in data:
-                        raise RuntimeError(
-                            f"CDP error: {data['error'].get('message', data['error'])}"
-                        )
-                    return data.get("result", {})
-            except asyncio.TimeoutError:
-                raise TimeoutError(f"CDP command timed out: {method}")
+            raw = await asyncio.wait_for(self._browser_ws.recv(), timeout=FETCH_TIMEOUT)
+            data = json.loads(raw)
+            if data.get("id") == msg_id:
+                if "error" in data:
+                    raise RuntimeError(f"Global CDP error: {data['error']}")
+                return data.get("result", {})
+
+    async def _send_session(self, method, params=None):
+        msg_id = self._next_id()
+        payload = {"id": msg_id, "method": method, "sessionId": self._session_id}
+        if params:
+            payload["params"] = params
+        await self._browser_ws.send(json.dumps(payload))
+        while True:
+            raw = await asyncio.wait_for(self._browser_ws.recv(), timeout=FETCH_TIMEOUT)
+            data = json.loads(raw)
+            if data.get("id") == msg_id:
+                if "error" in data:
+                    raise RuntimeError(f"Session CDP error: {data['error']}")
+                return data.get("result", {})
+                
+    async def _send(self, method, params=None):
+        return await self._send_session(method, params)
 
     async def _evaluate(self, expression, await_promise=False):
         """Evaluate JavaScript in the page context and return the result value."""
         params = {"expression": expression}
         if await_promise:
             params["awaitPromise"] = True
-        result = await self._send("Runtime.evaluate", params)
+        result = await self._send_session("Runtime.evaluate", params)
         inner = result.get("result", {})
         if inner.get("type") == "undefined":
             return None
