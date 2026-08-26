@@ -159,7 +159,7 @@ class UberBrowserTransport:
 
     async def ensure_ready(self):
         """Connect and prepare the transport for catalog capture by navigating to Uber Eats."""
-        if self._ws is None or self._ws.closed:
+        if self._ws is None :
             await self.connect()
             
         await self._send_session("Page.navigate", {"url": "https://www.ubereats.com/"})
@@ -173,7 +173,7 @@ class UberBrowserTransport:
         if hasattr(self, '_target_id') and self._target_id:
             await self._send_global("Target.closeTarget", {"targetId": self._target_id})
             
-        if hasattr(self, '_browser_ws') and self._browser_ws and not self._browser_ws.closed:
+        if hasattr(self, '_browser_ws') and self._browser_ws :
             await self._browser_ws.close()
             
         self._ws = None
@@ -437,6 +437,53 @@ class UberBrowserTransport:
     # ------------------------------------------------------------------
     # Multi-store sync
     # ------------------------------------------------------------------
+
+
+
+    async def fetch_feed_v1(self, lat, lng):
+        js = '''
+        (async () => {
+            const resp = await fetch('/_p/api/getFeedV1?localeCode=mx', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'x-csrf-token': 'x'
+                },
+                body: JSON.stringify({
+                    userQuery: "supermercado"
+                })
+            });
+            return await resp.json();
+        })();
+        '''
+        res = await self._send_session("Runtime.evaluate", {"expression": js, "awaitPromise": True, "returnByValue": True})
+        val = res.get("result", {}).get("value")
+        if not val or "error" in val:
+            raise RuntimeError(f"Failed to fetch feed: {val}")
+        return val
+
+    async def fetch_store_v1(self, store_uuid, offset=0):
+        js = f'''
+        (async () => {{
+            const resp = await fetch('/_p/api/getStoreV1?localeCode=mx', {{
+                method: 'POST',
+                headers: {{
+                    'Content-Type': 'application/json',
+                    'x-csrf-token': 'x'
+                }},
+                body: JSON.stringify({{
+                    storeUuid: '{store_uuid}',
+                    catalogSectionOffset: {offset}
+                }})
+            }});
+            return await resp.json();
+        }})();
+        '''
+        res = await self._send_session("Runtime.evaluate", {"expression": js, "awaitPromise": True, "returnByValue": True})
+        val = res.get("result", {}).get("value")
+        if not val or "error" in val:
+            raise RuntimeError(f"Failed to fetch store: {val}")
+        return val
 
     async def capture_stores(self, store_urls_or_uuids, on_progress=None):
         """Capture multiple stores sequentially.

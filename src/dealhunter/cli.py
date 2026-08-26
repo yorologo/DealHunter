@@ -164,6 +164,12 @@ def build_parser():
     watch_p = subparsers.add_parser("watch", help="Manage watchlist")
     watch_p.add_argument("action", choices=["add", "list", "remove", "enable", "disable"])
     watch_p.add_argument("query_or_id", nargs="?")
+    uber_p = subparsers.add_parser("uber", help="Uber Eats management")
+    uber_p.add_argument("action", choices=["status", "setup"])
+    
+    sync_p = subparsers.add_parser("sync", help="Sync data from a specific provider", parents=[base_parser])
+    sync_p.add_argument("--provider", choices=["rappi", "uber_eats"], default="rappi", help="Provider to sync")
+
     watch_p.add_argument("--below", type=float)
 
     doctor_p = subparsers.add_parser("doctor", help="Run system diagnostics")
@@ -235,7 +241,7 @@ def main(args_list=None):
                 print(f"Error checking account: {err}", file=sys.stderr)
         return
 
-    crawler_commands = ("discover", "update", "restaurants", None)
+    crawler_commands = ("discover", "update", "restaurants", "sync", None)
     location = None
     if args.command == "auth":
         if args.provider == "rappi":
@@ -493,6 +499,15 @@ def main(args_list=None):
             print("Vacuum complete")
         return
 
+    elif args.command == "uber":
+        if args.action == "status":
+            from dealhunter.providers.uber_eats.status import print_status
+            print_status()
+        elif args.action == "setup":
+            from dealhunter.providers.uber_eats.setup import run_setup
+            run_setup()
+        return
+
     elif args.command == "runs":
         c = conn.cursor()
         c.execute("SELECT run_id, started_at, finished_at, status FROM runs ORDER BY started_at DESC LIMIT ?", (args.last,))
@@ -549,62 +564,66 @@ def main(args_list=None):
         print(f"Running mode: {mode}", file=sys.stderr)
 
         try:
-            import asyncio
-            from dealhunter.auth import RappiSessionProvider
-            from dealhunter.account import SessionStatus
-
-            provider = RappiSessionProvider()
-            has_token = asyncio.run(provider.is_authenticated())
-            status = SessionStatus().get_current(check_network=False)
-            is_auth = has_token and status.get("status") in ("VALID", "UNVERIFIED", "CONFIGURED")
-            print(f"DEBUG: has_token={has_token}, status={status.get('status')}, is_auth={is_auth}", file=sys.stderr)
-
-            if is_auth and config.get("catalog_sync", {}).get("enabled", True):
-                print(f"SESSION_{status.get('status')}: Using ZONE_INVENTORY mode.", file=sys.stderr)
-                from dealhunter.crawler_zone import run_zone_inventory
-                state, reqs = run_zone_inventory(config, lat, lng, conn, run_id, dry_run=config.get("dry_run"))
-                if state == "SESSION_EXPIRED":
-                    print("SESSION_EXPIRED: Using SEARCH_DISCOVERY mode as fallback.", file=sys.stderr)
-                    
-                    from dealhunter.secret_store import SessionService
-                    from datetime import timezone
-                    svc = SessionService()
-                    if svc.get_mode() == "PERSISTENT":
-                        svc.update_validation("EXPIRED", datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ'))
+            if args.command == "sync" and getattr(args, "provider", "") == "uber_eats":
+                from dealhunter.providers.uber_eats.crawler import run_uber_sync
+                state, reqs = run_uber_sync(config, lat, lng, conn, run_id)
+            else:
+                import asyncio
+                from dealhunter.auth import RappiSessionProvider
+                from dealhunter.account import SessionStatus
+    
+                provider = RappiSessionProvider()
+                has_token = asyncio.run(provider.is_authenticated())
+                status = SessionStatus().get_current(check_network=False)
+                is_auth = has_token and status.get("status") in ("VALID", "UNVERIFIED", "CONFIGURED")
+                print(f"DEBUG: has_token={has_token}, status={status.get('status')}, is_auth={is_auth}", file=sys.stderr)
+    
+                if is_auth and config.get("catalog_sync", {}).get("enabled", True):
+                    print(f"SESSION_{status.get('status')}: Using ZONE_INVENTORY mode.", file=sys.stderr)
+                    from dealhunter.crawler_zone import run_zone_inventory
+                    state, reqs = run_zone_inventory(config, lat, lng, conn, run_id, dry_run=config.get("dry_run"))
+                    if state == "SESSION_EXPIRED":
+                        print("SESSION_EXPIRED: Using SEARCH_DISCOVERY mode as fallback.", file=sys.stderr)
                         
-                    c.execute('''UPDATE runs SET crawler_mode = ?, coverage_complete = ?, status = ?, finished_at = CURRENT_TIMESTAMP WHERE run_id = ?''',
-                              ("ZONE_INVENTORY", 0, "PARTIAL", run_id))
-                    conn.commit()
-
-                    import uuid
-                    fallback_run_id = str(uuid.uuid4())
-                    c.execute('INSERT INTO runs (run_id, started_at, status) VALUES (?, CURRENT_TIMESTAMP, "RUNNING")', (fallback_run_id,))
-                    conn.commit()
-
-                    from dealhunter.crawler import run_discover, run_update
-                    if mode == "discover":
-                        state, reqs = run_discover(config, lat, lng, conn, fallback_run_id, dry_run=config.get("dry_run"))
-                    else:
-                        state, reqs = run_update(config, lat, lng, conn, fallback_run_id, dry_run=config.get("dry_run"))
-
-                    # Update run_id variable so the final block uses the fallback run_id
-                    run_id = fallback_run_id
-                else:
-                    # If it succeeded without EXPIRED, and it was UNVERIFIED or CONFIGURED, mark as VALID
-                    if status.get("status") in ("UNVERIFIED", "CONFIGURED"):
                         from dealhunter.secret_store import SessionService
                         from datetime import timezone
                         svc = SessionService()
                         if svc.get_mode() == "PERSISTENT":
-                            svc.update_validation("VALID", datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ'))
-            else:
-                print("NOT_CONFIGURED or disabled: Using SEARCH_DISCOVERY mode as fallback.", file=sys.stderr)
-                from dealhunter.crawler import run_discover, run_update
-                if mode == "discover":
-                    state, reqs = run_discover(config, lat, lng, conn, run_id, dry_run=config.get("dry_run"))
+                            svc.update_validation("EXPIRED", datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ'))
+                            
+                        c.execute('''UPDATE runs SET crawler_mode = ?, coverage_complete = ?, status = ?, finished_at = CURRENT_TIMESTAMP WHERE run_id = ?''',
+                                  ("ZONE_INVENTORY", 0, "PARTIAL", run_id))
+                        conn.commit()
+    
+                        import uuid
+                        fallback_run_id = str(uuid.uuid4())
+                        c.execute('INSERT INTO runs (run_id, started_at, status) VALUES (?, CURRENT_TIMESTAMP, "RUNNING")', (fallback_run_id,))
+                        conn.commit()
+    
+                        from dealhunter.crawler import run_discover, run_update
+                        if mode == "discover":
+                            state, reqs = run_discover(config, lat, lng, conn, fallback_run_id, dry_run=config.get("dry_run"))
+                        else:
+                            state, reqs = run_update(config, lat, lng, conn, fallback_run_id, dry_run=config.get("dry_run"))
+    
+                        # Update run_id variable so the final block uses the fallback run_id
+                        run_id = fallback_run_id
+                    else:
+                        # If it succeeded without EXPIRED, and it was UNVERIFIED or CONFIGURED, mark as VALID
+                        if status.get("status") in ("UNVERIFIED", "CONFIGURED"):
+                            from dealhunter.secret_store import SessionService
+                            from datetime import timezone
+                            svc = SessionService()
+                            if svc.get_mode() == "PERSISTENT":
+                                svc.update_validation("VALID", datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ'))
                 else:
-                    state, reqs = run_update(config, lat, lng, conn, run_id, dry_run=config.get("dry_run"))
-
+                    print("NOT_CONFIGURED or disabled: Using SEARCH_DISCOVERY mode as fallback.", file=sys.stderr)
+                    from dealhunter.crawler import run_discover, run_update
+                    if mode == "discover":
+                        state, reqs = run_discover(config, lat, lng, conn, run_id, dry_run=config.get("dry_run"))
+                    else:
+                        state, reqs = run_update(config, lat, lng, conn, run_id, dry_run=config.get("dry_run"))
+    
         except Exception as exc:
             # Preserve already-committed observations; mark run as PARTIAL
             from .errors import classify_error
