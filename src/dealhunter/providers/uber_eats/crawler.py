@@ -80,7 +80,8 @@ async def _run_uber_sync_async(config, lat, lng, conn, run_id):
                         store_failed = True
                         break
 
-                    parsed = parser.parse_store(store_data)
+                    payload = store_data.get("data", store_data)
+                    parsed = parser.parse_store(payload)
                     prods = parsed.get("products", [])
 
                     for p in prods:

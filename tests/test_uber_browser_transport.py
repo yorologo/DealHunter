@@ -183,3 +183,42 @@ class TestParserIntegration:
         assert obs["stock"] == 1
         assert obs["discount_price"] > 0
         assert "provider" not in obs
+
+
+class TestTargetStability:
+    @pytest.mark.asyncio
+    @patch("dealhunter.providers.uber_eats.browser_transport.UberBrowserTransport.connect")
+    @patch("dealhunter.providers.uber_eats.browser_transport.UberBrowserTransport._install_csrf_interceptor")
+    @patch("dealhunter.providers.uber_eats.browser_transport.UberBrowserTransport._check_login_state")
+    async def test_ensure_ready_waits_for_stable_execution_context(self, mock_check, mock_install, mock_connect):
+        transport = UberBrowserTransport()
+        transport._ws = AsyncMock()
+        transport._session_id = "test-session"
+        
+        # Simulate send_session calls
+        # 1. Page.navigate
+        # 2. Runtime.evaluate loops
+        call_count = 0
+        async def mock_send_session(method, params=None):
+            nonlocal call_count
+            if method == "Page.navigate":
+                return {}
+            if method == "Runtime.evaluate":
+                call_count += 1
+                # Return false for the first 2 calls (simulating redirect / loading)
+                if call_count < 3:
+                    return {"result": {"value": False}}
+                # Return true on the 3rd call
+                return {"result": {"value": True}}
+            return {}
+            
+        transport._send_session = AsyncMock(side_effect=mock_send_session)
+        
+        # Also patch asyncio.sleep to not actually sleep in tests
+        with patch("asyncio.sleep", new_callable=AsyncMock) as mock_sleep:
+            await transport.ensure_ready()
+            
+            # verify it polled until true
+            assert call_count == 3
+            # verify it slept between polls (plus the final sleep(1))
+            assert mock_sleep.call_count == 4
