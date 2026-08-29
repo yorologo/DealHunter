@@ -1,3 +1,20 @@
+## [v3.2.0] - Pre-Main Promotion
+
+### Added
+- **Multi-Provider Architecture**: Implemented robust provider registry and decoupled core logic from specific providers.
+- **Uber Eats Integration (Phone-Only)**: Added production-ready headless synchronization for Uber Eats via Termux native CDP transport. Does not require X11 or PC.
+- **Provider & Membership Settings**: Added configuration (`--enable-rappi`, `--enable-uber-eats`, `--rappi-pro`, `--uber-one`) to toggle providers and isolate pricing safely.
+- **Provider-Safe IDs**: Migrated to `(provider, store_id, product_id)` primary compound identity across the system (DB, history, alerts, watchlist, routes).
+- **Schema v16 Migration**: Expanded data model to support cross-provider metadata, opaque canonical IDs, and membership isolation. 
+- **Canonical Shadow Infrastructure**: Prepared the semantic evidence gate and shadow matcher logic for future cross-provider product correlation.
+
+### Changed
+- Isolated Deal Score logic to `compare_eligible_offers` to avoid polluting the core query layer.
+- Enhanced exact evidence gate to mandate absolute token parity (ratio=1.0) and explicit package size alignment before generating candidate matches.
+
+### Limitations
+- **Auto Canonicalization OFF**: Automated merging of products across providers is intentionally disabled by default (`AUTO_CANONICAL_WRITES=0`) pending further human ground truth calibration (Statistical Gate currently NOT_MET). Canonical UI is strictly experimental.
+
 # Changelog
 
 ## Unreleased / experimental
