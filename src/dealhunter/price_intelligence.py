@@ -121,7 +121,7 @@ def compute_price_metrics(obs_list):
         "history_days": (ts_last - ts_first).days if len(obs_list) > 1 else 0
     }
 
-def compute_cross_provider_deal_score(canonical_product, provider_offers, membership_context=None):
+def compare_eligible_offers(canonical_product, provider_offers, membership_context=None):
     """
     Experimental 5H: Cross-Provider Deal Scoring.
     canonical_product: dict with canonical identity
@@ -152,8 +152,8 @@ def compute_cross_provider_deal_score(canonical_product, provider_offers, member
                 eligible_price = member_price
                 
         # We can calculate unit price using canonical_product.quantity and canonical_product.unit
-        qty = canonical_product.get("quantity")
-        unit = canonical_product.get("unit")
+        qty = offer.get("quantity") or canonical_product.get("quantity")
+        unit = offer.get("unit") or canonical_product.get("unit")
         
         unit_price = eligible_price
         if qty and qty > 0:

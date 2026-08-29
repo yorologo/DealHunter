@@ -163,7 +163,7 @@ def test_unavailable_preserves_unknown(current_schema_db):
     
     # We will test process_and_insert_product with v12 enabled
     import dealhunter.db as db_module
-    db_module.CURRENT_SCHEMA_VERSION = 15
+    db_module.CURRENT_SCHEMA_VERSION = 16
     
     run_id = "run-1"
     store_id = "store-1"
@@ -179,7 +179,7 @@ def test_unavailable_preserves_unknown(current_schema_db):
 def test_available_no_pro_writes_zero(current_schema_db):
     from dealhunter.core import process_and_insert_product
     import dealhunter.db as db_module
-    db_module.CURRENT_SCHEMA_VERSION = 15
+    db_module.CURRENT_SCHEMA_VERSION = 16
     db_conn = current_schema_db
     p = {
         "id": "123",
@@ -197,7 +197,7 @@ def test_available_no_pro_writes_zero(current_schema_db):
 def test_available_pro_writes_one(current_schema_db):
     from dealhunter.core import process_and_insert_product
     import dealhunter.db as db_module
-    db_module.CURRENT_SCHEMA_VERSION = 15
+    db_module.CURRENT_SCHEMA_VERSION = 16
     db_conn = current_schema_db
     p = {
         "id": "123",

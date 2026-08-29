@@ -49,20 +49,26 @@ def generate_candidates(db_path):
                         index[f"token:{t}"].append(idx2)
                             
             for p1 in products_by_provider[prov1]:
-                block = set()
                 brand = p1["signature"]["brand"]
-                if brand:
-                    block.update(index.get(f"brand:{brand}", []))
+                brand_matches = index.get(f"brand:{brand}", []) if brand else []
                 
+                token_matches = set()
                 tokens = p1["signature"]["base_name"].split()
                 for t in tokens[:3]:
                     if len(t) > 2:
-                        block.update(index.get(f"token:{t}", []))
+                        token_matches.update(index.get(f"token:{t}", []))
+                        
+                # Prioritize high-information evidence (brand matches)
+                block_ordered = list(brand_matches)
+                for idx in token_matches:
+                    if idx not in block_ordered:
+                        block_ordered.append(idx)
                                 
-                if len(block) > 100:
-                    block = list(block)[:100]
+                if len(block_ordered) > 100:
+                    # Deterministic candidate cap sorting by priority (brand > token)
+                    block_ordered = block_ordered[:100]
                     
-                for idx2 in block:
+                for idx2 in block_ordered:
                     p2 = products_by_provider[prov2][idx2]
                     
                     rejected, reason = is_hard_reject(p1["signature"], p2["signature"])
@@ -132,19 +138,29 @@ def match_products(p1, p2):
     # Check if prepared
     def is_prepared(name):
         n = name.lower()
-        return any(w in n for w in ["taco", "chilaquiles", "torta", "lonche", "hamburguesa", "pizza"])
+        return any(w in n for w in ["taco", "chilaquiles", "torta", "lonche", "hamburguesa", "pizza", "combo", "menu"])
     
     prep1 = is_prepared(p1.get("name", ""))
     prep2 = is_prepared(p2.get("name", ""))
     
-    if ratio_min >= 0.75 and ratio_max >= 0.75:
-        if has_brand and has_size and not (prep1 or prep2):
-            return "AUTO_CONFIRMED", "Exact match with evidence"
+    if sig1.get("approximate_quantity") or sig2.get("approximate_quantity"):
+        return "REVIEW_REQUIRED", "Approximate/Variable weight item"
+        
+    if prep1 or prep2:
+        return "REVIEW_REQUIRED", "Prepared or fresh item"
+        
+    # EXACT EVIDENCE GATE:
+    # Requires brand, size, NO fresh/prepared, NO approx weight.
+    # AND missing evidence check: ratio_max MUST be 1.0 (exact token parity)
+    # Token ratio is NOT an authority for EXACT_PRODUCT by itself, but parity is required.
+    if ratio_max == 1.0:
+        if has_brand and has_size:
+            return "AUTO_CONFIRMED", "Exact match with full evidence parity"
         else:
-            return "REVIEW_REQUIRED", "Exact similarity but missing critical evidence or is prepared"
+            return "REVIEW_REQUIRED", "Exact token similarity but missing critical evidence (brand/size)"
         
     if ratio_min >= 0.8:
-        return "REVIEW_REQUIRED", "High overlap"
+        return "REVIEW_REQUIRED", "High overlap, missing evidence/parity"
         
     if ratio_min >= 0.5:
         return "REVIEW_REQUIRED", "Moderate overlap"
