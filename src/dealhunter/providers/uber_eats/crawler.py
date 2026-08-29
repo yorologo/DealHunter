@@ -1,3 +1,4 @@
+from dealhunter.providers.registry import validate_provider
 import asyncio
 import logging
 from .runtime import ChromiumRuntime
@@ -62,7 +63,7 @@ async def _run_uber_sync_async(config, lat, lng, conn, run_id):
 
             try:
                 c = conn.cursor()
-                validate_provider(provider)
+                validate_provider('uber_eats')
                 c.execute('''INSERT INTO stores (provider, store_id, name, brand, type, status, last_seen_at, vertical)
                              VALUES (?, ?, ?, ?, ?, 'ACTIVE', CURRENT_TIMESTAMP, ?)
                              ON CONFLICT(provider, store_id) DO UPDATE SET last_seen_at=CURRENT_TIMESTAMP, name=excluded.name''',
@@ -89,7 +90,7 @@ async def _run_uber_sync_async(config, lat, lng, conn, run_id):
                         norm_p = normalizer.normalize_product(p)
                         norm_o = normalizer.normalize_observation(p, run_id)
 
-                        validate_provider(provider)
+                        validate_provider('uber_eats')
                         c.execute('''INSERT INTO products (provider, store_id, product_id, name, brand, image, category, category_source)
                                      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                                      ON CONFLICT(provider, store_id, product_id) DO UPDATE SET

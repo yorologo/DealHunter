@@ -1,3 +1,4 @@
+from dealhunter.providers.registry import validate_provider
 from dealhunter.semantic import classify_membership
 from datetime import datetime
 from .discounts import calculate_discount
@@ -117,6 +118,7 @@ def process_and_insert_product(p, run_id, s_id, s_name, config, q, conn, seen_in
         norm["pack_count"]
     )
         
+    validate_provider(provider)
     c.execute('''INSERT INTO products (provider, product_id, store_id, name, brand, image, 
                  normalized_name, quantity, unit, normalized_quantity, normalized_unit,
                  fingerprint, pack_count, category, has_toppings, category_source)
@@ -175,6 +177,7 @@ def process_and_insert_product(p, run_id, s_id, s_name, config, q, conn, seen_in
     
     from dealhunter.db import CURRENT_SCHEMA_VERSION
     if CURRENT_SCHEMA_VERSION >= 12:
+        validate_provider(provider)
         c.execute('''INSERT OR IGNORE INTO observations (run_id, provider, store_id, product_id, price, original_price, stock, timestamp, 
                      discount_price, discount_promotion, discount_effective, discount_source, promotion_type, promotion_label, query_term, availability,
                      has_pro_offer, pro_price, pro_discount_effective, limit_info)
