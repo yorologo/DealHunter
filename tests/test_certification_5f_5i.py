@@ -14,7 +14,7 @@ def test_package_topology_invariants():
     c2, pu2, t2, u2 = parse_package("0.6 L", None, None)
     assert t1 == 600.0 and u1 == "ml"
     assert t2 == 600.0 and u2 == "ml"
-    
+
     # 1 kg == 1000 g
     c1, pu1, t1, u1 = parse_package("1 kg", None, None)
     c2, pu2, t2, u2 = parse_package("1000 g", None, None)
@@ -46,12 +46,12 @@ def test_exact_evidence_gate():
     p2 = {"brand": "Coca-Cola", "name": "Coca-Cola Zero Refresco sin azúcar (500 ml)", "quantity": 500, "unit": "ml"}
     status, _ = match_products(p1, p2)
     assert status == "AUTO_CONFIRMED"
-    
+
     # Missing variant (Zero)
     p3 = {"brand": "Coca-Cola", "name": "Coca-Cola Refresco sin azúcar (500 ml)", "quantity": 500, "unit": "ml"}
     status, _ = match_products(p1, p3)
     assert status == "REVIEW_REQUIRED" # Dropped Zero, overlap is not 100%
-    
+
     # Missing Brand
     p4 = {"brand": "", "name": "Coca-Cola Zero Refresco Sin Azúcar 500 mL", "quantity": 500, "unit": "mL"}
     status, _ = match_products(p4, p2)
@@ -62,7 +62,7 @@ def test_exact_evidence_gate():
     taco2 = {"brand": "", "name": "Taco de arrachera", "quantity": None, "unit": None}
     status, _ = match_products(taco1, taco2)
     assert status == "REVIEW_REQUIRED" # Excluded by prepared words
-    
+
     combo1 = {"brand": "Burger King", "name": "Combo Whopper", "quantity": 1, "unit": "pz"}
     combo2 = {"brand": "Burger King", "name": "Combo Whopper", "quantity": 1, "unit": "pz"}
     status, _ = match_products(combo1, combo2)
@@ -78,7 +78,7 @@ def test_uber_brand_extraction():
     sig = extract_signature("", "Coca-Cola · Refresco sin azúcar (500 ml)", None, None)
     assert sig["brand"] == "coca cola"
     assert sig["base_name"] == "refresco sin az car 500 ml"
-    
+
     sig2 = extract_signature("", "No Brand Descriptor · Just Product", None, None)
     assert sig2["brand"] == "no brand descriptor"
 
@@ -86,13 +86,13 @@ def test_uber_brand_extraction():
 def test_schema_v16_migration():
     if os.path.exists("test_v16.db"):
         os.remove("test_v16.db")
-    
+
     # Schema should migrate unconditionally to v16
     conn = setup_db("test_v16.db")
     c = conn.cursor()
     c.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='canonical_products'")
     assert c.fetchone() is not None
-    
+
     c.execute("SELECT version FROM schema_version")
     assert c.fetchone()[0] == 16
     conn.close()
@@ -106,17 +106,17 @@ def test_membership_isolation_score():
         {"provider": "rappi", "store_id": "1", "price": 100, "member_price": 80, "quantity": 1, "unit": "L"},
         {"provider": "uber_eats", "store_id": "2", "price": 95, "member_price": 75, "quantity": 1, "unit": "L"}
     ]
-    
+
     # No memberships
     res = compare_eligible_offers(canonical, offers, {"rappi_pro": False, "uber_one": False})
     assert res["best_offer"]["provider"] == "uber_eats"
     assert res["best_offer"]["eligible_price"] == 95
-    
+
     # Rappi Pro only
     res = compare_eligible_offers(canonical, offers, {"rappi_pro": True, "uber_one": False})
     assert res["best_offer"]["provider"] == "rappi"
     assert res["best_offer"]["eligible_price"] == 80
-    
+
     # Uber One only
     res = compare_eligible_offers(canonical, offers, {"rappi_pro": False, "uber_one": True})
     assert res["best_offer"]["provider"] == "uber_eats"
@@ -133,7 +133,42 @@ def test_unit_price_dimension_safety():
     assert res["best_offer"]["unit_price"] == 50.0
 
 # 8. Gold Loader Integrity
-def test_gold_loader_blocked():
-    with pytest.raises(ValueError, match="GOLD_RECOVERY = BLOCKED"):
-        load_gold_corpus()
 
+
+def test_gold_loader_contract(tmp_path):
+    from dealhunter.identity.gold_loader import load_gold_corpus, GoldRecoveryBlocked
+    import json
+
+    # 1. Missing file -> BLOCKED
+    missing_path = str(tmp_path / "missing.json")
+    with pytest.raises(GoldRecoveryBlocked, match="GOLD_RECOVERY = BLOCKED"):
+        load_gold_corpus(missing_path)
+
+    # 2. Malformed JSON -> FAIL explícito
+    malformed_path = str(tmp_path / "malformed.json")
+    with open(malformed_path, "w", encoding="utf-8") as f:
+        f.write("{invalid_json: true,")
+    with pytest.raises(ValueError, match="malformed JSON"):
+        load_gold_corpus(malformed_path)
+
+    # 3. Not an array -> FAIL explícito
+    dict_path = str(tmp_path / "dict.json")
+    with open(dict_path, "w", encoding="utf-8") as f:
+        json.dump({"items": []}, f)
+    with pytest.raises(ValueError, match="must be a JSON array"):
+        load_gold_corpus(dict_path)
+
+    # 4. Wrong count -> FAIL explícito
+    wrong_count_path = str(tmp_path / "wrong.json")
+    with open(wrong_count_path, "w", encoding="utf-8") as f:
+        json.dump([{"id": 1}], f)
+    with pytest.raises(ValueError, match="Expected 30 pairs"):
+        load_gold_corpus(wrong_count_path)
+
+    # 5. Valid synthetic corpus -> LOAD PASS
+    valid_path = str(tmp_path / "valid.json")
+    synthetic_corpus = [{"id": i} for i in range(30)]
+    with open(valid_path, "w", encoding="utf-8") as f:
+        json.dump(synthetic_corpus, f)
+    loaded = load_gold_corpus(valid_path)
+    assert len(loaded) == 30
