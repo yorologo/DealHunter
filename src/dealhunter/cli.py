@@ -175,6 +175,23 @@ def build_parser():
     doctor_p = subparsers.add_parser("doctor", help="Run system diagnostics")
     doctor_p.add_argument("--network", action='store_true', help="Include network checks (not yet implemented)")
 
+    # Phase 5E settings
+    providers_p = subparsers.add_parser("providers", help="List configured providers")
+    
+    prov_p = subparsers.add_parser("provider", help="Manage a provider")
+    prov_p.add_argument("name", choices=["rappi", "uber_eats"])
+    prov_p.add_argument("action", choices=["enable", "disable"])
+    
+    memberships_p = subparsers.add_parser("memberships", help="List configured memberships")
+    
+    mem_p = subparsers.add_parser("membership", help="Manage a membership")
+    mem_p.add_argument("name", choices=["rappi_pro", "uber_one"])
+    mem_p.add_argument("action", choices=["active", "inactive", "unknown"])
+    
+    comp_p = subparsers.add_parser("comparison", help="Manage comparison policies")
+    comp_p.add_argument("policy", choices=["membership-policy"])
+    comp_p.add_argument("value", choices=["exclude", "show_but_exclude", "include"])
+
     return parser
 
 def handle_config_command(args):
@@ -482,7 +499,61 @@ def main(args_list=None):
 
     conn = setup_db()
 
+
+    from dealhunter.config import load_config, save_config
+
+    if args.command == "providers":
+        cfg = load_config()
+        provs = cfg.get("providers", {})
+        print("Providers:")
+        for p in ["rappi", "uber_eats"]:
+            status = provs.get(p, {}).get("enabled", True)
+            print(f"  {p}: {'Enabled' if status else 'Disabled'}")
+        return
+
+    if args.command == "provider":
+        cfg = load_config()
+        if "providers" not in cfg:
+            cfg["providers"] = {}
+        if args.name not in cfg["providers"]:
+            cfg["providers"][args.name] = {}
+        cfg["providers"][args.name]["enabled"] = (args.action == "enable")
+        save_config(cfg)
+        print(f"Provider {args.name} has been {args.action}d.")
+        return
+
+    if args.command == "memberships":
+        cfg = load_config()
+        mems = cfg.get("memberships", {})
+        print("Memberships:")
+        for m in ["rappi_pro", "uber_one"]:
+            status = mems.get(m, {}).get("status", "unknown")
+            print(f"  {m}: {status}")
+        return
+
+    if args.command == "membership":
+        cfg = load_config()
+        if "memberships" not in cfg:
+            cfg["memberships"] = {}
+        if args.name not in cfg["memberships"]:
+            cfg["memberships"][args.name] = {}
+        cfg["memberships"][args.name]["status"] = args.action
+        save_config(cfg)
+        print(f"Membership {args.name} is now {args.action}.")
+        return
+
+    if args.command == "comparison":
+        cfg = load_config()
+        if "comparison" not in cfg:
+            cfg["comparison"] = {}
+        if args.policy == "membership-policy":
+            cfg["comparison"]["inactive_membership_offers"] = args.value
+        save_config(cfg)
+        print(f"Comparison policy updated.")
+        return
+
     if args.command == "db":
+
         import os
         db_path = os.environ.get("RAPPI_DB_PATH", os.path.expanduser("~/rappi-deal-hunter/rappi-deals.db"))
 
@@ -563,8 +634,22 @@ def main(args_list=None):
         mode = args.command if args.command else "discover"
         print(f"Running mode: {mode}", file=sys.stderr)
 
+        from dealhunter.eligibility import EligibilityEngine
+        engine = EligibilityEngine(config)
+        target_provider = getattr(args, "provider", "rappi")
+        
+        if not engine.is_provider_enabled(target_provider):
+            print(f"SKIPPED: Provider '{target_provider}' is disabled in configuration.", file=sys.stderr)
+            
+            # Still update run to COMPLETED so it doesn't stay RUNNING
+            c = conn.cursor()
+            c.execute("UPDATE runs SET status='SKIPPED', finished_at=? WHERE run_id=?", 
+                     (datetime.now().isoformat(), run_id))
+            conn.commit()
+            return 0
+
         try:
-            if args.command == "sync" and getattr(args, "provider", "") == "uber_eats":
+            if args.command == "sync" and target_provider == "uber_eats":
                 from dealhunter.providers.uber_eats.crawler import run_uber_sync
                 state, reqs = run_uber_sync(config, lat, lng, conn, run_id)
             else:

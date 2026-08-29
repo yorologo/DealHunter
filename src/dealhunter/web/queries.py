@@ -123,7 +123,7 @@ def get_product_detail(db_path, store_id, product_id):
     
     # Get obs
     c.execute('''
-        SELECT price, timestamp, original_price, availability, discount_promotion, promotion_type, promotion_label, run_id
+        SELECT price, timestamp, original_price, availability, discount_promotion, promotion_type, promotion_label, run_id, has_pro_offer, pro_price, pro_discount_effective
         FROM observations
         WHERE store_id = ? AND product_id = ?
         ORDER BY timestamp ASC, ROWID ASC
@@ -144,13 +144,16 @@ def get_product_detail(db_path, store_id, product_id):
 
         obs.append({
             "price": r[0],
-            "timestamp": ts,
+            "timestamp": r[1],
             "original_price": r[2],
             "availability": r[3],
             "discount_promotion": r[4],
             "promotion_type": r[5],
             "promotion_label": r[6],
-            "run_id": r[7]
+            "run_id": r[7],
+            "has_pro_offer": bool(r[8]),
+            "pro_price": r[9],
+            "pro_discount_effective": r[10],
         })
         
     p["observations"] = obs
@@ -409,11 +412,17 @@ def get_deals(db_path, filters, sort, page, per_page=25):
 def get_catalog(db_path, filters, sort, page, per_page=25):
     import sqlite3
     from dealhunter.query_layer import build_faceted_query
+    from dealhunter.config import get_merged_config
+    from dealhunter.eligibility import EligibilityEngine
+    from dealhunter.config import get_merged_config
+    from dealhunter.eligibility import EligibilityEngine
     conn = sqlite3.connect(db_path)
     c = conn.cursor()
     
     facets = _translate_filters(filters, sort, page, per_page)
-    q, count_q, params = build_faceted_query(facets)
+    config = get_merged_config(None)
+    engine = EligibilityEngine(config)
+    q, count_q, params = build_faceted_query(facets, config)
     
     c.execute(count_q, params)
     total = c.fetchone()[0]
@@ -423,6 +432,11 @@ def get_catalog(db_path, filters, sort, page, per_page=25):
     
     products = []
     for r in rows:
+        provider = r[23] if len(r) > 23 else 'rappi'
+        has_pro = bool(r[13])
+        elig = engine.evaluate(provider, has_pro)
+        req_mem = engine.map_offer_to_membership(provider, has_pro)
+        
         products.append({
             "product_id": r[0],
             "store_id": r[1],
@@ -437,7 +451,7 @@ def get_catalog(db_path, filters, sort, page, per_page=25):
             "savings": (r[9] - r[8]) if r[9] and r[8] else 0.0,
             "promotion_type": r[11],
             "promotion_label": r[12],
-            "has_pro_offer": r[13],
+            "has_pro_offer": has_pro,
             "pro_price": r[14],
             "pro_discount_effective": r[15],
             "limit_info": r[16],
@@ -447,6 +461,9 @@ def get_catalog(db_path, filters, sort, page, per_page=25):
             "unit": r[20],
             "normalized_quantity": r[21],
             "normalized_unit": r[22],
+            "provider": provider,
+            "ranking_eligible": elig["ranking_eligible"],
+            "requires_membership": req_mem,
         })
         
     conn.close()
@@ -803,8 +820,10 @@ def _translate_filters(filters, sort=None, page=None, per_page=None):
 def get_ui_facets(db_path, filters):
     import sqlite3
     from dealhunter.query_layer import get_facet_counts
+    from dealhunter.config import get_merged_config
+    from dealhunter.config import get_merged_config
     conn = sqlite3.connect(db_path)
     facets = _translate_filters(filters)
-    counts = get_facet_counts(conn, facets)
+    counts = get_facet_counts(conn, facets, get_merged_config(None))
     conn.close()
     return counts

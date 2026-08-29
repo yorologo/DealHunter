@@ -2,12 +2,15 @@ import sqlite3
 import json
 import uuid
 import datetime
+from dealhunter.eligibility import EligibilityEngine
 
 class DealWatcher:
-    def __init__(self, db_path, price_drop_threshold=10.0):
+    def __init__(self, db_path, config=None, price_drop_threshold=10.0):
         self.db_path = db_path
+        self.config = config or {}
         self.price_drop_threshold = price_drop_threshold
         self.conn = sqlite3.connect(db_path)
+
         
     def generate_event_key(self, event_type, store_id, product_id, run_id):
         return f"{event_type}_{store_id}_{product_id}_{run_id}"
@@ -28,7 +31,7 @@ class DealWatcher:
         
         c.execute(f'''
             SELECT id, store_id, product_id, price, original_price, discount_effective, 
-                   has_pro_offer, pro_price, pro_discount_effective, promotion_type, availability
+                   has_pro_offer, pro_price, pro_discount_effective, promotion_type, availability, provider
             FROM observations 
             WHERE run_id = ?
         ''', (run_id,))
@@ -39,12 +42,12 @@ class DealWatcher:
             curr_obs[(r[1], r[2])] = {
                 'id': r[0], 'price': r[3], 'original_price': r[4], 'discount_effective': r[5],
                 'has_pro_offer': r[6], 'pro_price': r[7], 'pro_discount_effective': r[8],
-                'promotion_type': r[9], 'availability': r[10]
+                'promotion_type': r[9], 'availability': r[10], 'provider': r[11]
             }
             
         c.execute(f'''
             SELECT o.id, o.store_id, o.product_id, o.price, o.original_price, o.discount_effective, 
-                   o.has_pro_offer, o.pro_price, o.pro_discount_effective, o.promotion_type, o.availability
+                   o.has_pro_offer, o.pro_price, o.pro_discount_effective, o.promotion_type, o.availability, o.provider
             FROM observations o
             INNER JOIN (
                 SELECT store_id, product_id, MAX(timestamp) as max_ts
@@ -60,7 +63,7 @@ class DealWatcher:
             prev_obs[(r[1], r[2])] = {
                 'id': r[0], 'price': r[3], 'original_price': r[4], 'discount_effective': r[5],
                 'has_pro_offer': r[6], 'pro_price': r[7], 'pro_discount_effective': r[8],
-                'promotion_type': r[9], 'availability': r[10]
+                'promotion_type': r[9], 'availability': r[10], 'provider': r[11]
             }
             
         # Get the latest state for products in these stores to prevent spam
@@ -97,10 +100,12 @@ class DealWatcher:
                 'created_at': run_started_at
             })
             
+        engine = EligibilityEngine(self.config)
         for (store_id, product_id), curr in curr_obs.items():
             prev = prev_obs.get((store_id, product_id))
             last_event = state_history.get((store_id, product_id))
             is_missing = (last_event == 'OUT_OF_STOCK')
+            curr_provider = curr['provider']
             
             if not prev:
                 if curr['discount_effective'] and curr['discount_effective'] >= 50:
@@ -140,7 +145,15 @@ class DealWatcher:
             prev_pro = prev['has_pro_offer']
             curr_pro = curr['has_pro_offer']
             if curr_pro == 1 and prev_pro in (0, None):
-                add_event('PRO_DEAL_APPEARED', store_id, product_id, prev['id'], curr['id'], 'PRO', prev_pro, curr_pro, {'pro_price': curr['pro_price'], 'pro_discount_effective': curr['pro_discount_effective']})
+                # Check eligibility
+                elig = engine.evaluate(curr_provider, True)
+                if elig["ranking_eligible"]:
+                    meta = {'pro_price': curr['pro_price'], 'pro_discount_effective': curr['pro_discount_effective']}
+                    req_mem = engine.map_offer_to_membership(curr_provider, True)
+                    if req_mem != "NONE":
+                        meta["requires_membership"] = req_mem
+                        meta["membership_status"] = engine.get_membership_status(req_mem)
+                    add_event('PRO_DEAL_APPEARED', store_id, product_id, prev['id'], curr['id'], 'PRO', prev_pro, curr_pro, meta)
 
         for (store_id, product_id), prev in prev_obs.items():
             if (store_id, product_id) not in curr_obs:

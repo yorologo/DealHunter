@@ -56,6 +56,14 @@ def _dump_value(v):
         return f"[{items}]"
     return '""'
 
+def _deep_update(d, u):
+    for k, v in u.items():
+        if isinstance(v, dict) and k in d and isinstance(d[k], dict):
+            _deep_update(d[k], v)
+        else:
+            d[k] = v
+    return d
+
 def get_merged_config(cli_args, profile_name=None):
     # defaults
     config = {
@@ -75,21 +83,40 @@ def get_merged_config(cli_args, profile_name=None):
         "max_requests": 1000,
         "max_runtime": 3600,
         "compact": False,
-        "dry_run": False
+        "dry_run": False,
+        
+        # Phase 5E Settings
+        "providers": {
+            "rappi": {"enabled": True},
+            "uber_eats": {"enabled": True}
+        },
+        "memberships": {
+            "rappi_pro": {"status": "unknown"},
+            "uber_one": {"status": "unknown"}
+        },
+        "comparison": {
+            "inactive_membership_offers": "show_but_exclude"
+        }
     }
     
     # global config
     global_cfg = load_config()
     for k in config.keys():
         if k in global_cfg:
-            config[k] = global_cfg[k]
+            if isinstance(config[k], dict) and isinstance(global_cfg[k], dict):
+                _deep_update(config[k], global_cfg[k])
+            else:
+                config[k] = global_cfg[k]
             
     # profile
     if profile_name and "profiles" in global_cfg and profile_name in global_cfg["profiles"]:
         profile_cfg = global_cfg["profiles"][profile_name]
         for k in config.keys():
             if k in profile_cfg:
-                config[k] = profile_cfg[k]
+                if isinstance(config[k], dict) and isinstance(profile_cfg[k], dict):
+                    _deep_update(config[k], profile_cfg[k])
+                else:
+                    config[k] = profile_cfg[k]
                 
     # cli override
     if cli_args:
