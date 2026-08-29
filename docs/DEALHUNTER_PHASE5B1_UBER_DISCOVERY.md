@@ -1,5 +1,13 @@
 # DEALHUNTER PHASE 5B.1 — UBER EATS SURFACE DISCOVERY
 
+> [!IMPORTANT]
+> Historical phase snapshot. It records the evidence and constraints observed in
+> that phase; it is not current operational guidance. Current RC truth is
+> v3.2.0 / schema v16: Rappi and Uber acquisition are production-capable, while
+> canonical matching remains shadow-only, automatic writes are OFF, human
+> ground truth is insufficient and the statistical gate is `NOT_MET`.
+
+
 **Date**: 2026-08-25
 **Baseline**: DealHunter v3.0.1, Schema 14
 **Method**: Android dumpsys + Web search research (no live requests to UE APIs)

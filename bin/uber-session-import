@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Uber Eats Session Bridge — Experimental secure session import.
+Uber Eats Session Bridge — optional secure setup/session renewal.
 
 Usage:
     bin/uber-session-import [--discovery] [--port PORT]
@@ -425,7 +425,9 @@ def print_sanitized_status(ctx: dict):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Uber Eats Session Bridge (Experimental)")
+    parser = argparse.ArgumentParser(
+        description="Optional Uber Eats secure setup/session renewal bridge"
+    )
     parser.add_argument('--discovery', action='store_true', help='Print discovery-only snippet')
     parser.add_argument('--port', type=int, default=DEFAULT_PORT, help='Listener port')
     parser.add_argument('--timeout', type=int, default=300, help='Listener timeout in seconds')
@@ -446,12 +448,12 @@ def main():
     store = UberSessionStore()
 
     print("=" * 60)
-    print("UBER EATS SESSION BRIDGE — EXPERIMENTAL")
+    print("UBER EATS SESSION BRIDGE — OPTIONAL SETUP / SESSION RENEWAL")
     print("=" * 60)
     print()
     print("STEP 1 — On your Windows PC, open PowerShell and run:")
     print()
-    print(f'  ssh -N -L {args.port}:127.0.0.1:{args.port} -p 8022 -i "$env:USERPROFILE\\.ssh\\termux_ed25519" u0_a435@192.168.68.76')
+    print(f'  ssh -N -L {args.port}:127.0.0.1:{args.port} -p 8022 -i "$env:USERPROFILE\\.ssh\\termux_ed25519" <TERMUX_USER>@<PHONE_IP>')
     print()
     print("STEP 2 — Open https://www.ubereats.com/mx in your browser and sign in.")
     print()

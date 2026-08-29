@@ -1,5 +1,13 @@
 # Phase 5D.5 — Uber Phone-Only 24H Production Soak
 
+> [!IMPORTANT]
+> Historical phase snapshot. It records the evidence and constraints observed in
+> that phase; it is not current operational guidance. Current RC truth is
+> v3.2.0 / schema v16: Rappi and Uber acquisition are production-capable, while
+> canonical matching remains shadow-only, automatic writes are OFF, human
+> ground truth is insufficient and the statistical gate is `NOT_MET`.
+
+
 ## Objective
 Validate for >= 24 real hours that the Uber phone-only crawler can operate automatically alongside DealHunter/Rappi without human intervention, PC, X11, DB corruption, or progressive Chromium degradation.
 

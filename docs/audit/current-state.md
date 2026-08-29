@@ -1,4 +1,10 @@
-# Estado Actual del Proyecto (Current State)
+# Snapshot histórico del proyecto (v2 era)
+
+> [!IMPORTANT]
+> Este archivo conserva una auditoría histórica anterior a la arquitectura
+> multiprovider. No describe el estado actual. Para el RC vigente consulte
+> `README.md`, `docs/ARCHITECTURE.md` y el schema ejecutable en
+> `src/dealhunter/db.py`.
 
 ## Resumen General
 **Rappi Deal Hunter** es un rastreador (crawler) automatizado en Python diseñado para el entorno Termux. Evolucionó de una simple PoC de descubrimiento de tiendas a un motor analítico de precios históricos completo (v2).

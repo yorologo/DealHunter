@@ -276,7 +276,7 @@ def register_routes(app):
         import sqlite3
         with sqlite3.connect(current_app.config['DATABASE']) as conn:
             row = conn.execute(
-                "SELECT name, type FROM stores WHERE store_id = ?",
+                "SELECT name, type FROM stores WHERE provider = 'rappi' AND store_id = ?",
                 (store_id,),
             ).fetchone()
         if row is None:
@@ -304,4 +304,3 @@ def register_routes(app):
     @app.errorhandler(500)
     def internal_error(e):
         return render_template('placeholder.html', title="Error Interno", subtitle="No pudimos leer los datos.\nCódigo: DB_ERROR\nTus datos no fueron modificados.", current_path=""), 500
-

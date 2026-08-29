@@ -1,5 +1,13 @@
 # UBER EATS SURFACES INVENTORY
 
+> [!IMPORTANT]
+> Historical phase snapshot. It records the evidence and constraints observed in
+> that phase; it is not current operational guidance. Current RC truth is
+> v3.2.0 / schema v16: Rappi and Uber acquisition are production-capable, while
+> canonical matching remains shadow-only, automatic writes are OFF, human
+> ground truth is insufficient and the statistical gate is `NOT_MET`.
+
+
 Phase 5B.1 — Surface Discovery (2026-08-25)
 Phase 5B.2 — Surface Validation (2026-08-25)
 
@@ -353,4 +361,3 @@ storeUuid
 | — | `/sitemap.xml` (root) | N/A | **REJECTED** (404) | Sitemaps in robots.txt only |
 | — | `/mx/city/*` | N/A | **REJECTED** (404) | Not a valid URL pattern |
 | — | SSO Content Provider | N/A | **BLOCKED** | Signature-protected |
-

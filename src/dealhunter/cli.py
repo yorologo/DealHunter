@@ -9,9 +9,9 @@ from .crawler import run_discover, run_update
 from .historico import analyze_history, compare_stores
 from .output import print_results
 from .doctor import run_doctor, format_doctor_output
+from .metadata import VERSION
 from datetime import datetime
 
-VERSION = "3.0.0-rc1"
 LOCATION_CHANGE_WARNING_METERS = 500.0
 
 

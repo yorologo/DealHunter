@@ -111,7 +111,7 @@ def match_products(p1, p2):
     Returns: status (AUTO_CONFIRMED, REVIEW_REQUIRED, REJECTED), reason
     """
     from .normalization import extract_signature, is_hard_reject
-    # simple extraction since we don't have full structured evidence module in src yet
+    # Shadow-only extraction; it does not write canonical memberships.
     sig1 = extract_signature(p1.get("brand", ""), p1.get("name", ""), p1.get("quantity"), p1.get("unit"))
     sig2 = extract_signature(p2.get("brand", ""), p2.get("name", ""), p2.get("quantity"), p2.get("unit"))
     

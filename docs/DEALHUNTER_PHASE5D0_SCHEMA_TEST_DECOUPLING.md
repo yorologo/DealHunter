@@ -1,5 +1,13 @@
 # PHASE 5D.0 — SCHEMA-TEST DECOUPLING
 
+> [!IMPORTANT]
+> Historical phase snapshot. It records the evidence and constraints observed in
+> that phase; it is not current operational guidance. Current RC truth is
+> v3.2.0 / schema v16: Rappi and Uber acquisition are production-capable, while
+> canonical matching remains shadow-only, automatic writes are OFF, human
+> ground truth is insufficient and the statistical gate is `NOT_MET`.
+
+
 ## STATUS
 COMPLETED (SCHEMA_TEST_DECOUPLING_CERTIFIED)
 

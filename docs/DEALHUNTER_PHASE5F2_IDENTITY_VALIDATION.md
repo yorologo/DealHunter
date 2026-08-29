@@ -1,5 +1,13 @@
 # Phase 5F.2 Identity Validation
 
+> [!IMPORTANT]
+> Historical phase snapshot. It records the evidence and constraints observed in
+> that phase; it is not current operational guidance. Current RC truth is
+> v3.2.0 / schema v16: Rappi and Uber acquisition are production-capable, while
+> canonical matching remains shadow-only, automatic writes are OFF, human
+> ground truth is insufficient and the statistical gate is `NOT_MET`.
+
+
 ## Human vs Model Labels
 For this phase, a blind review of the 600-pair review corpus was conducted using an independent AI model, rather than relying strictly on human ground truth. This ensures separation from the heuristic rules, but these labels MUST NOT be considered `human ground truth`.
 
@@ -28,8 +36,16 @@ The heuristic model over-indexes `AUTO_CONFIRMED` on non-exact products, meaning
 - Statistical Production Gate: NOT_MET
 - 0 false positive requirement was NOT met due to 22 non-exact pairs classified as AUTO_CONFIRMED.
 
-## Why Schema v16 Remains Deferred
-Because the matcher requires calibration and the production gate was NOT MET, it is unsafe to roll out the Canonicalization database (schema v16) right now. Doing so would write faulty identity associations into the database. Schema v15 will remain intact.
+## Why Schema v16 Was Deferred in This Snapshot
+At this phase snapshot, schema v16 had not yet been implemented because the
+matcher required calibration and the production gate was `NOT_MET`.
 
-## Performance
-Candidate generation is currently O(N²) global over all products in the database. When tested on the main catalog, the script timed out. It needs to be bounded (e.g., grouped by brand and category before comparing) before it is production ready.
+Current resolution: schema v16 now provides empty canonical infrastructure,
+while automatic membership writes remain absent. Implementing the tables did
+not promote the matcher to production.
+
+## Historical Performance Finding
+The unbounded generator used during this snapshot timed out. It was later
+replaced by bounded candidate generation. Current reproducible measurements
+are recorded in `DEALHUNTER_PHASE_END_REPORT.md`; this historical timeout must
+not be presented as the current implementation.

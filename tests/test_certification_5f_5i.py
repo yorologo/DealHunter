@@ -82,12 +82,12 @@ def test_uber_brand_extraction():
     sig2 = extract_signature("", "No Brand Descriptor · Just Product", None, None)
     assert sig2["brand"] == "no brand descriptor"
 
-# 5. Schema v16 Migration & Default OFF Canonical Writes
-def test_schema_v16_migration():
+# 5. Schema v16 Migration Infrastructure
+def test_schema_v16_migration_creates_canonical_tables():
     if os.path.exists("test_v16.db"):
         os.remove("test_v16.db")
 
-    # Schema should migrate unconditionally to v16
+    # Schema migrates to v16; this test does not claim an automatic write path.
     conn = setup_db("test_v16.db")
     c = conn.cursor()
     c.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='canonical_products'")

@@ -9,6 +9,11 @@ bin/rappi-ofertas discover --min-discount 30
 bin/rappi-ofertas update
 bin/rappi-ofertas doctor
 bin/rappi-ofertas account status
+bin/rappi-ofertas providers
+bin/rappi-ofertas provider uber_eats enable
+bin/rappi-ofertas memberships
+bin/rappi-ofertas membership uber_one active
+bin/rappi-ofertas sync --provider uber_eats --lat TU_LAT --lng TU_LNG
 ```
 
 ## `rappi-historico`
@@ -22,4 +27,9 @@ bin/rappi-historico db status
 bin/rappi-historico web --port 8765
 ```
 
-Utilice el flag `--help` en terminal para listar los comandos exhaustivos operativos de v2.7.0.
+Utilice `--help` para consultar los comandos que expone el HEAD instalado. La
+descripción de la CLI obtiene su versión de `dealhunter.metadata.VERSION`.
+
+La sincronización Uber normal usa Chromium headless en Termux. Carbonyl se usa
+únicamente para setup o renovación del perfil; un PC no es requisito de los
+runs normales.

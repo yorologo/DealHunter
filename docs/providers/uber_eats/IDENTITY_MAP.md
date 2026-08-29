@@ -1,6 +1,7 @@
 # UBER EATS IDENTITY MAP
 
-Phase 5B.2 — Validated (2026-08-25)
+Phase 5B.2 discovery snapshot (2026-08-25), corrected against the current
+evidence audit on 2026-08-29.
 
 ---
 
@@ -8,11 +9,11 @@ Phase 5B.2 — Validated (2026-08-25)
 
 Uber Eats uses two UUID representations:
 
-### Full UUID (Canonical)
+### Full UUID representation
 - Format: `xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx` (RFC 4122)
 - Example: `a24b5931-99f4-48bc-af90-5808ed3d7556`
 - Found in: `__REACT_QUERY_STATE__`, JSON-LD, API responses
-- Scope: GLOBAL_PROVIDER
+- Scope: provider-specific; entity scope depends on the field.
 
 ### URL-safe Base64 UUID
 - Format: 22-character base64url-encoded binary UUID
@@ -33,13 +34,13 @@ Uber Eats uses two UUID representations:
 | `sectionUuid` | UUID | `7824731d-b6fd-52c3-b7d1-48859a8a997e` | catalogItems[].sectionUuid | PER-STORE |
 | `subsectionUuid` | UUID | `cf860f35-0870-475e-b8a9-149f0d87baf0` | catalogItems[].subsectionUuid | PER-STORE |
 | `itemUuid` (catalog) | UUID | `67870a59-b875-49be-843c-602c9d6f5e6c` | catalogItems[].uuid | PER-STORE |
-| `productUuid` | UUID | `c66f0df5-d72a-5cd7-a863-08985aed5c31` | catalogItems[].productInfo.productUuid | CROSS-STORE (product identity) |
+| `productUuid` | UUID | `c66f0df5-d72a-5cd7-a863-08985aed5c31` | catalogItems[].productInfo.productUuid | PROVIDER PRODUCT ID; cross-store scope unproven |
 | `promotionUUID` | UUID | `debe88e8-9a26-4e61-bc9f-be0d07228704` | catalogItems[].promoInfo.promotionUUID | TEMPORAL |
 | `collectionUuid` | UUID | `c335215c-c9f5-4864-9ceb-6a6f2760bf6f` | itemLevelPromotion.multiSKUFlatPromotion | TEMPORAL |
 
 ---
 
-## Identity Hierarchy (Validated)
+## Provider Identity Hierarchy
 
 ```
 storeUuid (= uuid)
@@ -48,7 +49,7 @@ storeUuid (= uuid)
   ├── sections[] (sectionUuid)
   │     └── subsections[] (subsectionUuid)
   │           └── catalogItems[] (uuid)
-  │                 ├── productInfo.productUuid  ← CROSS-STORE IDENTITY
+  │                 ├── productInfo.productUuid  ← PROVIDER-SPECIFIC EVIDENCE
   │                 ├── promoInfo.promotionUUID
   │                 └── itemLevelPromotion.collectionUuid
   └── promotions[] (promotionUUID)
@@ -57,10 +58,11 @@ storeUuid (= uuid)
 ### Key Distinction: itemUuid vs productUuid
 
 - `uuid` (in catalogItems): Store-specific item instance ID
-- `productUuid`: Cross-store product identity — the SAME product at different stores
-  shares the same `productUuid`
+- `productUuid`: provider-specific product identifier observed in raw catalog
+  data. The audited corpus did not demonstrate that it is stable across stores.
 
-This distinction is critical for DealHunter's cross-store comparison feature.
+Neither UUID is proof that a Rappi and Uber listing are the same commercial
+product. DealHunter preserves both as raw/provider evidence.
 
 ---
 
@@ -108,7 +110,7 @@ ubereats://store/browse?client_id=eats&storeUUID={uuid}&itemUUID={item_uuid}
 
 ## Identity Unknowns
 
-1. Whether `productUuid` is truly stable across time and store changes
+1. Whether `productUuid` is stable across time and store changes; current evidence is insufficient
 2. Whether section/subsection UUIDs persist across menu updates
 3. Exact mapping of base64url UUID ↔ canonical UUID for all entity types
 4. Whether menu UUIDs differ between delivery and pickup modes

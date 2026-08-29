@@ -1,7 +1,8 @@
 def extract_structured_evidence(raw_product_dict):
     """
     Extracts structured evidence from a raw product dictionary.
-    Since we don't have schema v16 yet, we'll do this in-memory.
+    Shadow evaluation remains in-memory even though schema v16 infrastructure
+    exists; automatic canonical membership writes are not implemented.
     """
     provider = raw_product_dict.get("provider", "")
     evidence = {
@@ -19,4 +20,3 @@ def extract_structured_evidence(raw_product_dict):
         evidence["is_prepared"] = True
         
     return evidence
-

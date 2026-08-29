@@ -43,7 +43,7 @@ def get_status():
     try:
         conn = setup_db()
         c = conn.cursor()
-        # Use provider column which exists in v15 schema
+        # Provider is part of the current raw identity contract.
         c.execute("""SELECT finished_at FROM runs
                      WHERE run_id IN (
                          SELECT DISTINCT run_id FROM observations WHERE provider = 'uber_eats'

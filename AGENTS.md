@@ -26,15 +26,31 @@ The project must prioritize demonstrable value, not the largest advertised disco
 
 ---
 
-## CURRENT STABLE
+## CURRENT DEVELOPMENT / RC
 
-- **Version**: v3.2.0
+- **Target version**: v3.2.0
 - **Schema**: 16
+- **Last public release**: v3.0.1
+- **Release status**: v3.2.0 is not merged, tagged or released yet.
+- **Version source of truth**: `src/dealhunter/metadata.py`.
+- **Schema source of truth**: `src/dealhunter/db.py::CURRENT_SCHEMA_VERSION`.
+
+### Provider and identity status
+
+- Rappi acquisition: production.
+- Uber Eats acquisition: production, phone-only Termux Chromium headless.
+- Provider configuration: production.
+- Rappi Pro / Uber One configuration and eligibility: production and separate from product identity.
+- Canonical schema infrastructure: implemented in schema v16.
+- Canonical matcher: shadow / experimental.
+- Automatic canonicalization: OFF; there is no automatic canonical membership write path.
+- Human ground truth: insufficient.
+- Statistical identity gate: `NOT_MET`.
 
 ### Web Modules Status:
 - **COMPRAR**: Completado (Deals, Market, Turbo, Restaurants, Categories, Stores)
 - **INVESTIGAR**: Completado (Products, Detail, History, Compare)
-- **SEGUIR**: Watchlist y Alerts Engine operativos en Core/CLI. Interfaz web pendiente para v2.8.
+- **SEGUIR**: Watchlist y Alerts Engine operativos en Core/CLI. La interfaz web permanece parcial/placeholder.
 - **ADMINISTRAR**: Completado (Admin Home, Account Diagnostics, Runs, Events, Doctor, Database Backup, Settings)
 
 ## Core Technical Rules Stabilized:
@@ -45,7 +61,6 @@ The project must prioritize demonstrable value, not the largest advertised disco
 - **Admin Network**: Admin GET is local-only (0 external requests). Network diagnostics require explicit POST.
 - **Security**: Secrets NEVER passed to templates. Config Settings allowlist (`SAFE_EDITABLE`). CSRF required for POST. DB actions limited to safe read/backup.
 - **Rappi navigation & Catalog Fetching**: Resolve `store_id` and type server-side. While the verified `gbrappi` exact-store contract through Shizuku is used for native navigation, **web fallbacks (e.g., www.rappi.com.mx/tiendas/...) ARE allowed and encouraged** specifically to extract full store catalogs and ensure 100% inventory coverage.
-- **Security**: Secrets NEVER passed to templates. Config Settings allowlist (`SAFE_EDITABLE`). CSRF required for POST. DB actions limited to safe read/backup.
 - **Location context**: Crawls require explicit `lat/lng` from CLI/profile/global config. Never restore a hardcoded city fallback. Persist provenance once per `runs` row; a significant change warns and preserves history until an explicit, backed-up decision.
 
 ### 1. Local-first
@@ -138,11 +153,15 @@ instead of guessing.
 
 ---
 
-## Current Stable Release
+## Release terminology
 
-Current public stable baseline:
+- **CURRENT DEVELOPMENT / RC** means the checked-out candidate: target v3.2.0, schema 16.
+- **PUBLIC RELEASE** means a published Git tag/release.
+- **LAST PUBLIC RELEASE** is derived from Git/GitHub metadata, not inferred from README text.
 
-DealHunter v3.1.0
+Last verified public release:
+
+DealHunter v3.0.1
 
 Main capabilities include:
 
@@ -243,17 +262,18 @@ Preserve:
 - schema_version;
 - existing historical observations.
 
-Important identity:
+Important raw identity:
 
-store_id + product_id
+(provider, store_id, product_id)
 
-identifies a product within a store.
+identifies a provider product within a store. Canonical identity is an additional
+layer and never replaces this raw key.
 
 Historical observations must allow multiple runs while preventing duplicates inside the same run.
 
 Expected uniqueness:
 
-UNIQUE(run_id, store_id, product_id)
+UNIQUE(run_id, provider, store_id, product_id)
 
 Migrations must be:
 
@@ -300,7 +320,8 @@ Prefer discover less frequently.
 
 ## Product Intelligence Direction
 
-Future product comparison should not rely on fuzzy string matching alone.
+Product comparison and shadow canonical evaluation must not rely on fuzzy
+string matching alone.
 
 Normalize products using attributes such as:
 
@@ -723,18 +744,16 @@ Priority direction:
 - suspicious reference price detection;
 - availability history.
 
-### v3.0 — Multi-source Intelligence
+### v3.2 RC — Multi-provider foundation
 
-Long-term direction:
+Current status:
 
-- additional retailers/providers;
-- cross-source product matching;
-- basket optimization;
-- effective purchase cost;
-- alerts;
-- daily digest;
-- local API;
-- dashboard.
+- Rappi and Uber Eats acquisition are production-capable;
+- provider and membership configuration are implemented;
+- raw identity is provider-aware;
+- schema v16 canonical infrastructure is implemented;
+- cross-provider canonical matching remains shadow/experimental;
+- automatic canonicalization remains OFF until human and statistical gates pass.
 
 ---
 
@@ -3147,16 +3166,21 @@ Manual DDL is reserved for:
 
 Do not hardcode current schema physical layout (column counts, positions) without justification. Tests should depend on semantics, not physical layout.
 
-## Multi-source Intelligence: Uber Eats (Experimental)
+## Multi-source Intelligence: Uber Eats
 
-DealHunter is actively developing support for Uber Eats as a secondary provider.
-All Uber Eats logic is safely isolated in `src/dealhunter/providers/uber_eats/` and has been **validated against the V15 multi-provider schema**, confirming proper UUID deduplication and observations history without contaminating Rappi data.
-- **Transport Pattern:** CDP (Chrome DevTools Protocol) is the required transport layer for Uber Eats to bypass Cloudflare/bot protections safely. Transport logic runs native JS `fetch` inside an authenticated browser context.
+Uber Eats acquisition is production-capable on the Termux phone and persists
+provider-aware rows under schema v16. Its implementation remains isolated in
+`src/dealhunter/providers/uber_eats/`.
+
+- **Normal transport:** native Termux Chromium headless over local CDP; no PC or X server is required for normal runs.
+- **Session setup/renewal:** Carbonyl uses the same phone-local profile. The PC session bridge is optional setup tooling, not a runtime dependency.
+- **Transport Pattern:** CDP (Chrome DevTools Protocol) runs native JS `fetch` inside the authenticated browser context while respecting provider limits.
 - **CSRF Placeholder:** Uber Eats allows `x-csrf-token: "x"` which acts as a static placeholder for tested browser operations, while cookies remain the actual authority.
+- **Identity:** `productInfo.productUuid` is preserved as provider evidence where available, but its cross-store scope is not sufficient proof of cross-provider commercial identity.
 
 ## Multiprovider Invariants
 
-As DealHunter evolves into a multi-provider core (Rappi + Uber Eats + future providers), the following invariants must be preserved:
+In the current multi-provider core (Rappi + Uber Eats), the following invariants must be preserved:
 
 1. **Opt-in / Opt-out**: The user can enable one, multiple, or all providers.
 2. **No Mandatory Providers**: No single provider is mandatory.
@@ -3164,8 +3188,8 @@ As DealHunter evolves into a multi-provider core (Rappi + Uber Eats + future pro
 4. **Provider != Membership**: The concept of a provider is separate from a membership.
 5. **Distinct Memberships**: Rappi Pro != Uber One. Do not invent a universal "membership" boolean if the models differ.
 6. **Offer Separation**: Membership-exclusive offers must be preserved conceptually separate from public offers.
-7. **Cross-provider Comparison Policy**: Future price comparison must support configurable policies: `exclude`, `show_but_exclude`, `include`.
+7. **Cross-provider Comparison Policy**: Membership eligibility supports configurable policies: `exclude`, `show_but_exclude`, `include`.
 8. **Identity Isolation**: `provider=all` does NOT mean products from different providers with the same name are identical.
 9. **No Naive Matching**: Never attempt cross-provider matching based solely on naive string comparison of the product name.
-10. **Canonical Matching**: Canonical product matching (fingerprinting) is deferred to a future phase.
+10. **Canonical Matching**: Schema v16 infrastructure and a shadow matcher exist, but automatic canonical membership writes are OFF. Human ground truth is insufficient and the statistical gate is `NOT_MET`.
 11. **Core Domains**: Query Layer, Deal Score, Alerts, Web, and Historical tracking remain universal, but must always be explicitly provider-aware.

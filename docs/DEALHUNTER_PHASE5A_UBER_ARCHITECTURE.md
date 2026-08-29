@@ -1,5 +1,13 @@
 # DEALHUNTER PHASE 5A: UBER EATS ARCHITECTURE ANALYSIS
 
+> [!IMPORTANT]
+> Historical phase snapshot. It records the evidence and constraints observed in
+> that phase; it is not current operational guidance. Current RC truth is
+> v3.2.0 / schema v16: Rappi and Uber acquisition are production-capable, while
+> canonical matching remains shadow-only, automatic writes are OFF, human
+> ground truth is insufficient and the statistical gate is `NOT_MET`.
+
+
 This document details the architectural impact of integrating Uber Eats as the second provider in DealHunter v3.0.1.
 
 ## 1. Provider Boundaries

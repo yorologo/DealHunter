@@ -9,7 +9,15 @@ graph TD
     D --> E[Web / Alerts / Watchlist]
 ```
 
-## Identity Side Pipeline (Phase 5F Experimental)
+Current RC boundary:
+
+- Rappi and Uber Eats acquisition are production-capable.
+- Raw identity is `(provider, store_id, product_id)`.
+- Provider selection and Rappi Pro/Uber One eligibility are production configuration.
+- Schema v16 canonical tables are implemented infrastructure.
+- Canonical matching remains shadow/experimental and cannot write memberships automatically.
+
+## Identity Side Pipeline (Shadow / Experimental)
 ```mermaid
 graph TD
     A[Raw Products] --> B[Evidence Extraction]

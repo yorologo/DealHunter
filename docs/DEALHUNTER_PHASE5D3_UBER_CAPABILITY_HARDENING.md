@@ -1,5 +1,13 @@
 # Phase 5D.3: Uber Eats Provider Capability Hardening
 
+> [!IMPORTANT]
+> Historical phase snapshot. It records the evidence and constraints observed in
+> that phase; it is not current operational guidance. Current RC truth is
+> v3.2.0 / schema v16: Rappi and Uber acquisition are production-capable, while
+> canonical matching remains shadow-only, automatic writes are OFF, human
+> ground truth is insufficient and the statistical gate is `NOT_MET`.
+
+
 ## Overview
 Phase 5D.3 evaluated the operational viability of Uber Eats across native Android, Chrome/CDP, and Hybrid architectures, subsequently adopting the `CDP_PRIMARY` transport as the most reliable, fully-featured primitive. 
 

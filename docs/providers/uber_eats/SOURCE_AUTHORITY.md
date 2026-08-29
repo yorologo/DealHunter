@@ -1,5 +1,13 @@
 # UBER EATS SOURCE AUTHORITY
 
+> [!IMPORTANT]
+> Historical phase snapshot. It records the evidence and constraints observed in
+> that phase; it is not current operational guidance. Current RC truth is
+> v3.2.0 / schema v16: Rappi and Uber acquisition are production-capable, while
+> canonical matching remains shadow-only, automatic writes are OFF, human
+> ground truth is insufficient and the statistical gate is `NOT_MET`.
+
+
 Phase 5B.2 — Validated (2026-08-25)
 
 ---
@@ -21,7 +29,7 @@ Phase 5B.2 — Validated (2026-08-25)
 | Item availability (isSoldOut, isAvailable, itemAvailabilityState) | ✅ | COMPLETE | PRIMARY |
 | Item pricing (centavos) | ✅ | COMPLETE | PRIMARY |
 | Item promotions (promoInfo, itemLevelPromotion) | ✅ | COMPLETE | PRIMARY |
-| Product identity (productUuid) | ✅ | COMPLETE | PRIMARY |
+| Provider product identifier (`productUuid`) | ✅ | FIELD PRESENT; cross-store scope UNKNOWN | SUPPORTING |
 | Purchase constraints (min/max quantities) | ✅ | COMPLETE | PRIMARY |
 | Customization indicator (hasCustomizations) | ✅ | COMPLETE | PRIMARY |
 

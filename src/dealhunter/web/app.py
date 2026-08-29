@@ -3,6 +3,7 @@ import os
 import secrets
 from flask import Flask, session, request, abort, g, current_app
 from dealhunter.db import get_default_db_path
+from dealhunter.metadata import VERSION
 from dealhunter.web.routes import register_routes
 from dealhunter.web.admin import admin_bp
 from dealhunter.termux import acquire_wake_lock, is_termux
@@ -33,8 +34,11 @@ def create_app(test_config=None):
                 abort(400, "CSRF token missing or invalid")
 
     @app.context_processor
-    def inject_csrf_token():
-        return dict(csrf_token=session.get('csrf_token'))
+    def inject_template_metadata():
+        return {
+            'csrf_token': session.get('csrf_token'),
+            'dealhunter_version': VERSION,
+        }
 
     register_routes(app)
     @app.errorhandler(400)

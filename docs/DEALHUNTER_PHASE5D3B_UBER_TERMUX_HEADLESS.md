@@ -1,5 +1,13 @@
 # Phase 5D.3B — Uber Termux Headless Phone-Only Background Transport
 
+> [!IMPORTANT]
+> Historical phase snapshot. It records the evidence and constraints observed in
+> that phase; it is not current operational guidance. Current RC truth is
+> v3.2.0 / schema v16: Rappi and Uber acquisition are production-capable, while
+> canonical matching remains shadow-only, automatic writes are OFF, human
+> ground truth is insufficient and the statistical gate is `NOT_MET`.
+
+
 ## Decision
 **TERMUX_CHROMIUM_PHONE_ONLY_WITH_LOGIN_SETUP**
 
@@ -33,4 +41,3 @@ To overcome Uber's location constraints on new profiles, `carbonyl` (a terminal-
 ## Tests
 - **Suite**: 418 passed in 51.24s (0 failures).
 - **V15 Isolation**: PASS (Rappi crawler unaffected).
-

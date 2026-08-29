@@ -1,5 +1,13 @@
 # Phase 5D.2: Uber Operational Browser Transport
 
+> [!IMPORTANT]
+> Historical phase snapshot. It records the evidence and constraints observed in
+> that phase; it is not current operational guidance. Current RC truth is
+> v3.2.0 / schema v16: Rappi and Uber acquisition are production-capable, while
+> canonical matching remains shadow-only, automatic writes are OFF, human
+> ground truth is insufficient and the statistical gate is `NOT_MET`.
+
+
 ## Objective
 Implement a robust, generic browser transport using CDP (Chrome DevTools Protocol) to reliably execute structured fetches for Uber Eats catalogs.
 

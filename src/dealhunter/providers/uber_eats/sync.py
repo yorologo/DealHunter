@@ -1,8 +1,8 @@
 """
 Uber Eats catalog sync — orchestrates BrowserTransport → Parser → Normalizer → DB.
 
-Produces a sanitized capture envelope and persists to schema v15 temp DB.
-Does NOT modify the production database.
+Produces a sanitized capture envelope and, when ``db_path`` is configured,
+persists provider-aware rows through the current database contract.
 """
 import asyncio
 import json
@@ -234,7 +234,7 @@ class UberCatalogSync:
         }
 
     def _persist_to_db(self, parsed, run_id, store_uuid):
-        """Persist parsed data to the temp v15 database."""
+        """Persist parsed data to the configured provider-aware database."""
         if not self.db_path:
             return 0
 

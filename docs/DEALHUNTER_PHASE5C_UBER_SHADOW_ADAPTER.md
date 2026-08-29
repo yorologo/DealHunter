@@ -1,5 +1,13 @@
 # DEALHUNTER_PHASE5C_UBER_SHADOW_ADAPTER
 
+> [!IMPORTANT]
+> Historical phase snapshot. It records the evidence and constraints observed in
+> that phase; it is not current operational guidance. Current RC truth is
+> v3.2.0 / schema v16: Rappi and Uber acquisition are production-capable, while
+> canonical matching remains shadow-only, automatic writes are OFF, human
+> ground truth is insufficient and the statistical gate is `NOT_MET`.
+
+
 ## PARSER
 - **payload**: Se consume exitosamente el JSON estructurado de `getStoreV1`. Transport separado del normalizer.
 - **sections**: Extraídas correctamente de `data.catalogSectionsMap` usando `VERTICAL_GRID` y `HORIZONTAL_GRID`.

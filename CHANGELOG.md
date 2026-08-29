@@ -1,30 +1,26 @@
-## [v3.2.0] - Pre-Main Promotion
+# Changelog
+
+## [v3.2.0] - Unreleased release candidate
+
+`v3.2.0` is the current development target. It has not been merged to `main`,
+tagged or released.
 
 ### Added
 - **Multi-Provider Architecture**: Implemented robust provider registry and decoupled core logic from specific providers.
-- **Uber Eats Integration (Phone-Only)**: Added production-ready headless synchronization for Uber Eats via Termux native CDP transport. Does not require X11 or PC.
-- **Provider & Membership Settings**: Added configuration (`--enable-rappi`, `--enable-uber-eats`, `--rappi-pro`, `--uber-one`) to toggle providers and isolate pricing safely.
+- **Uber Eats Integration (Phone-Only)**: Added production headless synchronization for Uber Eats via native Termux Chromium and local CDP. Normal runs require neither a PC nor an X server; Carbonyl is limited to phone-local setup/session renewal.
+- **Provider & Membership Settings**: Added the `provider` and `membership` CLI configuration commands to select providers and keep Rappi Pro/Uber One eligibility separate from identity.
 - **Provider-Safe IDs**: Migrated to `(provider, store_id, product_id)` primary compound identity across the system (DB, history, alerts, watchlist, routes).
-- **Schema v16 Migration**: Expanded data model to support cross-provider metadata, opaque canonical IDs, and membership isolation. 
-- **Canonical Shadow Infrastructure**: Prepared the semantic evidence gate and shadow matcher logic for future cross-provider product correlation.
+- **Schema v16 Migration**: Added canonical product, family, external identifier, member and identity-decision infrastructure while preserving raw provider IDs.
+- **Canonical Shadow Infrastructure**: Implemented in-memory candidate generation and evidence evaluation for experimental cross-provider correlation.
 
 ### Changed
 - Isolated Deal Score logic to `compare_eligible_offers` to avoid polluting the core query layer.
-- Enhanced exact evidence gate to mandate absolute token parity (ratio=1.0) and explicit package size alignment before generating candidate matches.
+- The shadow exact gate requires set-token parity, explicit brand/size evidence and no detected package contradiction. This is a conservative implementation rule, not evidence of measured human precision.
 
 ### Limitations
-- **Auto Canonicalization OFF**: Automated merging of products across providers is intentionally disabled by default (`AUTO_CANONICAL_WRITES=0`) pending further human ground truth calibration (Statistical Gate currently NOT_MET). Canonical UI is strictly experimental.
-
-# Changelog
-
-## Unreleased / experimental
-- Decoupled test infrastructure from physical v14 schema layout.
-- Prepared schema evolution safely with centralized test fixtures.
-- Uber Eats structured shadow adapter
-- Uber Eats generic CDP Browser Transport (Phase 5D.2) using Runtime.evaluate injection.
-- Browser-native payload research and static placeholder x-csrf-token.
-- Parser # Changelog Normalizer implemented with deduplication
-- No production ingestion yet (schema is V15)
+- **Auto Canonicalization OFF**: No automatic canonical membership write path is implemented. The matcher and canonical UI remain shadow/experimental.
+- **Human Ground Truth**: Insufficient; the statistical identity gate is `NOT_MET`.
+- **Production Boundary**: Rappi acquisition, Uber Eats acquisition, provider configuration and membership configuration are production-capable. Canonical matching is not.
 
 
 ## v3.0.1 - 2026-08-24
