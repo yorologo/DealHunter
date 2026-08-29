@@ -1,14 +1,12 @@
 import re
-
 with open("src/dealhunter/web/queries.py", "r") as f:
     content = f.read()
 
-# Add get_merged_config
-content = content.replace("from dealhunter.query_layer import build_faceted_query", "from dealhunter.query_layer import build_faceted_query\n    from dealhunter.config import get_merged_config")
-content = content.replace("q, count_q, params = build_faceted_query(facets)", "q, count_q, params = build_faceted_query(facets, get_merged_config(None))")
+content = content.replace("def get_product_detail(db_path, store_id, product_id):", "def get_product_detail(db_path, provider, store_id, product_id):")
+content = content.replace("WHERE p.store_id = ? AND p.product_id = ?", "WHERE p.provider = ? AND p.store_id = ? AND p.product_id = ?")
+content = content.replace("(store_id, product_id)", "(provider, store_id, product_id)")
+# But wait, there might be other (store_id, product_id) tuples in queries.py! Let's be careful.
+content = content.replace("''', (store_id, product_id))", "''', (provider, store_id, product_id))")
 
-content = content.replace("from dealhunter.query_layer import get_facet_counts", "from dealhunter.query_layer import get_facet_counts\n    from dealhunter.config import get_merged_config")
-content = content.replace("counts = get_facet_counts(conn, facets)", "counts = get_facet_counts(conn, facets, get_merged_config(None))")
-
-with open("src/dealhunter/web/queries.py", "w") as f:
-    f.write(content)
+# Wait, the above replaced (store_id, product_id) everywhere in queries.py.
+# There are 2 instances: get_product_detail has ONE execute, another execute is for history.

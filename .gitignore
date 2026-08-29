@@ -32,3 +32,4 @@ coverage.xml
 htmlcov/
 audit_results.txt
 tec_log.txt
+research/
