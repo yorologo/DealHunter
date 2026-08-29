@@ -3,9 +3,13 @@ import re
 with open('src/dealhunter/db.py', 'r') as f:
     content = f.read()
 
-v16_sql = """
-        -- Schema V16
-        if current_version < 16:
+v16_migration = """
+    # v16 migration (Shadow / Disabled by default)
+    # Controlled by ENABLE_CANONICALIZATION flag in future
+    if version < 16:
+        import os
+        if os.environ.get("ENABLE_CANONICALIZATION") == "1":
+            print("Applying schema v16 (Canonicalization)")
             c.execute('''
             CREATE TABLE IF NOT EXISTS product_families (
                 family_id TEXT PRIMARY KEY,
@@ -13,7 +17,6 @@ v16_sql = """
                 brand TEXT,
                 category TEXT
             )''')
-
             c.execute('''
             CREATE TABLE IF NOT EXISTS canonical_products (
                 canonical_id TEXT PRIMARY KEY,
@@ -25,7 +28,6 @@ v16_sql = """
                 category TEXT,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )''')
-
             c.execute('''
             CREATE TABLE IF NOT EXISTS product_external_identifiers (
                 canonical_id TEXT REFERENCES canonical_products(canonical_id),
@@ -33,7 +35,6 @@ v16_sql = """
                 identifier_value TEXT,
                 PRIMARY KEY (canonical_id, identifier_type, identifier_value)
             )''')
-
             c.execute('''
             CREATE TABLE IF NOT EXISTS canonical_product_members (
                 canonical_id TEXT REFERENCES canonical_products(canonical_id),
@@ -45,7 +46,6 @@ v16_sql = """
                 added_by TEXT,
                 PRIMARY KEY (canonical_id, provider, store_id, product_id)
             )''')
-
             c.execute('''
             CREATE TABLE IF NOT EXISTS product_identity_decisions (
                 decision_id TEXT PRIMARY KEY,
@@ -57,11 +57,14 @@ v16_sql = """
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 source TEXT
             )''')
-
+            # Do NOT update the CURRENT_SCHEMA_VERSION constant yet, 
+            # just update the DB if flag is passed.
             c.execute('UPDATE schema_version SET version = 16')
-            conn.commit()
+            version = 16
 """
 
-# Just write this to a safe location, don't migrate yet as it needs to be behind a flag
-# The instructions say "Sólo avanzar a schema v16 si: identity model es estable..."
-# Since model is NOT stable (AUTO_CONFIRMED false positives), we prepare it.
+# Find where version < CURRENT_SCHEMA_VERSION is handled
+content = content.replace("if version < CURRENT_SCHEMA_VERSION:", v16_migration + "\n    if version < CURRENT_SCHEMA_VERSION:")
+
+with open('src/dealhunter/db.py', 'w') as f:
+    f.write(content)

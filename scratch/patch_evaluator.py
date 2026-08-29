@@ -1,9 +1,9 @@
-import sqlite3
-import json
-from collections import defaultdict
-from .normalization import extract_signature, is_hard_reject
+import re
 
+with open('src/dealhunter/identity/evaluator.py', 'r') as f:
+    content = f.read()
 
+new_gen = """
 def generate_candidates(db_path):
     conn = sqlite3.connect(db_path)
     c = conn.cursor()
@@ -85,68 +85,11 @@ def generate_candidates(db_path):
                         })
                         
     return candidates
-def evaluate_shadow(db_path):
-    candidates = generate_candidates(db_path)
-    print(f"Shadow mode generated {len(candidates)} cross-provider candidates.")
-    
-    # Dump a sample
-    if candidates:
-        print("\nSample Candidates:")
-        for c in sorted(candidates, key=lambda x: x["confidence"], reverse=True)[:10]:
-            print(f"- [Score: {c['confidence']:.2f}]")
-            print(f"  {c['p1']['provider']}: {c['p1']['name']} (Sig: {c['p1']['signature']})")
-            print(f"  {c['p2']['provider']}: {c['p2']['name']} (Sig: {c['p2']['signature']})")
-            
-    return candidates
+"""
 
-def match_products(p1, p2):
-    """
-    Given two product dictionaries, returns the matching status and reason.
-    Returns: status (AUTO_CONFIRMED, REVIEW_REQUIRED, REJECTED), reason
-    """
-    from .normalization import extract_signature, is_hard_reject
-    # simple extraction since we don't have full structured evidence module in src yet
-    sig1 = extract_signature(p1.get("brand", ""), p1.get("name", ""), p1.get("quantity"), p1.get("unit"))
-    sig2 = extract_signature(p2.get("brand", ""), p2.get("name", ""), p2.get("quantity"), p2.get("unit"))
-    
-    rejected, reason = is_hard_reject(sig1, sig2)
-    if rejected:
-        return "REJECTED", reason
-        
-    s1_tokens = set(sig1["base_name"].split())
-    s2_tokens = set(sig2["base_name"].split())
-    
-    if not s1_tokens or not s2_tokens:
-        return "REVIEW_REQUIRED", "Empty base name"
-        
-    overlap = len(s1_tokens.intersection(s2_tokens))
-    min_len = min(len(s1_tokens), len(s2_tokens))
-    max_len = max(len(s1_tokens), len(s2_tokens))
-    
-    ratio_min = overlap / min_len if min_len > 0 else 0
-    ratio_max = overlap / max_len if max_len > 0 else 0
-    
-    has_brand = bool(sig1["brand"] and sig2["brand"])
-    has_size = bool(sig1["total"] and sig2["total"])
-    
-    # Check if prepared
-    def is_prepared(name):
-        n = name.lower()
-        return any(w in n for w in ["taco", "chilaquiles", "torta", "lonche", "hamburguesa", "pizza"])
-    
-    prep1 = is_prepared(p1.get("name", ""))
-    prep2 = is_prepared(p2.get("name", ""))
-    
-    if ratio_min >= 0.75 and ratio_max >= 0.75:
-        if has_brand and has_size and not (prep1 or prep2):
-            return "AUTO_CONFIRMED", "Exact match with evidence"
-        else:
-            return "REVIEW_REQUIRED", "Exact similarity but missing critical evidence or is prepared"
-        
-    if ratio_min >= 0.8:
-        return "REVIEW_REQUIRED", "High overlap"
-        
-    if ratio_min >= 0.5:
-        return "REVIEW_REQUIRED", "Moderate overlap"
-        
-    return "REJECTED", "Low overlap"
+# Replace
+import re
+content = re.sub(r'def generate_candidates\(db_path\):.*?(?=def evaluate_shadow)', new_gen, content, flags=re.DOTALL)
+
+with open('src/dealhunter/identity/evaluator.py', 'w') as f:
+    f.write(content)

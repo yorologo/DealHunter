@@ -33,64 +33,85 @@ def parse_package(text, qty_val, unit_val):
 
     text_lower = text.lower()
     
-    # Try NxM format
-    m = re.search(r'(\d+)\s*x\s*([\d\.]+)\s*([a-z]+)', text_lower)
+    # Check 10+2 format (promotional extra)
+    m = re.search(r'(\d+)\+(\d+)\s*(?:sobres|piezas|pz|pack|unidades)', text_lower)
+    if m:
+        count = int(m.group(1)) + int(m.group(2))
+        return count, per_unit, total, unit
+
+    # Try NxM format (8 x 42.5 g)
+    m = re.search(r'(\d+)\s*x\s*(\d+[\d\.,]*)\s*([a-z]+)', text_lower)
     if m:
         count = int(m.group(1))
-        pu = float(m.group(2))
+        pu = float(m.group(2).replace(',', '.'))
         u = m.group(3)
         pu, u = normalize_value(pu, u)
         return count, pu, count * pu, u
         
-    # Try X unidades / Y g format
-    m = re.search(r'(\d+)\s*(?:unidades|piezas|pz|pack).*?(?:/|de|con)\s*([\d\.]+)\s*([a-z]+)', text_lower)
+    # Try 12 pack 355 ml
+    m = re.search(r'(\d+)\s*(?:pack|unidades|piezas|pz).*?(\d+[\d\.,]*)\s*([a-z]+)', text_lower)
     if m:
         count = int(m.group(1))
-        t = float(m.group(2))
+        pu = float(m.group(2).replace(',', '.'))
+        u = m.group(3)
+        pu, u = normalize_value(pu, u)
+        return count, pu, count * pu, u
+        
+    # Try X unidades / Y g format (8 und / 340 g)
+    m = re.search(r'(\d+)\s*(?:unidades|piezas|pz|pack|und).*?(?:/|de|con)\s*(\d+[\d\.,]*)\s*([a-z]+)', text_lower)
+    if m:
+        count = int(m.group(1))
+        t = float(m.group(2).replace(',', '.'))
         u = m.group(3)
         t, u = normalize_value(t, u)
         return count, t / count if count > 0 else t, t, u
-        
-    m = re.search(r'(\d+)\s*(?:pack|unidades|piezas|pz)', text_lower)
+
+    # Simple pack size (4 piezas)
+    m = re.search(r'(\d+)\s*(?:pack|unidades|piezas|pz|sobres)', text_lower)
     if m:
         count = int(m.group(1))
         if per_unit and count > 1:
             per_unit = total / count
+        # Don't return yet, we might still extract simple qty if unit is missing
+        # Actually if unit is missing, we just use what we have
+        if per_unit and unit:
+            return count, per_unit, total, unit
+
+    # Simple quantity without count (600 ml, 1.2 L bottle, 1,5 L, 1 kg)
+    # Check if total is not set yet
+    if not total or not unit:
+        # Match standalone number + unit
+        # careful with stuff like "coca cola zero", it has no number.
+        m = re.search(r'(?<!x\s)(?<!\dx)\b(\d+[\d\.,]*)\s*(ml|l|g|kg|oz|lb)\b', text_lower)
+        if m:
+            t_val = float(m.group(1).replace(',', '.'))
+            u_val = m.group(2)
+            t_val, u_val = normalize_value(t_val, u_val)
+            if not unit:
+                unit = u_val
+            if not total:
+                total = t_val
+                if count > 0:
+                    per_unit = total / count
             
     return count, per_unit, total, unit
 
-    text_lower = text.lower()
-    
-    # Try to find NxM format (e.g., 8 x 42.5 g)
-    m = re.search(r'(\d+)\s*x\s*([\d\.]+)\s*([a-z]+)', text_lower)
-    if m:
-        count = int(m.group(1))
-        per_unit = float(m.group(2))
-        unit = m.group(3)
-        total = count * per_unit
-        return count, per_unit, total, unit
-        
-    # Try to find 'X unidades / Y g' format
-    m = re.search(r'(\d+)\s*(?:unidades|piezas|pz|pack).*?(?:/|de|con)\s*([\d\.]+)\s*([a-z]+)', text_lower)
-    if m:
-        count = int(m.group(1))
-        total = float(m.group(2))
-        unit = m.group(3)
-        per_unit = total / count if count > 0 else total
-        return count, per_unit, total, unit
-        
-    # Check if pack size is mentioned but total is what we have in qty_val
-    m = re.search(r'(\d+)\s*(?:pack|unidades|piezas|pz)', text_lower)
-    if m:
-        count = int(m.group(1))
-        if per_unit and count > 1:
-            per_unit = total / count
-            
-    return count, per_unit, total, unit
 
 def extract_signature(brand, name, qty, unit):
     norm_brand = normalize_text(brand)
+    
+    # Uber title-derived brand (e.g., "Coca-Cola · Refresco")
+    if not norm_brand and name and ' · ' in name:
+        parts = name.split(' · ', 1)
+        if len(parts) == 2:
+            derived_brand = parts[0].strip()
+            # simple sanity check: if it's too long, maybe not a brand
+            if len(derived_brand) < 30:
+                norm_brand = normalize_text(derived_brand)
+                name = parts[1].strip()
+
     norm_name = normalize_text(name)
+
     
     # Re-implemented parse_package locally to include is_approx without changing tuple size in tests if possible
     # Actually, we can just return it in signature dictionary directly

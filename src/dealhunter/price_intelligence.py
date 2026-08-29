@@ -120,3 +120,64 @@ def compute_price_metrics(obs_list):
         "observations_count": len(obs_list),
         "history_days": (ts_last - ts_first).days if len(obs_list) > 1 else 0
     }
+
+def compute_cross_provider_deal_score(canonical_product, provider_offers, membership_context=None):
+    """
+    Experimental 5H: Cross-Provider Deal Scoring.
+    canonical_product: dict with canonical identity
+    provider_offers: list of current valid offers from different providers
+    membership_context: dict with eligibility status (e.g. {'rappi_pro': True, 'uber_one': False})
+    
+    Returns best offer and ranking.
+    """
+    if not provider_offers:
+        return None
+        
+    membership_context = membership_context or {}
+    scored_offers = []
+    
+    for offer in provider_offers:
+        provider = offer.get("provider")
+        raw_price = offer.get("price")
+        if raw_price is None or raw_price <= 0:
+            continue
+            
+        # Membership eligibility
+        eligible_price = raw_price
+        member_price = offer.get("member_price")
+        if member_price and member_price > 0 and member_price < raw_price:
+            if provider == "rappi" and membership_context.get("rappi_pro"):
+                eligible_price = member_price
+            elif provider == "uber_eats" and membership_context.get("uber_one"):
+                eligible_price = member_price
+                
+        # We can calculate unit price using canonical_product.quantity and canonical_product.unit
+        qty = canonical_product.get("quantity")
+        unit = canonical_product.get("unit")
+        
+        unit_price = eligible_price
+        if qty and qty > 0:
+            unit_price = eligible_price / qty
+            
+        scored_offers.append({
+            "provider": provider,
+            "store_id": offer.get("store_id"),
+            "product_id": offer.get("product_id"),
+            "original_price": offer.get("original_price"),
+            "raw_price": raw_price,
+            "eligible_price": eligible_price,
+            "unit_price": unit_price,
+            "unit": unit
+        })
+        
+    if not scored_offers:
+        return None
+        
+    scored_offers.sort(key=lambda x: x["eligible_price"])
+    best_offer = scored_offers[0]
+    
+    return {
+        "best_offer": best_offer,
+        "ranking": scored_offers,
+        "spread_percent": ((scored_offers[-1]["eligible_price"] / best_offer["eligible_price"]) - 1) * 100 if best_offer["eligible_price"] > 0 else 0
+    }
