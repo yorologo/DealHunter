@@ -208,7 +208,7 @@ def handle_config_command(args):
             sys.exit(1)
         try:
             val = float(args.value) if '.' in args.value else int(args.value)
-        except:
+        except ValueError:
             val = args.value
         cfg[args.key] = val
         save_config(cfg)
