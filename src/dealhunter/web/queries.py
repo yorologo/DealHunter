@@ -144,7 +144,7 @@ def get_product_detail(db_path, store_id, product_id):
 
         obs.append({
             "price": r[0],
-            "timestamp": r[1],
+            "timestamp": ts,
             "original_price": r[2],
             "availability": r[3],
             "discount_promotion": r[4],
