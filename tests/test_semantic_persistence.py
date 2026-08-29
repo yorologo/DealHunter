@@ -62,7 +62,7 @@ def test_migration_v10_to_v11(tmp_path):
     conn = sqlite3.connect(db_path)
     c = conn.cursor()
     c.execute("SELECT version FROM schema_version")
-    assert c.fetchone()[0] in [11, 12, 13, 14, 15]
+    assert c.fetchone()[0] in [11, 12, 13, 14, 15, 16]
     
     # Check legacy data was preserved and got default values
     c.execute("SELECT semantic_type, semantic_reason FROM product_memberships WHERE raw_name='Sushi'")
