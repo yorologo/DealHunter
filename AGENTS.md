@@ -28,8 +28,8 @@ The project must prioritize demonstrable value, not the largest advertised disco
 
 ## CURRENT STABLE
 
-- **Version**: v3.0.1
-- **Schema**: 14
+- **Version**: v3.1.0
+- **Schema**: 15
 
 ### Web Modules Status:
 - **COMPRAR**: Completado (Deals, Market, Turbo, Restaurants, Categories, Stores)
@@ -142,7 +142,7 @@ instead of guessing.
 
 Current public stable baseline:
 
-DealHunter v2.1.0
+DealHunter v3.1.0
 
 Main capabilities include:
 
@@ -3153,3 +3153,19 @@ DealHunter is actively developing support for Uber Eats as a secondary provider.
 All Uber Eats logic is safely isolated in `src/dealhunter/providers/uber_eats/` and has been **validated against the V15 multi-provider schema**, confirming proper UUID deduplication and observations history without contaminating Rappi data.
 - **Transport Pattern:** CDP (Chrome DevTools Protocol) is the required transport layer for Uber Eats to bypass Cloudflare/bot protections safely. Transport logic runs native JS `fetch` inside an authenticated browser context.
 - **CSRF Placeholder:** Uber Eats allows `x-csrf-token: "x"` which acts as a static placeholder for tested browser operations, while cookies remain the actual authority.
+
+## Multiprovider Invariants
+
+As DealHunter evolves into a multi-provider core (Rappi + Uber Eats + future providers), the following invariants must be preserved:
+
+1. **Opt-in / Opt-out**: The user can enable one, multiple, or all providers.
+2. **No Mandatory Providers**: No single provider is mandatory.
+3. **Fault Isolation**: A failure in one provider must not block or crash another provider.
+4. **Provider != Membership**: The concept of a provider is separate from a membership.
+5. **Distinct Memberships**: Rappi Pro != Uber One. Do not invent a universal "membership" boolean if the models differ.
+6. **Offer Separation**: Membership-exclusive offers must be preserved conceptually separate from public offers.
+7. **Cross-provider Comparison Policy**: Future price comparison must support configurable policies: `exclude`, `show_but_exclude`, `include`.
+8. **Identity Isolation**: `provider=all` does NOT mean products from different providers with the same name are identical.
+9. **No Naive Matching**: Never attempt cross-provider matching based solely on naive string comparison of the product name.
+10. **Canonical Matching**: Canonical product matching (fingerprinting) is deferred to a future phase.
+11. **Core Domains**: Query Layer, Deal Score, Alerts, Web, and Historical tracking remain universal, but must always be explicitly provider-aware.
