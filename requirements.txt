@@ -1,6 +1,4 @@
 flask
 cryptography
-pytest
-pytest-asyncio
 websockets
 aiohttp
