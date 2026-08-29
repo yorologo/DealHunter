@@ -49,7 +49,7 @@ def test_restaurants_home(client):
     assert b'3' in rv.data # total dishes
 
 def test_restaurant_detail(client):
-    rv = client.get('/restaurants/r1')
+    rv = client.get('/restaurants/rappi/r1')
     assert rv.status_code == 200
     assert b'McDonalds' in rv.data
     assert b'Combos' in rv.data

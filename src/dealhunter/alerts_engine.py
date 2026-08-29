@@ -12,8 +12,8 @@ class DealWatcher:
         self.conn = sqlite3.connect(db_path)
 
         
-    def generate_event_key(self, event_type, store_id, product_id, run_id):
-        return f"{event_type}_{store_id}_{product_id}_{run_id}"
+    def generate_event_key(self, event_type, provider, store_id, product_id, run_id):
+        return f"{event_type}_{provider}_{store_id}_{product_id}_{run_id}"
 
     def process_run(self, run_id):
         c = self.conn.cursor()
@@ -39,7 +39,7 @@ class DealWatcher:
         curr_obs_rows = c.fetchall()
         curr_obs = {}
         for r in curr_obs_rows:
-            curr_obs[(r[1], r[2])] = {
+            curr_obs[(r[11], r[1], r[2])] = {
                 'id': r[0], 'price': r[3], 'original_price': r[4], 'discount_effective': r[5],
                 'has_pro_offer': r[6], 'pro_price': r[7], 'pro_discount_effective': r[8],
                 'promotion_type': r[9], 'availability': r[10], 'provider': r[11]
@@ -50,17 +50,17 @@ class DealWatcher:
                    o.has_pro_offer, o.pro_price, o.pro_discount_effective, o.promotion_type, o.availability, o.provider
             FROM observations o
             INNER JOIN (
-                SELECT store_id, product_id, MAX(timestamp) as max_ts
+                SELECT provider, store_id, product_id, MAX(timestamp) as max_ts
                 FROM observations
                 WHERE store_id IN ({store_list_str}) AND run_id != ? AND timestamp < (SELECT started_at FROM runs WHERE run_id = ?)
-                GROUP BY store_id, product_id
-            ) prev ON o.store_id = prev.store_id AND o.product_id = prev.product_id AND o.timestamp = prev.max_ts
+                GROUP BY provider, store_id, product_id
+            ) prev ON o.provider = prev.provider AND o.store_id = prev.store_id AND o.product_id = prev.product_id AND o.timestamp = prev.max_ts
         ''', (run_id, run_id))
         
         prev_obs_rows = c.fetchall()
         prev_obs = {}
         for r in prev_obs_rows:
-            prev_obs[(r[1], r[2])] = {
+            prev_obs[(r[11], r[1], r[2])] = {
                 'id': r[0], 'price': r[3], 'original_price': r[4], 'discount_effective': r[5],
                 'has_pro_offer': r[6], 'pro_price': r[7], 'pro_discount_effective': r[8],
                 'promotion_type': r[9], 'availability': r[10], 'provider': r[11]
@@ -69,7 +69,7 @@ class DealWatcher:
         # Get the latest state for products in these stores to prevent spam
         # We only care about OUT_OF_STOCK and BACK_IN_STOCK to know the current 'missing' state
         c.execute(f'''
-            SELECT store_id, product_id, event_type
+            SELECT provider, store_id, product_id, event_type
             FROM alert_events 
             WHERE store_id IN ({store_list_str}) 
               AND event_type IN ('OUT_OF_STOCK', 'BACK_IN_STOCK')
@@ -80,17 +80,18 @@ class DealWatcher:
         # This gives us the chronological sequence, so the last one is the current state
         state_history = {}
         for r in c.fetchall():
-            state_history[(r[0], r[1])] = r[2]
+            state_history[(r[0], r[1], r[2])] = r[3]
         
         events = []
         
-        def add_event(event_type, store_id, product_id, prev_id, curr_id, channel, before, after, meta):
-            key = self.generate_event_key(event_type, store_id, product_id, run_id)
+        def add_event(event_type, provider, store_id, product_id, prev_id, curr_id, channel, before, after, meta):
+            key = self.generate_event_key(event_type, provider, store_id, product_id, run_id)
             events.append({
                 'event_key': key,
                 'event_type': event_type,
                 'store_id': store_id,
                 'product_id': product_id,
+                'provider': provider,
                 'previous_observation_id': prev_id,
                 'current_observation_id': curr_id,
                 'channel': channel,
@@ -101,20 +102,20 @@ class DealWatcher:
             })
             
         engine = EligibilityEngine(self.config)
-        for (store_id, product_id), curr in curr_obs.items():
-            prev = prev_obs.get((store_id, product_id))
-            last_event = state_history.get((store_id, product_id))
+        for (provider, store_id, product_id), curr in curr_obs.items():
+            prev = prev_obs.get((provider, store_id, product_id))
+            last_event = state_history.get((provider, store_id, product_id))
             is_missing = (last_event == 'OUT_OF_STOCK')
             curr_provider = curr['provider']
             
             if not prev:
                 if curr['discount_effective'] and curr['discount_effective'] >= 50:
-                    add_event('NEW_PRODUCT_WITH_DEAL', store_id, product_id, None, curr['id'], 'PUBLIC', None, curr['discount_effective'], {'reason': 'newly observed >=50%'})
+                    add_event('NEW_PRODUCT_WITH_DEAL', provider, store_id, product_id, None, curr['id'], 'PUBLIC', None, curr['discount_effective'], {'reason': 'newly observed >=50%'})
                 continue
                 
             if prev['availability'] == 'UNAVAILABLE' or is_missing:
                 if curr['availability'] == 'AVAILABLE':
-                    add_event('BACK_IN_STOCK', store_id, product_id, prev['id'], curr['id'], 'PUBLIC', 'UNAVAILABLE', 'AVAILABLE', None)
+                    add_event('BACK_IN_STOCK', provider, store_id, product_id, prev['id'], curr['id'], 'PUBLIC', 'UNAVAILABLE', 'AVAILABLE', None)
                     is_missing = False # Now available for further evaluation
                 else:
                     continue # Still unavailable, skip price checks
@@ -125,22 +126,22 @@ class DealWatcher:
             if prev['price'] is not None and curr['price'] is not None and curr['price'] < prev['price']:
                 drop_pct = (1 - curr['price'] / prev['price']) * 100
                 if drop_pct >= self.price_drop_threshold:
-                    add_event('PRICE_DROP', store_id, product_id, prev['id'], curr['id'], 'PUBLIC', prev['price'], curr['price'], {'drop_pct': drop_pct})
+                    add_event('PRICE_DROP', provider, store_id, product_id, prev['id'], curr['id'], 'PUBLIC', prev['price'], curr['price'], {'drop_pct': drop_pct})
                     
             prev_disc = prev['discount_effective'] or 0
             curr_disc = curr['discount_effective'] or 0
             if curr_disc > prev_disc:
-                add_event('DISCOUNT_INCREASED', store_id, product_id, prev['id'], curr['id'], 'PUBLIC', prev_disc, curr_disc, None)
+                add_event('DISCOUNT_INCREASED', provider, store_id, product_id, prev['id'], curr['id'], 'PUBLIC', prev_disc, curr_disc, None)
                 if curr_disc >= 50 and prev_disc < 50:
-                    add_event('NEW_DEAL', store_id, product_id, prev['id'], curr['id'], 'PUBLIC', prev_disc, curr_disc, {'reason': 'crossed 50%'})
+                    add_event('NEW_DEAL', provider, store_id, product_id, prev['id'], curr['id'], 'PUBLIC', prev_disc, curr_disc, {'reason': 'crossed 50%'})
                     
             prev_promo = prev['promotion_type'] or ''
             curr_promo = curr['promotion_type'] or ''
             if 'NxM' in curr_promo and 'NxM' not in prev_promo:
-                add_event('NXM_APPEARED', store_id, product_id, prev['id'], curr['id'], 'PUBLIC', prev_promo, curr_promo, None)
+                add_event('NXM_APPEARED', provider, store_id, product_id, prev['id'], curr['id'], 'PUBLIC', prev_promo, curr_promo, None)
                 
             if 'Progressive' in curr_promo and 'Progressive' not in prev_promo:
-                add_event('PROGRESSIVE_APPEARED', store_id, product_id, prev['id'], curr['id'], 'PUBLIC', prev_promo, curr_promo, None)
+                add_event('PROGRESSIVE_APPEARED', provider, store_id, product_id, prev['id'], curr['id'], 'PUBLIC', prev_promo, curr_promo, None)
                 
             prev_pro = prev['has_pro_offer']
             curr_pro = curr['has_pro_offer']
@@ -153,18 +154,18 @@ class DealWatcher:
                     if req_mem != "NONE":
                         meta["requires_membership"] = req_mem
                         meta["membership_status"] = engine.get_membership_status(req_mem)
-                    add_event('PRO_DEAL_APPEARED', store_id, product_id, prev['id'], curr['id'], 'PRO', prev_pro, curr_pro, meta)
+                    add_event('PRO_DEAL_APPEARED', provider, store_id, product_id, prev['id'], curr['id'], 'PRO', prev_pro, curr_pro, meta)
 
-        for (store_id, product_id), prev in prev_obs.items():
-            if (store_id, product_id) not in curr_obs:
-                last_event = state_history.get((store_id, product_id))
+        for (provider, store_id, product_id), prev in prev_obs.items():
+            if (provider, store_id, product_id) not in curr_obs:
+                last_event = state_history.get((provider, store_id, product_id))
                 if prev['availability'] == 'AVAILABLE' and last_event != 'OUT_OF_STOCK':
-                    add_event('OUT_OF_STOCK', store_id, product_id, prev['id'], None, 'PUBLIC', 'AVAILABLE', 'UNAVAILABLE', None)
+                    add_event('OUT_OF_STOCK', provider, store_id, product_id, prev['id'], None, 'PUBLIC', 'AVAILABLE', 'UNAVAILABLE', None)
                     
         final_events = []
         grouped = {}
         for ev in events:
-            grouped.setdefault((ev['store_id'], ev['product_id']), []).append(ev)
+            grouped.setdefault((ev.get('provider', 'rappi'), ev['store_id'], ev['product_id']), []).append(ev)
             
         for key, evs in grouped.items():
             types = {e['event_type']: e for e in evs}

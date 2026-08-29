@@ -14,7 +14,7 @@ def test_get_product_detail_mapping(current_schema_db_path):
     conn.commit()
     conn.close()
     
-    p = get_product_detail(current_schema_db_path, 's1', 'p1')
+    p = get_product_detail(current_schema_db_path, 'rappi', 's1', 'p1')
     assert p["product_name"] == "Test Product"
     assert p["store_name"] == "MyStore"
     assert p["store_type"] == "market"

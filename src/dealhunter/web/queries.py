@@ -51,7 +51,7 @@ def search_local(db_path, query, limit=10):
     c.execute('''
         SELECT DISTINCT p.product_id, p.store_id, p.name, s.name, p.image, p.brand
         FROM products p
-        JOIN stores s ON p.store_id = s.store_id
+        JOIN stores s ON p.provider = s.provider AND p.store_id = s.store_id
         WHERE (p.name LIKE ? OR p.brand LIKE ? OR p.normalized_name LIKE ?)
         LIMIT ?
     ''', (f'%{query}%', f'%{query}%', f'%{query}%', limit))
@@ -92,15 +92,15 @@ from dealhunter.historico import compute_price_metrics, compare_stores, compare_
 from dealhunter.normalization import format_unit_price
 from datetime import datetime
 
-def get_product_detail(db_path, store_id, product_id):
+def get_product_detail(db_path, provider, store_id, product_id):
     c = sqlite3.connect(db_path).cursor()
     c.execute('''
         SELECT p.provider, p.product_id, p.store_id, p.name, s.name, s.type as store_type, p.brand, 
                p.category, p.quantity, p.unit, p.normalized_quantity, p.normalized_unit, p.pack_count
         FROM products p
-        JOIN stores s ON p.store_id = s.store_id
-        WHERE p.store_id = ? AND p.product_id = ?
-    ''', (store_id, product_id))
+        JOIN stores s ON p.provider = s.provider AND p.store_id = s.store_id
+        WHERE p.provider = ? AND p.store_id = ? AND p.product_id = ?
+    ''', (provider, store_id, product_id))
     row = c.fetchone()
     if not row:
         return None
@@ -125,9 +125,9 @@ def get_product_detail(db_path, store_id, product_id):
     c.execute('''
         SELECT price, timestamp, original_price, availability, discount_promotion, promotion_type, promotion_label, run_id, has_pro_offer, pro_price, pro_discount_effective
         FROM observations
-        WHERE store_id = ? AND product_id = ?
+        WHERE provider = ? AND store_id = ? AND product_id = ?
         ORDER BY timestamp ASC, ROWID ASC
-    ''', (store_id, product_id))
+    ''', (provider, store_id, product_id))
     
     obs_rows = c.fetchall()
     
@@ -190,8 +190,8 @@ def get_product_compare(db_path, product_name):
     return res
 
 
-def get_anchor_compare(db_path, store_id, product_id):
-    return compare_with_anchor(db_path, store_id, product_id)
+def get_anchor_compare(db_path, provider, store_id, product_id):
+    return compare_with_anchor(db_path, provider, store_id, product_id)
 
 
 def enrich_products_with_metrics(db_path, products):
@@ -210,13 +210,13 @@ def enrich_products_with_metrics(db_path, products):
         conds.append("(product_id = ? AND store_id = ?)")
         params.extend([p["product_id"], p["store_id"]])
         
-    query = f"SELECT store_id, product_id, price, timestamp, original_price FROM observations WHERE {' OR '.join(conds)} ORDER BY timestamp ASC, ROWID ASC"
+    query = f"SELECT provider, store_id, product_id, price, timestamp, original_price FROM observations WHERE {' OR '.join(conds)} ORDER BY timestamp ASC, ROWID ASC"
     c.execute(query, params)
     obs_rows = c.fetchall()
     
     obs_map = {}
     for r in obs_rows:
-        key = (r[0], r[1])
+        key = (r[0], r[1], r[2])
         if key not in obs_map:
             obs_map[key] = []
 
@@ -515,18 +515,18 @@ def get_stores(db_path, hide_empty=True, filters=None):
     conn.close()
     return stores
 
-def get_store_detail(db_path, store_id):
+def get_store_detail(db_path, provider, store_id):
     conn = sqlite3.connect(db_path)
     c = conn.cursor()
-    c.execute("SELECT name, type FROM stores WHERE store_id = ?", (store_id,))
+    c.execute("SELECT name, type FROM stores WHERE provider = ? AND store_id = ?", (provider, store_id))
     row = c.fetchone()
     if not row:
         return None
     
-    c.execute("SELECT COUNT(product_id) FROM products WHERE store_id = ?", (store_id,))
+    c.execute("SELECT COUNT(product_id) FROM products WHERE provider = ? AND store_id = ?", (provider, store_id))
     p_count = c.fetchone()[0]
     
-    c.execute("SELECT MAX(timestamp) FROM observations WHERE store_id = ?", (store_id,))
+    c.execute("SELECT MAX(timestamp) FROM observations WHERE provider = ? AND store_id = ?", (provider, store_id))
     last_obs = c.fetchone()[0]
     
     # categories
@@ -534,10 +534,10 @@ def get_store_detail(db_path, store_id):
         SELECT COALESCE(NULLIF(TRIM(p.category), ''), 'Uncategorized') as cat_name, 
                COUNT(DISTINCT p.product_id)
         FROM products p
-        WHERE p.store_id = ?
+        WHERE p.provider = ? AND p.store_id = ?
         GROUP BY cat_name
         ORDER BY cat_name ASC
-    ''', (store_id,))
+    ''', (provider, store_id))
     cats = [{"name": r[0], "count": r[1]} for r in c.fetchall()]
     
     conn.close()
@@ -578,18 +578,18 @@ def get_restaurants_home(db_path, filters=None):
         c.execute('''
             SELECT COUNT(DISTINCT o.product_id)
             FROM observations o
-            WHERE o.store_id = ? AND o.availability = 'AVAILABLE'
-            AND o.timestamp = (SELECT MAX(timestamp) FROM observations WHERE product_id = o.product_id AND store_id = ?)
-        ''', (store_id, store_id))
+            WHERE o.provider = ? AND o.store_id = ? AND o.availability = 'AVAILABLE'
+            AND o.timestamp = (SELECT MAX(timestamp) FROM observations WHERE provider = o.provider AND product_id = o.product_id AND store_id = ?)
+        ''', (provider, store_id, provider, store_id))
         available = c.fetchone()[0]
         
         # Count promotions
         c.execute('''
             SELECT COUNT(DISTINCT o.product_id)
             FROM observations o
-            WHERE o.store_id = ? AND o.discount_effective > 0
-            AND o.timestamp = (SELECT MAX(timestamp) FROM observations WHERE product_id = o.product_id AND store_id = ?)
-        ''', (store_id, store_id))
+            WHERE o.provider = ? AND o.store_id = ? AND o.discount_effective > 0
+            AND o.timestamp = (SELECT MAX(timestamp) FROM observations WHERE provider = o.provider AND product_id = o.product_id AND store_id = ?)
+        ''', (provider, store_id, provider, store_id))
         promos = c.fetchone()[0]
         
         stores.append({
@@ -605,11 +605,11 @@ def get_restaurants_home(db_path, filters=None):
     conn.close()
     return stores
 
-def get_restaurant_detail(db_path, store_id):
+def get_restaurant_detail(db_path, provider, store_id):
     conn = sqlite3.connect(db_path)
     c = conn.cursor()
     
-    c.execute("SELECT name, brand, type FROM stores WHERE store_id = ? AND type = 'restaurants'", (store_id,))
+    c.execute("SELECT name, brand, type FROM stores WHERE provider = ? AND store_id = ? AND type = 'restaurants'", (provider, store_id,))
     row = c.fetchone()
     if not row:
         return None
@@ -628,10 +628,10 @@ def get_restaurant_detail(db_path, store_id):
                MAX(o.timestamp) as ts, p.has_toppings
         FROM products p
         JOIN observations o ON p.product_id = o.product_id AND p.store_id = o.store_id
-        WHERE p.store_id = ?
+        WHERE p.provider = ? AND p.store_id = ?
         GROUP BY p.product_id
         ORDER BY category ASC, p.name ASC
-    ''', (store_id,))
+    ''', (provider, store_id))
     
     dishes = []
     cats = {}
@@ -712,7 +712,7 @@ def search_local(db_path, query, filters=None):
         
     # 3. Search Products (includes dishes)
     p_results = []
-    query_str = f"SELECT p.product_id, p.store_id, p.name, s.name, p.brand, s.type FROM products p JOIN stores s ON p.store_id = s.store_id "
+    query_str = f"SELECT p.product_id, p.store_id, p.name, s.name, p.brand, s.type FROM products p JOIN stores s ON p.provider = s.provider AND p.store_id = s.store_id "
     params = []
     if query:
         query_str += "WHERE p.name LIKE ? OR p.brand LIKE ? "
@@ -754,7 +754,7 @@ def get_available_stores(db_path, vertical=None, filters=None):
 def get_available_categories(db_path, vertical=None, store_ids=None, filters=None):
     conn = sqlite3.connect(db_path)
     c = conn.cursor()
-    query = "SELECT DISTINCT category FROM products p JOIN stores s ON p.store_id = s.store_id WHERE category IS NOT NULL AND category != ''"
+    query = "SELECT DISTINCT category FROM products p JOIN stores s ON p.provider = s.provider AND p.store_id = s.store_id WHERE category IS NOT NULL AND category != ''"
     params = []
     if vertical:
         if vertical == "turbo":

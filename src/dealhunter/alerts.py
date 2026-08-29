@@ -25,20 +25,21 @@ class AlertEngine:
         
         # We need historical availability to check BACK_IN_STOCK. We'll fetch the last two observations for each product.
         c.execute('''
-            SELECT store_id, product_id, availability
+            SELECT provider, store_id, product_id, availability
             FROM observations
             ORDER BY timestamp ASC
         ''')
         avail_history = {}
         for r in c.fetchall():
-            key = (r[0], r[1])
+            key = (r[0], r[1], r[2])
             if key not in avail_history:
                 avail_history[key] = []
-            avail_history[key].append(r[2])
+            avail_history[key].append(r[3])
             
         new_alerts = []
         
         for m in metrics_by_product:
+            provider = m["provider"]
             store_id = m["store_id"]
             product_id = m["product_id"]
             product_name = m["product_name"]
@@ -53,7 +54,7 @@ class AlertEngine:
                     if not t["store"] or t["store"] == store_id:
                         if current_price <= t["target_price"]:
                             self._try_add_alert(
-                                new_alerts, store_id, product_id, "TARGET_PRICE",
+                        new_alerts, provider, store_id, product_id, "TARGET_PRICE",
                                 current_price, prev_price, status,
                                 f"Precio actual ${current_price} <= objetivo ${t['target_price']}"
                             )
@@ -61,7 +62,7 @@ class AlertEngine:
             # Check NEW_LOW
             if status == "NEW_LOW":
                 self._try_add_alert(
-                    new_alerts, store_id, product_id, "NEW_LOW",
+                        new_alerts, provider, store_id, product_id, "NEW_LOW",
                     current_price, prev_price, status,
                     m["reason"]
                 )
@@ -69,7 +70,7 @@ class AlertEngine:
             # Check REAL_DEAL
             if status == "REAL_DEAL":
                 self._try_add_alert(
-                    new_alerts, store_id, product_id, "REAL_DEAL",
+                        new_alerts, provider, store_id, product_id, "REAL_DEAL",
                     current_price, prev_price, status,
                     m["reason"]
                 )
@@ -79,19 +80,19 @@ class AlertEngine:
                 drop_pct = (1 - (current_price / prev_price)) * 100
                 if drop_pct >= self.price_drop_percent:
                     self._try_add_alert(
-                        new_alerts, store_id, product_id, "PRICE_DROP",
+                        new_alerts, provider, store_id, product_id, "PRICE_DROP",
                         current_price, prev_price, status,
                         f"Precio bajó {drop_pct:.1f}% desde ${prev_price} a ${current_price}"
                     )
                     
             # Check BACK_IN_STOCK
-            history = avail_history.get((store_id, product_id), [])
+            history = avail_history.get((provider, store_id, product_id), [])
             if len(history) >= 2:
                 prev_avail = history[-2]
                 curr_avail = history[-1]
                 if prev_avail == "UNAVAILABLE" and curr_avail == "AVAILABLE":
                     self._try_add_alert(
-                        new_alerts, store_id, product_id, "BACK_IN_STOCK",
+                        new_alerts, provider, store_id, product_id, "BACK_IN_STOCK",
                         current_price, prev_price, status,
                         "Disponibilidad cambió de UNAVAILABLE a AVAILABLE"
                     )
@@ -106,9 +107,9 @@ class AlertEngine:
             # If the price dropped, allow a new alert.
             c.execute('''
                 SELECT price FROM alerts
-                WHERE product_id = ? AND store_id = ? AND alert_type = ?
+                WHERE provider = ? AND product_id = ? AND store_id = ? AND alert_type = ?
                 ORDER BY triggered_at DESC LIMIT 1
-            ''', (a["product_id"], a["store_id"], a["alert_type"]))
+            ''', (a["provider"], a["product_id"], a["store_id"], a["alert_type"]))
             row = c.fetchone()
             
             should_insert = True
@@ -123,9 +124,9 @@ class AlertEngine:
                 now = datetime.now().isoformat()
                 try:
                     c.execute('''
-                        INSERT INTO alerts (product_id, store_id, alert_type, triggered_at, price, previous_price, deal_status, reason, seen)
-                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0)
-                    ''', (a["product_id"], a["store_id"], a["alert_type"], now, a["price"], a["previous_price"], a["deal_status"], a["reason"]))
+                        INSERT INTO alerts (provider, product_id, store_id, alert_type, triggered_at, price, previous_price, deal_status, reason, seen)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0)
+                    ''', (a["provider"], a["product_id"], a["store_id"], a["alert_type"], now, a["price"], a["previous_price"], a["deal_status"], a["reason"]))
                     a["id"] = c.lastrowid
                     a["triggered_at"] = now
                     inserted_alerts.append(a)
@@ -135,8 +136,9 @@ class AlertEngine:
         self.conn.commit()
         return self.get_alerts(new_only=True)
         
-    def _try_add_alert(self, alerts_list, store_id, product_id, alert_type, price, previous_price, status, reason):
+    def _try_add_alert(self, alerts_list, provider, store_id, product_id, alert_type, price, previous_price, status, reason):
         alerts_list.append({
+            "provider": provider,
             "store_id": store_id,
             "product_id": product_id,
             "alert_type": alert_type,
@@ -150,11 +152,11 @@ class AlertEngine:
         c = self.conn.cursor()
         
         query = '''
-            SELECT a.id, a.alert_type, a.product_id, a.store_id, p.name, s.name,
+            SELECT a.id, a.alert_type, a.product_id, a.store_id, p.name, s.name, a.provider,
                    a.price, a.previous_price, a.deal_status, a.triggered_at, a.reason, a.seen
             FROM alerts a
-            JOIN products p ON a.product_id = p.product_id AND a.store_id = p.store_id
-            JOIN stores s ON a.store_id = s.store_id
+            JOIN products p ON a.provider = p.provider AND a.product_id = p.product_id AND a.store_id = p.store_id
+            JOIN stores s ON a.provider = s.provider AND a.store_id = s.store_id
             WHERE 1=1
         '''
         params = []
@@ -186,12 +188,13 @@ class AlertEngine:
                 "store_id": r[3],
                 "product_name": r[4],
                 "store_name": r[5],
-                "current_price": r[6],
-                "previous_price": r[7],
-                "deal_status": r[8],
-                "triggered_at": r[9],
-                "reason": r[10],
-                "seen": bool(r[11])
+                "provider": r[6],
+                "current_price": r[7],
+                "previous_price": r[8],
+                "deal_status": r[9],
+                "triggered_at": r[10],
+                "reason": r[11],
+                "seen": bool(r[12])
             })
         return res
         

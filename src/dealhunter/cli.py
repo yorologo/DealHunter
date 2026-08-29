@@ -542,6 +542,16 @@ def main(args_list=None):
         print(f"Membership {args.name} is now {args.action}.")
         return
 
+
+    if args.command == "identity":
+        if args.action == "evaluate":
+            if getattr(args, 'shadow', False):
+                from dealhunter.identity.evaluator import evaluate_shadow
+                evaluate_shadow(db_path)
+            else:
+                print("Production evaluation not enabled. Use --shadow.")
+        return
+
     if args.command == "comparison":
         cfg = load_config()
         if "comparison" not in cfg:

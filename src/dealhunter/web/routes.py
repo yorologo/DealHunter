@@ -45,10 +45,10 @@ def register_routes(app):
         results = search_local(db_path, "")
         return render_template('products.html', results=results, current_path='/products')
 
-    @app.route('/products/<store_id>/<product_id>')
-    def product_detail(store_id, product_id):
+    @app.route('/products/<provider>/<store_id>/<product_id>')
+    def product_detail(provider, store_id, product_id):
         db_path = current_app.config['DATABASE']
-        p = get_product_detail(db_path, store_id, product_id)
+        p = get_product_detail(db_path, provider, store_id, product_id)
         if not p:
             return render_template('404_product.html', current_path='/products'), 404
         return render_template('product_detail.html', p=p, current_path='/products')
@@ -62,7 +62,8 @@ def register_routes(app):
         db_path = current_app.config['DATABASE']
         
         if store_id and product_id:
-            res = get_anchor_compare(db_path, store_id, product_id)
+            provider = request.args.get('provider')
+            res = get_anchor_compare(db_path, provider, store_id, product_id)
             if request.headers.get('HX-Request'):
                 return render_template('partials/compare_results_anchor.html', res=res)
             return render_template('compare.html', res=res, anchor_mode=True, current_path='/compare')
@@ -188,15 +189,15 @@ def register_routes(app):
         stores_list = get_stores(db_path, hide_empty=not show_all)
         return render_template('stores.html', stores=stores_list, current_path='/stores', show_all=show_all)
         
-    @app.route('/stores/<store_id>')
-    def store_detail(store_id):
+    @app.route('/stores/<provider>/<store_id>')
+    def store_detail(provider, store_id):
         db_path = current_app.config['DATABASE']
-        detail = get_store_detail(db_path, store_id)
+        detail = get_store_detail(db_path, provider, store_id)
         if not detail:
             return "Store not found", 404
         page = int(request.args.get('page', 1))
         sort = request.args.get('sort', 'opportunity')
-        filters = {"store": store_id}
+        filters = {"provider": provider, "store": store_id}
         data = get_catalog(db_path, filters, sort, page)
         if request.headers.get('HX-Request') and not request.headers.get('HX-Boosted'):
             return render_template('partials/catalog_grid.html', data=data, filters=filters, sort=sort, view_mode=request.cookies.get('view_mode', 'cards'))
@@ -228,10 +229,10 @@ def register_routes(app):
         av_cats = facets["categories"]
         return render_template('catalog.html', data=data, sort=sort, filters=filters, av_stores=av_stores, av_cats=av_cats, av_collections=facets.get('collections', []), av_store_facets=facets.get('store_facets', []), title="Restaurantes", current_path='/restaurants', emoji="🍔").replace('av_cats=av_cats, ', 'av_cats=av_cats, av_collections=facets.get(\"collections\", []), av_store_facets=facets.get(\"store_facets\", []), ')
         
-    @app.route('/restaurants/<store_id>')
-    def restaurant_detail(store_id):
+    @app.route('/restaurants/<provider>/<store_id>')
+    def restaurant_detail(provider, store_id):
         db_path = current_app.config['DATABASE']
-        detail = get_restaurant_detail(db_path, store_id)
+        detail = get_restaurant_detail(db_path, provider, store_id)
         if not detail:
             return "Restaurant not found", 404
         return render_template('restaurant_detail.html', detail=detail, current_path='/restaurants')

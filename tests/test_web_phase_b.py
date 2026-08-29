@@ -48,7 +48,7 @@ def client(app):
     return app.test_client()
 
 def test_product_detail(client):
-    rv = client.get('/products/s1/p1')
+    rv = client.get('/products/rappi/s1/p1')
     assert rv.status_code == 200
     assert b'Electrolit Mora Azul 625 ml' in rv.data
     assert b'REAL_DEAL' in rv.data or b'NEW_LOW' in rv.data # Might be NEW_LOW depending on exact metrics calculation
@@ -57,7 +57,7 @@ def test_product_detail(client):
     assert b'alertas' in rv.data
 
 def test_product_not_found(client):
-    rv = client.get('/products/s1/non_existent')
+    rv = client.get('/products/rappi/s1/non_existent')
     assert rv.status_code == 404
     assert b'Producto no encontrado' in rv.data
 
@@ -80,7 +80,7 @@ def test_products_catalog(client):
 
 
 def test_compare_anchor(client):
-    rv = client.get('/compare?store_id=s1&product_id=p1')
+    rv = client.get('/compare?provider=rappi&store_id=s1&product_id=p1')
     assert rv.status_code == 200
     assert b'Comparando equivalentes a' in rv.data
     assert b'Electrolit Mora Azul 625 ml' in rv.data
@@ -137,7 +137,7 @@ def test_compare_anchor_strict_rules(client):
     conn.commit()
     conn.close()
     
-    res = compare_with_anchor(db, 's1', 'p_anc')
+    res = compare_with_anchor(db, 'rappi', 's1', 'p_anc')
     matched_ids = [m['product_id'] for m in res['matches']]
     
     assert 'p_anc' in matched_ids
@@ -149,10 +149,10 @@ def test_compare_anchor_strict_rules(client):
     assert 'p_nm2' not in matched_ids # 600ml vs 2000ml
     assert 'p_nm3' not in matched_ids # Pack mismatch
     
-    res_milk = compare_with_anchor(db, 's1', 'p_milk_anc')
+    res_milk = compare_with_anchor(db, 'rappi', 's1', 'p_milk_anc')
     assert 'p_milk_nm' not in [m['product_id'] for m in res_milk['matches']]
     
-    res_sham = compare_with_anchor(db, 's1', 'p_sham_anc')
+    res_sham = compare_with_anchor(db, 'rappi', 's1', 'p_sham_anc')
     assert 'p_sham_nm' not in [m['product_id'] for m in res_sham['matches']]
 
 

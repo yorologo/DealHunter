@@ -124,7 +124,7 @@ def compare_stores(db_path, query, exact_only=False, no_fuzzy=False):
                p.brand, p.normalized_name, p.quantity, p.unit, p.normalized_quantity, p.normalized_unit,
                p.fingerprint, p.pack_count
         FROM products p
-        JOIN stores s ON p.store_id = s.store_id
+        JOIN stores s ON p.provider = s.provider AND p.store_id = s.store_id
         WHERE p.name LIKE ? OR p.brand LIKE ?
     ''', (f"%{query}%", f"%{query}%"))
     
@@ -134,7 +134,7 @@ def compare_stores(db_path, query, exact_only=False, no_fuzzy=False):
         
     products_map = {}
     for r in rows:
-        key = (r[1], r[2]) # product_id, store_id
+        key = (r[0], r[1], r[2])
         products_map[key] = {
             "provider": r[0], "product_id": r[1], "store_id": r[2], "product_name": r[3], "store_name": r[4],
             "brand": r[5], "normalized_name": r[6], "quantity": r[7], "unit": r[8],
@@ -151,7 +151,7 @@ def compare_stores(db_path, query, exact_only=False, no_fuzzy=False):
     
     for r in obs_rows:
         provider, pid, sid, price, ts_str, orig_price = r
-        key = (pid, sid)
+        key = (provider, pid, sid)
         if key in products_map:
 
             if ts_str:
@@ -232,7 +232,7 @@ def compare_stores(db_path, query, exact_only=False, no_fuzzy=False):
     return res
 
 
-def compare_with_anchor(db_path, store_id, product_id):
+def compare_with_anchor(db_path, provider, store_id, product_id):
     from dealhunter.normalization import compute_match
     conn = setup_db(db_path)
     c = conn.cursor()
@@ -243,9 +243,9 @@ def compare_with_anchor(db_path, store_id, product_id):
                p.brand, p.normalized_name, p.quantity, p.unit, p.normalized_quantity, p.normalized_unit,
                p.fingerprint, p.pack_count
         FROM products p
-        JOIN stores s ON p.store_id = s.store_id
-        WHERE p.product_id = ? AND p.store_id = ?
-    ''', (product_id, store_id))
+        JOIN stores s ON p.provider = s.provider AND p.store_id = s.store_id
+        WHERE p.provider = ? AND p.store_id = ? AND p.product_id = ?
+    ''', (provider, store_id, product_id))
     
     row = c.fetchone()
     if not row:
@@ -278,7 +278,7 @@ def compare_with_anchor(db_path, store_id, product_id):
                p.brand, p.normalized_name, p.quantity, p.unit, p.normalized_quantity, p.normalized_unit,
                p.fingerprint, p.pack_count
         FROM products p
-        JOIN stores s ON p.store_id = s.store_id
+        JOIN stores s ON p.provider = s.provider AND p.store_id = s.store_id
         WHERE {' AND '.join(conditions)}
         LIMIT 200
     '''
@@ -287,7 +287,7 @@ def compare_with_anchor(db_path, store_id, product_id):
     
     products_map = {}
     for r in candidate_rows:
-        key = (r[1], r[2])
+        key = (r[0], r[1], r[2])
         products_map[key] = {
             "provider": r[0], "product_id": r[1], "store_id": r[2], "product_name": r[3], "store_name": r[4],
             "brand": r[5], "normalized_name": r[6], "quantity": r[7], "unit": r[8],
@@ -296,7 +296,7 @@ def compare_with_anchor(db_path, store_id, product_id):
         }
         
     # Ensure anchor is in map even if search missed it
-    products_map[(anchor["product_id"], anchor["store_id"])] = anchor
+    products_map[(anchor["provider"], anchor["product_id"], anchor["store_id"])] = anchor
         
     # Fetch observations for these candidates
     c.execute('''
@@ -307,7 +307,7 @@ def compare_with_anchor(db_path, store_id, product_id):
     obs_rows = c.fetchall()
     for r in obs_rows:
         provider, pid, sid, price, ts_str, orig_price = r
-        key = (pid, sid)
+        key = (provider, pid, sid)
         if key in products_map:
             try:
                 from datetime import datetime

@@ -37,7 +37,7 @@
             <div class="list-group-item bg-light text-secondary small fw-bold">PRODUCTOS Y PLATILLOS</div>
             {% for p in results.products %}
                 {% if p.store_type == 'restaurants' %}
-                    <a href="/products/{{ p.store_id }}/{{ p.product_id }}?context=restaurant" class="list-group-item list-group-item-action d-flex align-items-center gap-2">
+                    <a href="/products/{{ p.provider }}/{{ p.store_id }}/{{ p.product_id }}?context=restaurant" class="list-group-item list-group-item-action d-flex align-items-center gap-2">
                         <span>🍽️</span>
                         <div class="flex-grow-1">
                             <div class="fw-medium">{{ p.name }}</div>
@@ -46,7 +46,7 @@
                         <span class="badge bg-secondary-subtle text-secondary">Platillo</span>
                     </a>
                 {% else %}
-                    <a href="/products/{{ p.store_id }}/{{ p.product_id }}" class="list-group-item list-group-item-action d-flex align-items-center gap-2">
+                    <a href="/products/{{ p.provider }}/{{ p.store_id }}/{{ p.product_id }}" class="list-group-item list-group-item-action d-flex align-items-center gap-2">
                         <span>🛒</span>
                         <div class="flex-grow-1">
                             <div class="fw-medium">{{ p.name }}</div>
