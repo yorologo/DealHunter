@@ -9,7 +9,7 @@ tagged or released.
 - **Multi-Provider Architecture**: Implemented robust provider registry and decoupled core logic from specific providers.
 - **Uber Eats Integration (Phone-Only)**: Added production headless synchronization for Uber Eats via native Termux Chromium and local CDP. Normal runs require neither a PC nor an X server; Carbonyl is limited to phone-local setup/session renewal.
 - **Provider & Membership Settings**: Added the `provider` and `membership` CLI configuration commands to select providers and keep Rappi Pro/Uber One eligibility separate from identity.
-- **Provider-Safe IDs**: Migrated to `(provider, store_id, product_id)` primary compound identity across the system (DB, history, alerts, watchlist, routes).
+- **Provider-Safe IDs**: Migrated product identity to `(provider, store_id, product_id)` across the DB, history, alerts, query layer and routes. The query-based watchlist remains a separate concern.
 - **Schema v16 Migration**: Added canonical product, family, external identifier, member and identity-decision infrastructure while preserving raw provider IDs.
 - **Canonical Shadow Infrastructure**: Implemented in-memory candidate generation and evidence evaluation for experimental cross-provider correlation.
 
@@ -124,7 +124,11 @@ Patch release.
 - Web crawler action fix (PYTHONPATH propagado correctamente);
 - corrección de runs silenciosos (0s) al usar botón Web.
 
-## [Unreleased]
+## Historical pre-v3.0 development notes (formerly "Unreleased")
+
+This preserved snapshot predates the current v3.2.0 RC block above and is not a
+second current release target.
+
 - feat: Deal Score V1 stabilization and Deal/Market Advantage isolation
 - feat: Advanced Restaurant Taxonomy extraction directly from NextJS metadata
 - feat: Native multiselect filtering (UNION logic) for Stores and Categories

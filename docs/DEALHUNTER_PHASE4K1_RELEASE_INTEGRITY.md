@@ -1,5 +1,9 @@
 DEALHUNTER_PHASE4K1_RELEASE_INTEGRITY
 
+> [!IMPORTANT]
+> Historical Phase 4 release-integrity snapshot. Its SHAs, schema and test
+> counts describe that phase, not the current v3.2.0/schema v16 RC.
+
 RC1
 - tag SHA: b1afaa94c8ccda57b600b2c00ca8a4103b2fc2a6
 - release exists: Yes

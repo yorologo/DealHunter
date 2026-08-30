@@ -1,5 +1,10 @@
 # DEALHUNTER_PHASE4J_RAPPI_INTEGRATION_CLOSURE
 
+> [!IMPORTANT]
+> Historical Phase 4 snapshot, preserved as evidence of that release cycle. It
+> is not current RC metadata or operating guidance; current truth is documented
+> in README.md and targets v3.2.0/schema v16.
+
 ## GIT
 - starting HEAD: 41179de
 - final HEAD: 41179de

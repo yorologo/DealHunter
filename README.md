@@ -10,7 +10,7 @@ DealHunter es un motor local-first de inteligencia de precios y oportunidades pa
 - **Inteligencia de Precios**: Califica las ofertas (`NEW_LOW`, `REAL_DEAL`, `GOOD_PRICE`) evaluando el precio actual contra medianas móviles de 30 días y mínimos históricos.
 - **Comparación Cruzada**: Combina resultados de múltiples tiendas (`/compare`) para identificar la tienda más conveniente y el mejor precio por unidad.
 - **Alertas Locales**: Evalúa caídas de precio (`PRICE_DROP`), alcance de objetivos (`TARGET_PRICE`), y restock (`BACK_IN_STOCK`) sin requerir backend cloud.
-- **Arquitectura Local-first**: No envía tus datos a servidores externos, no guarda configuraciones de cuenta confidenciales y funciona con una base de datos SQLite embebida. Toda su interfaz web funciona offline sin CDNs.
+- **Arquitectura Local-first**: No envía tus datos a un backend de DealHunter y funciona con una base de datos SQLite embebida. Las credenciales de sesión sólo pueden persistirse localmente mediante el almacén seguro y con consentimiento explícito; nunca entran en SQLite, plantillas ni backups generales. Toda la interfaz web funciona offline sin CDNs.
 - **Filtros Avanzados**: Permite encontrar ofertas basándose en descuento histórico en lugar de descuentos anunciados engañosos (`--new-low`, `--real-deal`).
 - **Contexto Geográfico Auditable**: Cada run conserva `lat/lng`; el crawler exige una ubicación configurada y advierte cambios significativos sin borrar histórico automáticamente.
 - **Navegación Nativa a Tienda**: “🛵 Abrir en Rappi” usa el deep link nativo con `store_id`, dirigido exclusivamente a `com.grability.rappi`; no tiene fallback a Home, web o navegador.

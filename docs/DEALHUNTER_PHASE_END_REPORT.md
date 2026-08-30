@@ -35,7 +35,8 @@ authorities are `dealhunter.metadata.VERSION` and
 
 ## Reproducible Candidate Benchmark
 
-Command, executed three times with stable counts:
+Command, executed four times with stable counts (including the final truth-gate
+rerun):
 
 ```bash
 PYTHONHASHSEED=0 PYTHONPATH=src \
@@ -56,11 +57,11 @@ Dataset and pair counts:
 - clusters over cap: 4,541
 - entries dropped by cap: 520,560
 
-Observed runtime across the three fresh processes:
+Observed runtime across the four fresh processes:
 
-- actual `generate_candidates`: 6.050–6.262 s
-- instrumented full pass: 5.717–5.735 s
-- processing per left product: average 0.1457–0.1458 ms, P95 0.4812–0.4898 ms, max 5.485–12.110 ms
+- actual `generate_candidates`: 6.050–6.691 s
+- instrumented full pass: 5.717–5.966 s
+- processing per left product: average 0.1457–0.1511 ms, P95 0.4812–0.5105 ms, max 3.556–12.110 ms
 - actual peak RSS: 178.7–178.9 MiB
 
 These are candidate-generation measurements, not identity precision metrics.
