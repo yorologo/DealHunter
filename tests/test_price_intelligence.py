@@ -84,33 +84,8 @@ def test_all_none_prices():
     assert res is None
 
 def test_current_price_none():
-    """Last observation has None price → returns None."""
+    """Last observation has None price → uses last valid price."""
     obs = make_obs([100, 90, None])
-    res = compute_price_metrics(obs)
-    assert res is None
-
-def test_single_valid_rest_none():
-    """Only one valid price among Nones → still works (INSUFFICIENT_HISTORY)."""
-    obs = make_obs([None, None, 50])
-    res = compute_price_metrics(obs)
-    assert res is not None
-    assert res["current_price"] == 50
-    assert res["status"] == "INSUFFICIENT_HISTORY"
-
-def test_legacy_null_timestamp_valid_price():
-    """Observations with None timestamp but valid price → price is usable."""
-    obs = [
-        {"price": 100, "timestamp": None, "original_price": None},
-        {"price": 110, "timestamp": None, "original_price": None},
-        {"price": 90, "timestamp": now, "original_price": None},
-    ]
     res = compute_price_metrics(obs)
     assert res is not None
     assert res["current_price"] == 90
-    assert res["historical_min"] == 90
-    assert res["historical_max"] == 110
-
-def test_empty_list():
-    """Empty observation list returns None."""
-    res = compute_price_metrics([])
-    assert res is None

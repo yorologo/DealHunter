@@ -237,6 +237,13 @@ def compare_with_anchor(db_path, provider, store_id, product_id):
     conn = setup_db(db_path)
     c = conn.cursor()
     
+    if provider is None:
+        c.execute('SELECT DISTINCT provider FROM products WHERE store_id = ? AND product_id = ?', (store_id, product_id))
+        rows = c.fetchall()
+        if not rows or len(rows) > 1:
+            return []
+        provider = rows[0][0]
+        
     # 1. Fetch anchor product
     c.execute('''
         SELECT p.provider, p.product_id, p.store_id, p.name, s.name,

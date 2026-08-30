@@ -66,8 +66,14 @@ async def _run_uber_sync_async(config, lat, lng, conn, run_id):
                 validate_provider('uber_eats')
                 c.execute('''INSERT INTO stores (provider, store_id, name, brand, type, status, last_seen_at, vertical)
                              VALUES (?, ?, ?, ?, ?, 'ACTIVE', CURRENT_TIMESTAMP, ?)
-                             ON CONFLICT(provider, store_id) DO UPDATE SET last_seen_at=CURRENT_TIMESTAMP, name=excluded.name''',
-                          ("uber_eats", s['uuid'], s['name'], s['name'], "RESTAURANT" if s.get('type') == 'restaurant' else "GROCERY", "restaurant" if s.get('type') == 'restaurant' else "market"))
+                             ON CONFLICT(provider, store_id) DO UPDATE SET 
+                             last_seen_at=CURRENT_TIMESTAMP, 
+                             name=excluded.name,
+                             type = CASE WHEN excluded.type != 'UNKNOWN' THEN excluded.type ELSE type END,
+                             vertical = CASE WHEN excluded.vertical != 'UNKNOWN' THEN excluded.vertical ELSE vertical END''',
+                          ("uber_eats", s['uuid'], s['name'], s['name'], 
+                           "RESTAURANT" if s.get('type') == 'restaurant' else ("GROCERY" if s.get('type') == 'grocery' else "UNKNOWN"), 
+                           "RESTAURANTS" if s.get('type') == 'restaurant' else ("MARKET" if s.get('type') == 'grocery' else "UNKNOWN")))
                 conn.commit()
 
                 offset = 0

@@ -13,10 +13,21 @@ def is_known_provider(provider: str) -> bool:
         return False
     return provider.lower() in KNOWN_PROVIDERS
 
-def validate_provider(provider: str):
+def normalize_provider(provider: str) -> str:
     """
-    Validates a provider for new writes.
+    Normalizes a provider string to its canonical internal representation.
     Raises ValueError if the provider is not known.
     """
-    if not is_known_provider(provider):
+    if not provider:
+        raise ValueError(f"Provider cannot be empty. Must be one of {KNOWN_PROVIDERS}")
+    p_lower = provider.lower()
+    if p_lower not in KNOWN_PROVIDERS:
         raise ValueError(f"Unknown provider: '{provider}'. Must be one of {KNOWN_PROVIDERS}")
+    return p_lower
+
+def validate_provider(provider: str) -> str:
+    """
+    Validates a provider for new writes and returns the canonicalized string.
+    Raises ValueError if the provider is not known.
+    """
+    return normalize_provider(provider)
