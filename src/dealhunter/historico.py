@@ -327,7 +327,11 @@ def compare_with_anchor(db_path, provider, store_id, product_id):
     for key, p in products_map.items():
         if not p["obs"]:
             continue
-        if p["product_id"] == anchor["product_id"] and p["store_id"] == anchor["store_id"]:
+        if (
+            p["provider"] == anchor["provider"]
+            and p["product_id"] == anchor["product_id"]
+            and p["store_id"] == anchor["store_id"]
+        ):
             m_type = "EXACT_MATCH"
         else:
             m_type, m_conf = compute_match(anchor, p)
@@ -343,23 +347,26 @@ def compare_with_anchor(db_path, provider, store_id, product_id):
     if not valid_matches:
         return []
         
-    # Deduplicate by store_id
+    # Deduplicate by provider/store identity.
     store_best = {}
     for p in valid_matches:
-        sid = p["store_id"]
-        if sid not in store_best:
-            store_best[sid] = p
+        store_key = (p["provider"], p["store_id"])
+        if store_key not in store_best:
+            store_best[store_key] = p
         else:
             # If we already have the anchor for this store, keep it
-            if store_best[sid]["product_id"] == anchor["product_id"]:
+            if (
+                store_best[store_key]["provider"] == anchor["provider"]
+                and store_best[store_key]["product_id"] == anchor["product_id"]
+            ):
                 continue
             # If the new one is the anchor, use it
-            if p["product_id"] == anchor["product_id"]:
-                store_best[sid] = p
+            if p["provider"] == anchor["provider"] and p["product_id"] == anchor["product_id"]:
+                store_best[store_key] = p
             else:
                 # Pick the cheaper one
-                if p["price"] < store_best[sid]["price"]:
-                    store_best[sid] = p
+                if p["price"] < store_best[store_key]["price"]:
+                    store_best[store_key] = p
                     
     final_matches = list(store_best.values())
     
@@ -382,6 +389,7 @@ def compare_with_anchor(db_path, provider, store_id, product_id):
             vs_median_str = "0%"
             
         res.append({
+            "provider": item["provider"],
             "product_id": item["product_id"],
             "store_id": item["store_id"],
             "TIENDA": item["store_name"][:15],
@@ -401,4 +409,3 @@ def compare_with_anchor(db_path, provider, store_id, product_id):
         "anchor_name": anchor["product_name"],
         "matches": res
     }
-

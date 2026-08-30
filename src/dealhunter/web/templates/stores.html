@@ -21,14 +21,14 @@
 <div class="row row-cols-1 row-cols-sm-2 row-cols-md-3 row-cols-lg-4 g-4">
     {% for store in stores %}
     <div class="col">
-        <a href="/stores/{{ store.store_id }}" class="text-decoration-none">
+        <a href="/stores/{{ store.provider }}/{{ store.store_id }}" class="text-decoration-none">
             <div class="card h-100 shadow-sm hover-shadow transition-all border-0">
                 <div class="card-body">
                     <div class="d-flex justify-content-between align-items-start mb-3">
                         <span class="badge text-bg-light border text-uppercase">{{ store.type }}</span>
                     </div>
                     <h5 class="fw-bold text-body mb-1">{{ store.name }}</h5>
-                    <div class="small text-secondary">{{ store.store_id }}</div>
+                    <div class="small text-secondary">{{ store.provider }} · {{ store.store_id }}</div>
                 </div>
                 <div class="card-footer bg-transparent border-top-0 pt-0 text-secondary small">
                     <span class="fw-bold">{{ store.products }}</span> productos registrados

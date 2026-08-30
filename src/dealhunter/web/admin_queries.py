@@ -83,11 +83,17 @@ def get_run_detail(db_path, run_id):
         run['metadata'] = {}
 
     # Count distinct products
-    c.execute("SELECT COUNT(DISTINCT product_id) FROM observations WHERE run_id = ?", (run_id,))
+    c.execute(
+        "SELECT COUNT(DISTINCT provider || char(31) || store_id || char(31) || product_id) FROM observations WHERE run_id = ?",
+        (run_id,),
+    )
     run['product_count'] = c.fetchone()[0]
 
     # Count distinct stores
-    c.execute("SELECT COUNT(DISTINCT store_id) FROM observations WHERE run_id = ?", (run_id,))
+    c.execute(
+        "SELECT COUNT(DISTINCT provider || char(31) || store_id) FROM observations WHERE run_id = ?",
+        (run_id,),
+    )
     run['store_count'] = c.fetchone()[0]
 
     # Convert times to local for display

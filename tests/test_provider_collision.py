@@ -72,3 +72,35 @@ def test_alerts_collision(collision_db):
     
     assert drop_events[0]['provider'] == 'uber_eats'
     assert new_deal_events[0]['provider'] == 'rappi'
+
+    assert watcher.persist_events(events) == len(events)
+    rows = watcher.conn.execute(
+        "SELECT DISTINCT provider FROM alert_events ORDER BY provider"
+    ).fetchall()
+    assert rows == [('rappi',), ('uber_eats',)]
+
+
+def test_alert_run_scope_does_not_mark_other_provider_out_of_stock(collision_db):
+    conn = sqlite3.connect(collision_db)
+    conn.execute(
+        "INSERT INTO runs (run_id, started_at) VALUES ('run3', '2026-08-03T09:00:00Z')"
+    )
+    conn.execute(
+        """INSERT INTO observations
+           (run_id, provider, store_id, product_id, price, original_price, stock,
+            timestamp, availability, discount_effective)
+           VALUES ('run3', 'rappi', 's1', 'p1', 45.0, 100.0, 10,
+                   '2026-08-03T10:00:00Z', 'AVAILABLE', 55.0)"""
+    )
+    conn.commit()
+    conn.close()
+
+    watcher = DealWatcher(collision_db, config=get_merged_config(None), price_drop_threshold=10.0)
+    events = watcher.process_run("run3")
+
+    assert events
+    assert all(event['provider'] == 'rappi' for event in events)
+    assert not any(
+        event['event_type'] == 'OUT_OF_STOCK' and event['provider'] == 'uber_eats'
+        for event in events
+    )

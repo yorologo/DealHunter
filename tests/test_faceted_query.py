@@ -154,3 +154,59 @@ def test_facet_counts_exclude_dim(db_conn):
     assert "Cat A" in counts["categories"]
     assert "Cat B" in counts["categories"]
 
+
+def test_provider_collision_isolated_in_queries_and_facets(db_conn):
+    insert_store(
+        db_conn, 's1', name='Uber Store 1', type='market',
+        vertical='Supermercado', provider='uber_eats',
+    )
+    insert_store_facet(
+        db_conn, 's1', 'speed', 'Uber Only Facet', provider='uber_eats',
+    )
+    insert_product(
+        db_conn, 'p1', 's1', name='Uber Product 1', category='Uber Legacy',
+        provider='uber_eats',
+    )
+    insert_observation(
+        db_conn, run_id='uber-test', store_id='s1', product_id='p1',
+        price=777, original_price=800, discount_effective=2.875,
+        availability='AVAILABLE', timestamp='2023-01-02T00:00:00Z',
+        provider='uber_eats',
+    )
+    insert_membership(
+        db_conn, 's1', 'p1', raw_type='CATEGORY', raw_name='Uber Only Category',
+        semantic_type='CATEGORY', provider='uber_eats',
+    )
+    db_conn.commit()
+
+    rows, total = execute_filters(db_conn, {})
+    assert total == 4
+    assert len(rows) == 4
+
+    rows, total = execute_filters(db_conn, {"providers": ["uber_eats"]})
+    assert total == 1
+    assert len(rows) == 1
+    assert rows[0][2] == 'Uber Product 1'
+    assert rows[0][3] == 'Uber Store 1'
+    assert rows[0][8] == 777
+    assert rows[0][23] == 'uber_eats'
+
+    rows, total = execute_filters(db_conn, {"categories": ["Uber Only Category"]})
+    assert total == 1
+    assert rows[0][23] == 'uber_eats'
+
+    rows, total = execute_filters(db_conn, {"store_facets": ["Uber Only Facet"]})
+    assert total == 1
+    assert rows[0][23] == 'uber_eats'
+
+    rows, total = execute_filters(
+        db_conn, {"store_identities": [("uber_eats", "s1")]}
+    )
+    assert total == 1
+    assert rows[0][23] == 'uber_eats'
+
+    rappi_facets = get_facet_counts(db_conn, {"providers": ["rappi"]})
+    assert "Uber Only Category" not in rappi_facets["categories"]
+    assert "Uber Only Facet" not in rappi_facets["store_facets"]
+    assert all(store["provider"] == "rappi" for store in rappi_facets["stores"])
+    assert all(store["filter_key"].startswith("rappi::") for store in rappi_facets["stores"])

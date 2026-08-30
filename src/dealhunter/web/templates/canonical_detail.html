@@ -76,7 +76,7 @@
                         <td class="fw-bold">${{ "%.2f"|format(offer.eligible_price) }}</td>
                         <td class="text-muted">${{ "%.2f"|format(offer.unit_price) }} / {{ offer.unit }}</td>
                         <td>
-                            <a href="/products/{{ offer.provider }}/{{ offer.product_id }}" class="btn btn-sm btn-outline-primary">Ver Producto</a>
+                            <a href="/products/{{ offer.provider }}/{{ offer.store_id }}/{{ offer.product_id }}" class="btn btn-sm btn-outline-primary">Ver Producto</a>
                         </td>
                     </tr>
                     {% endfor %}

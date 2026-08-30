@@ -22,12 +22,13 @@ class DealWatcher:
         c.execute("SELECT started_at FROM runs WHERE run_id = ?", (run_id,))
         run_started_at = c.fetchone()[0]
         
-        c.execute("SELECT DISTINCT store_id FROM observations WHERE run_id = ?", (run_id,))
-        completed_stores = [r[0] for r in c.fetchall()]
-        if not completed_stores:
+        c.execute("SELECT DISTINCT provider, store_id FROM observations WHERE run_id = ?", (run_id,))
+        completed_scopes = [(r[0], r[1]) for r in c.fetchall()]
+        if not completed_scopes:
             return []
-            
-        store_list_str = ",".join(f"'{s}'" for s in completed_stores)
+
+        scope_sql = " OR ".join("(provider = ? AND store_id = ?)" for _ in completed_scopes)
+        scope_params = [value for scope in completed_scopes for value in scope]
         
         c.execute(f'''
             SELECT id, store_id, product_id, price, original_price, discount_effective, 
@@ -52,10 +53,10 @@ class DealWatcher:
             INNER JOIN (
                 SELECT provider, store_id, product_id, MAX(timestamp) as max_ts
                 FROM observations
-                WHERE store_id IN ({store_list_str}) AND run_id != ? AND timestamp < (SELECT started_at FROM runs WHERE run_id = ?)
+                WHERE ({scope_sql}) AND run_id != ? AND timestamp < (SELECT started_at FROM runs WHERE run_id = ?)
                 GROUP BY provider, store_id, product_id
             ) prev ON o.provider = prev.provider AND o.store_id = prev.store_id AND o.product_id = prev.product_id AND o.timestamp = prev.max_ts
-        ''', (run_id, run_id))
+        ''', (*scope_params, run_id, run_id))
         
         prev_obs_rows = c.fetchall()
         prev_obs = {}
@@ -71,11 +72,11 @@ class DealWatcher:
         c.execute(f'''
             SELECT provider, store_id, product_id, event_type
             FROM alert_events 
-            WHERE store_id IN ({store_list_str}) 
+            WHERE ({scope_sql})
               AND event_type IN ('OUT_OF_STOCK', 'BACK_IN_STOCK')
               AND created_at < (SELECT started_at FROM runs WHERE run_id = ?)
             ORDER BY created_at ASC
-        ''', (run_id,))
+        ''', (*scope_params, run_id))
         
         # This gives us the chronological sequence, so the last one is the current state
         state_history = {}
@@ -210,11 +211,11 @@ class DealWatcher:
             try:
                 c.execute('''
                     INSERT INTO alert_events 
-                    (event_key, event_type, store_id, product_id, previous_observation_id, 
+                    (provider, event_key, event_type, store_id, product_id, previous_observation_id,
                      current_observation_id, channel, before_value, after_value, metadata, created_at, delivery_status)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ''', (
-                    ev['event_key'], ev['event_type'], ev['store_id'], ev['product_id'],
+                    ev['provider'], ev['event_key'], ev['event_type'], ev['store_id'], ev['product_id'],
                     ev['previous_observation_id'], ev['current_observation_id'],
                     ev['channel'], ev['before_value'], ev['after_value'],
                     ev['metadata'], ev['created_at'], 'pending'

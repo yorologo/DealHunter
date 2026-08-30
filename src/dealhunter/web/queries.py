@@ -42,52 +42,6 @@ def get_watchlist(db_path, filters=None):
     except sqlite3.OperationalError:
         return []
 
-def search_local(db_path, query, limit=10):
-    c = sqlite3.connect(db_path).cursor()
-    
-    res = {}
-    
-    # Search products (max limit)
-    c.execute('''
-        SELECT DISTINCT p.product_id, p.store_id, p.name, s.name, p.image, p.brand
-        FROM products p
-        JOIN stores s ON p.provider = s.provider AND p.store_id = s.store_id
-        WHERE (p.name LIKE ? OR p.brand LIKE ? OR p.normalized_name LIKE ?)
-        LIMIT ?
-    ''', (f'%{query}%', f'%{query}%', f'%{query}%', limit))
-    
-    products = []
-    for r in c.fetchall():
-        products.append({
-            "product_id": r[0],
-            "store_id": r[1],
-            "name": r[2],
-            "store_name": r[3],
-            "image": r[4],
-            "brand": r[5]
-        })
-    res["products"] = products
-    
-    # Search stores
-    c.execute('''
-        SELECT store_id, name, type
-        FROM stores
-        WHERE name LIKE ?
-        LIMIT ?
-    ''', (f'%{query}%', limit))
-    stores = []
-    for r in c.fetchall():
-        stores.append({
-            "store_id": r[0],
-            "name": r[1],
-            "type": r[2]
-        })
-    res["stores"] = stores
-    
-    return res
-
-import sqlite3
-from dealhunter.db import get_default_db_path
 from dealhunter.historico import compute_price_metrics, compare_stores, compare_with_anchor
 from dealhunter.normalization import format_unit_price
 from datetime import datetime
@@ -173,7 +127,10 @@ def get_product_detail(db_path, provider, store_id, product_id):
         p["score_data"] = None
         
     # Alerts
-    c.execute("SELECT alert_type, triggered_at FROM alerts WHERE product_id = ? AND store_id = ? ORDER BY triggered_at DESC", (product_id, store_id))
+    c.execute(
+        "SELECT alert_type, triggered_at FROM alerts WHERE provider = ? AND product_id = ? AND store_id = ? ORDER BY triggered_at DESC",
+        (provider, product_id, store_id),
+    )
     alerts = c.fetchall()
     p["alerts"] = [{"alert_type": a[0], "triggered_at": a[1]} for a in alerts]
     
@@ -207,8 +164,8 @@ def enrich_products_with_metrics(db_path, products):
     conds = []
     params = []
     for p in products:
-        conds.append("(product_id = ? AND store_id = ?)")
-        params.extend([p["product_id"], p["store_id"]])
+        conds.append("(provider = ? AND product_id = ? AND store_id = ?)")
+        params.extend([p["provider"], p["product_id"], p["store_id"]])
         
     query = f"SELECT provider, store_id, product_id, price, timestamp, original_price FROM observations WHERE {' OR '.join(conds)} ORDER BY timestamp ASC, ROWID ASC"
     c.execute(query, params)
@@ -220,18 +177,18 @@ def enrich_products_with_metrics(db_path, products):
         if key not in obs_map:
             obs_map[key] = []
 
-        if r[3]:
+        if r[4]:
             try:
-                ts = datetime.fromisoformat(r[3].replace("Z", ""))
+                ts = datetime.fromisoformat(r[4].replace("Z", ""))
             except:
                 ts = datetime.now()
         else:
             ts = datetime(1970, 1, 1)
 
-        obs_map[key].append({"price": r[2], "timestamp": ts, "original_price": r[4]})
+        obs_map[key].append({"price": r[3], "timestamp": ts, "original_price": r[5]})
         
     for p in products:
-        key = (p["store_id"], p["product_id"])
+        key = (p["provider"], p["store_id"], p["product_id"])
         obs = obs_map.get(key, [])
         metrics = compute_price_metrics(obs)
         if metrics:
@@ -264,10 +221,15 @@ def get_deals(db_path, filters, sort, page, per_page=25):
     items = []
     
     tab = filters.get("tab", "todo")
+    selected_providers = set(filters.get("providers") or [])
+    history_scope = {"providers": list(selected_providers)} if selected_providers else {}
+
+    def provider_visible(item):
+        return not selected_providers or item.get("provider") in selected_providers
     
     if tab in ["NEW_LOW", "REAL_DEAL", "GOOD_PRICE"]:
         # Price Intelligence deals
-        res = analyze_history(db_path, {"status": tab})
+        res = analyze_history(db_path, {**history_scope, "status": tab})
         for r in res:
             items.append({
                 "type": "pi", # Price Intelligence
@@ -277,7 +239,10 @@ def get_deals(db_path, filters, sort, page, per_page=25):
     elif tab in ["PRICE_DROP", "TARGET_PRICE", "BACK_IN_STOCK"]:
         # Alerts
         engine = AlertEngine(db_path)
-        alerts = engine.get_alerts(alert_type=tab, top=1000)
+        alerts = [
+            alert for alert in engine.get_alerts(alert_type=tab, top=1000)
+            if provider_visible(alert)
+        ]
         for a in alerts:
             # We need to enrich it to look like a deal card
             a["unit_price"] = ""
@@ -288,10 +253,11 @@ def get_deals(db_path, filters, sort, page, per_page=25):
             })
     elif tab == "SUSPICIOUS_REFERENCE_PRICE":
         # We must find products where metrics say suspicious
-        res = analyze_history(db_path, {})
+        res = analyze_history(db_path, history_scope)
         for r in res:
             if r.get("is_suspicious_reference"):
                 item_data = {
+                    "provider": r["provider"],
                     "product_id": r["product_id"],
                     "store_id": r["store_id"],
                     "product_name": r["product_name"],
@@ -321,9 +287,13 @@ def get_deals(db_path, filters, sort, page, per_page=25):
                 })
     else:
         # Todo
-        res = analyze_history(db_path, {"status": ["NEW_LOW", "REAL_DEAL", "GOOD_PRICE"]})
+        res = analyze_history(
+            db_path,
+            {**history_scope, "status": ["NEW_LOW", "REAL_DEAL", "GOOD_PRICE"]},
+        )
         for r in res:
             item_data = {
+                "provider": r["provider"],
                 "product_id": r["product_id"],
                 "store_id": r["store_id"],
                 "product_name": r["product_name"],
@@ -353,7 +323,10 @@ def get_deals(db_path, filters, sort, page, per_page=25):
             })
             
         engine = AlertEngine(db_path)
-        alerts = engine.get_alerts(top=1000)
+        alerts = [
+            alert for alert in engine.get_alerts(top=1000)
+            if provider_visible(alert)
+        ]
         for a in alerts:
             if a["alert_type"] not in ["NEW_LOW", "REAL_DEAL"]: # Exclude these so we don't double count if they are already in PI
                 a["unit_price"] = ""
@@ -396,7 +369,10 @@ def get_deals(db_path, filters, sort, page, per_page=25):
     # Enrich alerts with full product detail (for unit price and image)
     for i in paginated:
         if i["type"] == "alert":
-            c.execute("SELECT normalized_quantity, normalized_unit FROM products WHERE product_id=? AND store_id=?", (i["data"]["product_id"], i["data"]["store_id"]))
+            c.execute(
+                "SELECT normalized_quantity, normalized_unit FROM products WHERE provider=? AND product_id=? AND store_id=?",
+                (i["data"]["provider"], i["data"]["product_id"], i["data"]["store_id"]),
+            )
             row = c.fetchone()
             if row:
                 i["data"]["UNIT_PRICE"] = format_unit_price(i["data"]["current_price"], row[0], row[1])
@@ -482,16 +458,26 @@ def get_catalog(db_path, filters, sort, page, per_page=25):
 def get_categories(db_path, filters=None):
     conn = sqlite3.connect(db_path)
     c = conn.cursor()
+    providers = (filters or {}).get("providers") or []
+    provider_sql = ""
+    params = []
+    if providers:
+        provider_sql = f" AND p.provider IN ({','.join('?' for _ in providers)})"
+        params.extend(providers)
     # Use real category from products, fallback to Uncategorized
-    c.execute('''
+    c.execute(f'''
         SELECT COALESCE(NULLIF(TRIM(p.category), ''), 'Uncategorized') as cat_name, 
-               COUNT(DISTINCT p.product_id), 
-               COUNT(DISTINCT p.store_id)
+               COUNT(*),
+               COUNT(DISTINCT p.provider || char(31) || p.store_id)
         FROM products p
-        JOIN observations o ON p.product_id = o.product_id AND p.store_id = o.store_id
+        WHERE EXISTS (
+            SELECT 1 FROM observations o
+            WHERE o.provider = p.provider AND o.product_id = p.product_id AND o.store_id = p.store_id
+        )
+        {provider_sql}
         GROUP BY cat_name
         ORDER BY cat_name ASC
-    ''')
+    ''', params)
     cats = [{"name": r[0], "products": r[1], "stores": r[2]} for r in c.fetchall()]
     conn.close()
     return cats
@@ -500,18 +486,23 @@ def get_stores(db_path, hide_empty=True, filters=None):
     import sqlite3
     conn = sqlite3.connect(db_path)
     c = conn.cursor()
+    providers = (filters or {}).get("providers") or []
     query = '''
-        SELECT s.store_id, s.name, s.type, COUNT(DISTINCT p.product_id) as prod_count
+        SELECT s.provider, s.store_id, s.name, s.type, COUNT(p.product_id) as prod_count
         FROM stores s
-        LEFT JOIN products p ON s.store_id = p.store_id
-        GROUP BY s.store_id
+        LEFT JOIN products p ON s.provider = p.provider AND s.store_id = p.store_id
     '''
+    params = []
+    if providers:
+        query += f" WHERE s.provider IN ({','.join('?' for _ in providers)})"
+        params.extend(providers)
+    query += ' GROUP BY s.provider, s.store_id'
     if hide_empty:
         query += ' HAVING prod_count > 0'
     query += ' ORDER BY s.name ASC'
     
-    c.execute(query)
-    stores = [{"store_id": r[0], "name": r[1], "type": r[2], "products": r[3]} for r in c.fetchall()]
+    c.execute(query, params)
+    stores = [{"provider": r[0], "store_id": r[1], "name": r[2], "type": r[3], "products": r[4]} for r in c.fetchall()]
     conn.close()
     return stores
 
@@ -542,6 +533,7 @@ def get_store_detail(db_path, provider, store_id):
     
     conn.close()
     return {
+        "provider": provider,
         "store_id": store_id,
         "name": row[0],
         "type": row[1],
@@ -555,32 +547,38 @@ def get_restaurants_home(db_path, filters=None):
     conn = sqlite3.connect(db_path)
     c = conn.cursor()
     
-    # We want a list of restaurants with stats
-    c.execute('''
-        SELECT s.store_id, s.name, s.brand,
+    providers = (filters or {}).get("providers") or []
+    provider_sql = ""
+    params = []
+    if providers:
+        provider_sql = f" AND s.provider IN ({','.join('?' for _ in providers)})"
+        params.extend(providers)
+
+    c.execute(f'''
+        SELECT s.provider, s.store_id, s.name, s.brand,
                COUNT(DISTINCT p.product_id) as total_dishes,
                MAX(o.timestamp) as last_obs
         FROM stores s
-        LEFT JOIN products p ON s.store_id = p.store_id
-        LEFT JOIN observations o ON p.product_id = o.product_id AND p.store_id = o.store_id
+        LEFT JOIN products p ON s.provider = p.provider AND s.store_id = p.store_id
+        LEFT JOIN observations o ON p.provider = o.provider AND p.product_id = o.product_id AND p.store_id = o.store_id
         WHERE s.type = 'restaurants'
-        GROUP BY s.store_id
-        '
-    if hide_empty:
-        query += ' HAVING COUNT(DISTINCT p.product_id) > 0'
-    query += ' ORDER BY s.name ASC
-    ''')
+        {provider_sql}
+        GROUP BY s.provider, s.store_id
+        HAVING COUNT(DISTINCT p.product_id) > 0
+        ORDER BY s.name ASC
+    ''', params)
     
     stores = []
     for r in c.fetchall():
-        store_id = r[0]
+        provider = r[0]
+        store_id = r[1]
         # Count available dishes
         c.execute('''
             SELECT COUNT(DISTINCT o.product_id)
             FROM observations o
             WHERE o.provider = ? AND o.store_id = ? AND o.availability = 'AVAILABLE'
-            AND o.timestamp = (SELECT MAX(timestamp) FROM observations WHERE provider = o.provider AND product_id = o.product_id AND store_id = ?)
-        ''', (provider, store_id, provider, store_id))
+            AND o.timestamp = (SELECT MAX(timestamp) FROM observations WHERE provider = o.provider AND product_id = o.product_id AND store_id = o.store_id)
+        ''', (provider, store_id))
         available = c.fetchone()[0]
         
         # Count promotions
@@ -588,18 +586,19 @@ def get_restaurants_home(db_path, filters=None):
             SELECT COUNT(DISTINCT o.product_id)
             FROM observations o
             WHERE o.provider = ? AND o.store_id = ? AND o.discount_effective > 0
-            AND o.timestamp = (SELECT MAX(timestamp) FROM observations WHERE provider = o.provider AND product_id = o.product_id AND store_id = ?)
-        ''', (provider, store_id, provider, store_id))
+            AND o.timestamp = (SELECT MAX(timestamp) FROM observations WHERE provider = o.provider AND product_id = o.product_id AND store_id = o.store_id)
+        ''', (provider, store_id))
         promos = c.fetchone()[0]
         
         stores.append({
+            "provider": provider,
             "store_id": store_id,
-            "name": r[1],
-            "brand": r[2],
-            "total_dishes": r[3],
+            "name": r[2],
+            "brand": r[3],
+            "total_dishes": r[4],
             "available_dishes": available,
             "promos": promos,
-            "last_obs": r[4]
+            "last_obs": r[5]
         })
         
     conn.close()
@@ -615,6 +614,7 @@ def get_restaurant_detail(db_path, provider, store_id):
         return None
         
     res = {
+        "provider": provider,
         "store_id": store_id,
         "name": row[0],
         "brand": row[1],
@@ -627,9 +627,9 @@ def get_restaurant_detail(db_path, provider, store_id):
                o.price, o.original_price, o.discount_effective, o.promotion_label, o.promotion_type, o.availability,
                MAX(o.timestamp) as ts, p.has_toppings
         FROM products p
-        JOIN observations o ON p.product_id = o.product_id AND p.store_id = o.store_id
+        JOIN observations o ON p.provider = o.provider AND p.product_id = o.product_id AND p.store_id = o.store_id
         WHERE p.provider = ? AND p.store_id = ?
-        GROUP BY p.product_id
+        GROUP BY p.provider, p.product_id
         ORDER BY category ASC, p.name ASC
     ''', (provider, store_id))
     
@@ -682,52 +682,74 @@ def search_local(db_path, query, filters=None):
     conn = sqlite3.connect(db_path)
     c = conn.cursor()
     
+    providers = (filters or {}).get("providers") or []
+
     # 1. Search Categories (using query_term or category field if it exists)
     c_results = []
     if query:
-        c.execute('''
+        provider_sql = ""
+        params = [f"%{query}%"]
+        if providers:
+            provider_sql = f" AND provider IN ({','.join('?' for _ in providers)})"
+            params.extend(providers)
+        c.execute(f'''
             SELECT DISTINCT COALESCE(NULLIF(TRIM(category), ''), 'Uncategorized') as cat
             FROM products 
             WHERE cat LIKE ?
+            {provider_sql}
             LIMIT 5
-        ''', (f"%{query}%",))
+        ''', params)
         for r in c.fetchall():
             c_results.append({"name": r[0]})
             
     # 2. Search Stores
     s_results = []
-    c.execute('''
-        SELECT store_id, name, type, brand
+    provider_sql = ""
+    params = [f"%{query}%", f"%{query}%"]
+    if providers:
+        provider_sql = f" AND provider IN ({','.join('?' for _ in providers)})"
+        params.extend(providers)
+    c.execute(f'''
+        SELECT provider, store_id, name, type, brand
         FROM stores
-        WHERE name LIKE ? OR brand LIKE ?
+        WHERE (name LIKE ? OR brand LIKE ?)
+        {provider_sql}
         LIMIT 10
-    ''', (f"%{query}%", f"%{query}%"))
+    ''', params)
     for r in c.fetchall():
         s_results.append({
-            "store_id": r[0],
-            "name": r[1],
-            "type": r[2],
-            "brand": r[3]
+            "provider": r[0],
+            "store_id": r[1],
+            "name": r[2],
+            "type": r[3],
+            "brand": r[4]
         })
         
     # 3. Search Products (includes dishes)
     p_results = []
-    query_str = f"SELECT p.product_id, p.store_id, p.name, s.name, p.brand, s.type FROM products p JOIN stores s ON p.provider = s.provider AND p.store_id = s.store_id "
+    query_str = f"SELECT p.provider, p.product_id, p.store_id, p.name, s.name, p.brand, s.type FROM products p JOIN stores s ON p.provider = s.provider AND p.store_id = s.store_id "
     params = []
+    conditions = []
     if query:
-        query_str += "WHERE p.name LIKE ? OR p.brand LIKE ? "
+        conditions.append("(p.name LIKE ? OR p.brand LIKE ?)")
         params.extend([f"%{query}%", f"%{query}%"])
+    if providers:
+        conditions.append(f"p.provider IN ({','.join('?' for _ in providers)})")
+        params.extend(providers)
+    if conditions:
+        query_str += "WHERE " + " AND ".join(conditions) + " "
     query_str += f"LIMIT {limit}"
     
     c.execute(query_str, params)
     for r in c.fetchall():
         p_results.append({
-            "product_id": r[0],
-            "store_id": r[1],
-            "name": r[2],
-            "store_name": r[3],
-            "brand": r[4],
-            "store_type": r[5]
+            "provider": r[0],
+            "product_id": r[1],
+            "store_id": r[2],
+            "name": r[3],
+            "store_name": r[4],
+            "brand": r[5],
+            "store_type": r[6]
         })
         
     conn.close()
@@ -788,7 +810,24 @@ def _translate_filters(filters, sort=None, page=None, per_page=None):
         if sort == "price_asc" or sort == "name_asc":
             facets["desc"] = False
     if filters.get("store"):
-        facets["store_ids"] = filters["store"] if isinstance(filters["store"], list) else [filters["store"]]
+        store_values = filters["store"] if isinstance(filters["store"], list) else [filters["store"]]
+        store_ids = []
+        store_identities = []
+        for value in store_values:
+            if isinstance(value, str) and "::" in value:
+                provider, store_id = value.split("::", 1)
+                store_identities.append((provider, store_id))
+            else:
+                store_ids.append(value)
+        if store_ids:
+            facets["store_ids"] = store_ids
+        if store_identities:
+            facets["store_identities"] = store_identities
+    providers = filters.get("providers")
+    if not providers and filters.get("provider"):
+        providers = [filters["provider"]]
+    if providers:
+        facets["providers"] = providers if isinstance(providers, list) else [providers]
     if filters.get("vertical"):
         v = filters["vertical"]
         if v == "turbo":

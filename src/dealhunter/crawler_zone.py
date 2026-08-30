@@ -130,7 +130,10 @@ async def _run_zone_inventory_async(config, lat, lng, conn, run_id, dry_run=Fals
                       ''', (provider_id, s_id, "store_subcategory", val, src, now_store_facets))
                       
         if has_metadata:
-            c.execute('DELETE FROM store_facets WHERE store_id=? AND last_seen != ?', (s_id, now_store_facets))
+            c.execute(
+                'DELETE FROM store_facets WHERE provider=? AND store_id=? AND last_seen != ?',
+                (provider_id, s_id, now_store_facets),
+            )
             
         conn.commit()
 
@@ -160,7 +163,7 @@ async def _run_zone_inventory_async(config, lat, lng, conn, run_id, dry_run=Fals
             if dry_run: continue
             pid = str(p.get("id") or p.get("product_id", ""))
             seen_products_in_store.add(pid)
-            process_and_insert_product(p, run_id, s_id, s_name, config, "*", conn, seen_in_run)
+            process_and_insert_product(p, run_id, s_id, s_name, config, "*", conn, seen_in_run, provider=provider_id)
 
         conn.commit()
 
@@ -168,9 +171,9 @@ async def _run_zone_inventory_async(config, lat, lng, conn, run_id, dry_run=Fals
             # Mark products NOT seen in this store as UNAVAILABLE
             placeholders = ','.join(['?'] * len(seen_products_in_store))
             query = f'''
-                SELECT product_id FROM products WHERE store_id = ?
+                SELECT product_id FROM products WHERE provider = ? AND store_id = ?
             '''
-            c.execute(query, (s_id,))
+            c.execute(query, (provider_id, s_id))
             all_known = [row[0] for row in c.fetchall()]
 
             for kpid in all_known:
@@ -179,11 +182,11 @@ async def _run_zone_inventory_async(config, lat, lng, conn, run_id, dry_run=Fals
                     from dealhunter.db import CURRENT_SCHEMA_VERSION
                     if CURRENT_SCHEMA_VERSION >= 12:
                         c.execute('''INSERT OR IGNORE INTO observations
-                                     (run_id, store_id, product_id, price, original_price, stock, timestamp,
+                                     (run_id, provider, store_id, product_id, price, original_price, stock, timestamp,
                                      discount_price, discount_promotion, discount_effective, discount_source, promotion_type, promotion_label, query_term, availability,
                                      has_pro_offer, pro_price, pro_discount_effective, limit_info)
-                                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
-                                     (run_id, s_id, kpid, 0, 0, 0, datetime.now().isoformat(),
+                                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
+                                     (run_id, provider_id, s_id, kpid, 0, 0, 0, datetime.now().isoformat(),
                                       0, 0, 0, "", "", "", "*", "UNAVAILABLE", None, None, None, None))
                     else:
                         c.execute('''INSERT OR IGNORE INTO observations
@@ -202,14 +205,14 @@ async def _run_zone_inventory_async(config, lat, lng, conn, run_id, dry_run=Fals
         # Phase 4B.3F.2 Scope-Safe Reconciliation:
         # Only stale a store if it belongs to a firmly covered A5 CPG scope.
         # We explicitly preserve restaurants, liquor, mall (rappimall_parent), and unknowns.
-        c.execute('SELECT store_id, type FROM stores WHERE status = "ACTIVE"')
+        c.execute('SELECT store_id, type FROM stores WHERE provider = ? AND status = "ACTIVE"', (provider_id,))
         covered_types = {'market', 'chiper_home', 'chiper_extended', 'express_parent', 'pets_cpgs', 'Farmatodo'}
         for row in c.fetchall():
             sid = row[0]
             stype = row[1]
             if sid not in seen_store_ids:
                 if stype in covered_types:
-                    c.execute('UPDATE stores SET status = "STALE" WHERE store_id = ?', (sid,))
+                    c.execute('UPDATE stores SET status = "STALE" WHERE provider = ? AND store_id = ?', (provider_id, sid))
         conn.commit()
 
     import json

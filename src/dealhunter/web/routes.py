@@ -42,7 +42,7 @@ def register_routes(app):
     @app.route('/products')
     def products():
         db_path = current_app.config['DATABASE']
-        results = search_local(db_path, "")
+        results = search_local(db_path, "", _base_filters())
         return render_template('products.html', results=results, current_path='/products')
 
     @app.route('/products/<provider>/<store_id>/<product_id>')
@@ -115,7 +115,7 @@ def register_routes(app):
         sort = request.args.get('sort', 'opportunity')
         store = request.args.getlist('store')
         category = request.args.getlist('category')
-        filters = {"vertical": "market"}
+        filters = _base_filters({"vertical": "market"})
         if store: filters["store"] = store
         if category: filters["category"] = category
         if request.args.get('only_deals'): filters['only_deals'] = True
@@ -123,7 +123,7 @@ def register_routes(app):
         if request.headers.get('HX-Request') and not request.headers.get('HX-Boosted'):
             return render_template('partials/catalog_grid.html', data=data, filters=filters, sort=sort, view_mode=request.cookies.get('view_mode', 'cards'))
         facets = get_ui_facets(db_path, filters)
-        av_stores = [{"id": s["store_id"], "name": s["name"]} for s in facets["stores"]]
+        av_stores = [{"id": s["filter_key"], "name": s["name"]} for s in facets["stores"]]
         av_cats = facets["categories"]
         return render_template('catalog.html', data=data, sort=sort, filters=filters, av_stores=av_stores, av_cats=av_cats, av_collections=facets.get('collections', []), av_store_facets=facets.get('store_facets', []), title="Supermercados", current_path='/market', emoji="🛒").replace('av_cats=av_cats, ', 'av_cats=av_cats, av_collections=facets.get(\"collections\", []), av_store_facets=facets.get(\"store_facets\", []), ')
         
@@ -134,7 +134,7 @@ def register_routes(app):
         sort = request.args.get('sort', 'opportunity')
         store = request.args.getlist('store')
         category = request.args.getlist('category')
-        filters = {"vertical": "turbo"}
+        filters = _base_filters({"vertical": "turbo"})
         if store: filters["store"] = store
         if category: filters["category"] = category
         if request.args.get('only_deals'): filters['only_deals'] = True
@@ -142,7 +142,7 @@ def register_routes(app):
         if request.headers.get('HX-Request') and not request.headers.get('HX-Boosted'):
             return render_template('partials/catalog_grid.html', data=data, filters=filters, sort=sort, view_mode=request.cookies.get('view_mode', 'cards'))
         facets = get_ui_facets(db_path, filters)
-        av_stores = [{"id": s["store_id"], "name": s["name"]} for s in facets["stores"]]
+        av_stores = [{"id": s["filter_key"], "name": s["name"]} for s in facets["stores"]]
         av_cats = facets["categories"]
         return render_template('catalog.html', data=data, sort=sort, filters=filters, av_stores=av_stores, av_cats=av_cats, av_collections=facets.get('collections', []), av_store_facets=facets.get('store_facets', []), title="Rappi Turbo", current_path='/turbo', emoji="⚡").replace('av_cats=av_cats, ', 'av_cats=av_cats, av_collections=facets.get(\"collections\", []), av_store_facets=facets.get(\"store_facets\", []), ')
         
@@ -171,14 +171,14 @@ def register_routes(app):
         page = int(request.args.get('page', 1))
         sort = request.args.get('sort', 'opportunity')
         store = request.args.getlist('store')
-        filters = {"category": category}
+        filters = _base_filters({"category": category})
         if store: filters["store"] = store
         if request.args.get('only_deals'): filters['only_deals'] = True
         data = get_catalog(db_path, filters, sort, page)
         if request.headers.get('HX-Request') and not request.headers.get('HX-Boosted'):
             return render_template('partials/catalog_grid.html', data=data, filters=filters, sort=sort, view_mode=request.cookies.get('view_mode', 'cards'))
         facets = get_ui_facets(db_path, filters)
-        av_stores = [{"id": s["store_id"], "name": s["name"]} for s in facets["stores"]]
+        av_stores = [{"id": s["filter_key"], "name": s["name"]} for s in facets["stores"]]
         av_cats = facets["categories"]
         return render_template('catalog.html', data=data, sort=sort, filters=filters, av_stores=av_stores, av_cats=av_cats, av_collections=facets.get('collections', []), av_store_facets=facets.get('store_facets', []), title=f"Categoría: {category}", current_path='/categories', emoji="📦").replace('av_cats=av_cats, ', 'av_cats=av_cats, av_collections=facets.get(\"collections\", []), av_store_facets=facets.get(\"store_facets\", []), ')
         
@@ -186,7 +186,7 @@ def register_routes(app):
     def stores():
         db_path = current_app.config['DATABASE']
         show_all = request.args.get('all', '0') == '1'
-        stores_list = get_stores(db_path, hide_empty=not show_all)
+        stores_list = get_stores(db_path, hide_empty=not show_all, filters=_base_filters())
         return render_template('stores.html', stores=stores_list, current_path='/stores', show_all=show_all)
         
     @app.route('/stores/<provider>/<store_id>')
@@ -215,7 +215,7 @@ def register_routes(app):
         sort = request.args.get('sort', 'discount')
         store = request.args.getlist('store')
         category = request.args.getlist('category')
-        filters = {"vertical": "restaurants"}
+        filters = _base_filters({"vertical": "restaurants"})
         if store: filters["store"] = store
         if category: filters["category"] = category
         if request.args.get('only_deals'): filters['only_deals'] = True
@@ -225,7 +225,7 @@ def register_routes(app):
             return render_template('partials/catalog_grid.html', data=data, filters=filters, sort=sort, current_path='/restaurants')
             
         facets = get_ui_facets(db_path, filters)
-        av_stores = [{"id": s["store_id"], "name": s["name"]} for s in facets["stores"]]
+        av_stores = [{"id": s["filter_key"], "name": s["name"]} for s in facets["stores"]]
         av_cats = facets["categories"]
         return render_template('catalog.html', data=data, sort=sort, filters=filters, av_stores=av_stores, av_cats=av_cats, av_collections=facets.get('collections', []), av_store_facets=facets.get('store_facets', []), title="Restaurantes", current_path='/restaurants', emoji="🍔").replace('av_cats=av_cats, ', 'av_cats=av_cats, av_collections=facets.get(\"collections\", []), av_store_facets=facets.get(\"store_facets\", []), ')
         
