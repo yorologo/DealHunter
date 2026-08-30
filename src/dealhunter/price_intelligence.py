@@ -1,5 +1,18 @@
 import statistics
 from datetime import datetime, timedelta
+import math
+
+def is_valid_commercial_price(price):
+    if price is None:
+        return False
+    try:
+        price_f = float(price)
+        if math.isnan(price_f) or math.isinf(price_f):
+            return False
+        return price_f > 0
+    except (TypeError, ValueError):
+        return False
+
 
 _EPOCH = datetime(1970, 1, 1)
 
@@ -21,29 +34,26 @@ def compute_price_metrics(obs_list):
     if not obs_list:
         return None
 
-    current_obs = obs_list[-1]
+    # Find the most recent valid observation to act as the current one
+    valid_obs_list = [o for o in obs_list if is_valid_commercial_price(o["price"])]
+    if not valid_obs_list:
+        return None
+        
+    current_obs = valid_obs_list[-1]
     current_price = current_obs["price"]
     original_price = current_obs.get("original_price")
 
-    # If current price is missing we cannot produce meaningful metrics.
-    if current_price is None:
-        return None
-
     # Build list of *valid* (non-None) prices for the full history.
-    prices_all = [o["price"] for o in obs_list if o["price"] is not None]
+    prices_all = [o["price"] for o in obs_list if is_valid_commercial_price(o["price"])]
     if not prices_all:
         return None
 
     # Previous price: walk backwards to find the most recent valid price
     # before the current observation.
     previous_price = current_price
-    prices_previous = []
-    if len(obs_list) > 1:
-        for o in obs_list[:-1]:
-            if o["price"] is not None:
-                prices_previous.append(o["price"])
-        if prices_previous:
-            previous_price = prices_previous[-1]
+    prices_previous = [o["price"] for o in valid_obs_list[:-1]]
+    if prices_previous:
+        previous_price = prices_previous[-1]
 
     historical_min_previous = min(prices_previous) if prices_previous else current_price
     historical_min = min(prices_all)
@@ -52,15 +62,15 @@ def compute_price_metrics(obs_list):
 
     now = datetime.now()
     obs_30d = [o["price"] for o in obs_list
-               if o["price"] is not None and _safe_ts(o) >= now - timedelta(days=30)]
+               if is_valid_commercial_price(o["price"]) and _safe_ts(o) >= now - timedelta(days=30)]
     median_30d = statistics.median(obs_30d) if obs_30d else current_price
 
     price_change = current_price - previous_price
-    price_change_percent = (price_change / previous_price * 100) if previous_price and previous_price > 0 else 0
+    price_change_percent = (price_change / previous_price * 100) if previous_price and is_valid_commercial_price(previous_price) else 0
 
-    discount_vs_median_30d = (1 - (current_price / median_30d)) * 100 if median_30d and median_30d > 0 else 0
-    discount_vs_historical_average = (1 - (current_price / historical_average)) * 100 if historical_average and historical_average > 0 else 0
-    distance_from_historical_min = ((current_price / historical_min) - 1) * 100 if historical_min and historical_min > 0 else 0
+    discount_vs_median_30d = (1 - (current_price / median_30d)) * 100 if median_30d and is_valid_commercial_price(median_30d) else 0
+    discount_vs_historical_average = (1 - (current_price / historical_average)) * 100 if historical_average and is_valid_commercial_price(historical_average) else 0
+    distance_from_historical_min = ((current_price / historical_min) - 1) * 100 if historical_min and is_valid_commercial_price(historical_min) else 0
 
     # Classify
     status = "NORMAL"
@@ -139,7 +149,7 @@ def compare_eligible_offers(canonical_product, provider_offers, membership_conte
     for offer in provider_offers:
         provider = offer.get("provider")
         raw_price = offer.get("price")
-        if raw_price is None or raw_price <= 0:
+        if not is_valid_commercial_price(raw_price):
             continue
             
         # Membership eligibility
@@ -156,7 +166,7 @@ def compare_eligible_offers(canonical_product, provider_offers, membership_conte
         unit = offer.get("unit") or canonical_product.get("unit")
         
         unit_price = eligible_price
-        if qty and qty > 0:
+        if qty and qty > 0.0:
             unit_price = eligible_price / qty
             
         scored_offers.append({
@@ -179,5 +189,5 @@ def compare_eligible_offers(canonical_product, provider_offers, membership_conte
     return {
         "best_offer": best_offer,
         "ranking": scored_offers,
-        "spread_percent": ((scored_offers[-1]["eligible_price"] / best_offer["eligible_price"]) - 1) * 100 if best_offer["eligible_price"] > 0 else 0
+        "spread_percent": ((scored_offers[-1]["eligible_price"] / best_offer["eligible_price"]) - 1) * 100 if is_valid_commercial_price(best_offer["eligible_price"]) else 0
     }

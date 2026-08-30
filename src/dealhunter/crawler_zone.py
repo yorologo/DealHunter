@@ -92,7 +92,7 @@ async def _run_zone_inventory_async(config, lat, lng, conn, run_id, dry_run=Fals
             elif "farma" in p_lower: vertical = "Farmacia"
             else: vertical = parent_type
 
-        validate_provider(provider_id)
+        provider_id = validate_provider(provider_id)
         c.execute('''INSERT INTO stores (provider, store_id, name, brand, type, status, last_seen_at, vertical)
                      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                      ON CONFLICT(provider, store_id) DO UPDATE SET
