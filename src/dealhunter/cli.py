@@ -9,9 +9,9 @@ from .crawler import run_discover, run_update
 from .historico import analyze_history, compare_stores
 from .output import print_results
 from .doctor import run_doctor, format_doctor_output
+from .metadata import VERSION
 from datetime import datetime
 
-VERSION = "3.0.0-rc1"
 LOCATION_CHANGE_WARNING_METERS = 500.0
 
 
@@ -164,10 +164,33 @@ def build_parser():
     watch_p = subparsers.add_parser("watch", help="Manage watchlist")
     watch_p.add_argument("action", choices=["add", "list", "remove", "enable", "disable"])
     watch_p.add_argument("query_or_id", nargs="?")
+    uber_p = subparsers.add_parser("uber", help="Uber Eats management")
+    uber_p.add_argument("action", choices=["status", "setup"])
+    
+    sync_p = subparsers.add_parser("sync", help="Sync data from a specific provider", parents=[base_parser])
+    sync_p.add_argument("--provider", choices=["rappi", "uber_eats"], default="rappi", help="Provider to sync")
+
     watch_p.add_argument("--below", type=float)
 
     doctor_p = subparsers.add_parser("doctor", help="Run system diagnostics")
     doctor_p.add_argument("--network", action='store_true', help="Include network checks (not yet implemented)")
+
+    # Phase 5E settings
+    providers_p = subparsers.add_parser("providers", help="List configured providers")
+    
+    prov_p = subparsers.add_parser("provider", help="Manage a provider")
+    prov_p.add_argument("name", choices=["rappi", "uber_eats"])
+    prov_p.add_argument("action", choices=["enable", "disable"])
+    
+    memberships_p = subparsers.add_parser("memberships", help="List configured memberships")
+    
+    mem_p = subparsers.add_parser("membership", help="Manage a membership")
+    mem_p.add_argument("name", choices=["rappi_pro", "uber_one"])
+    mem_p.add_argument("action", choices=["active", "inactive", "unknown"])
+    
+    comp_p = subparsers.add_parser("comparison", help="Manage comparison policies")
+    comp_p.add_argument("policy", choices=["membership-policy"])
+    comp_p.add_argument("value", choices=["exclude", "show_but_exclude", "include"])
 
     return parser
 
@@ -185,7 +208,7 @@ def handle_config_command(args):
             sys.exit(1)
         try:
             val = float(args.value) if '.' in args.value else int(args.value)
-        except:
+        except ValueError:
             val = args.value
         cfg[args.key] = val
         save_config(cfg)
@@ -235,7 +258,7 @@ def main(args_list=None):
                 print(f"Error checking account: {err}", file=sys.stderr)
         return
 
-    crawler_commands = ("discover", "update", "restaurants", None)
+    crawler_commands = ("discover", "update", "restaurants", "sync", None)
     location = None
     if args.command == "auth":
         if args.provider == "rappi":
@@ -476,7 +499,71 @@ def main(args_list=None):
 
     conn = setup_db()
 
+
+    from dealhunter.config import load_config, save_config
+
+    if args.command == "providers":
+        cfg = load_config()
+        provs = cfg.get("providers", {})
+        print("Providers:")
+        for p in ["rappi", "uber_eats"]:
+            status = provs.get(p, {}).get("enabled", True)
+            print(f"  {p}: {'Enabled' if status else 'Disabled'}")
+        return
+
+    if args.command == "provider":
+        cfg = load_config()
+        if "providers" not in cfg:
+            cfg["providers"] = {}
+        if args.name not in cfg["providers"]:
+            cfg["providers"][args.name] = {}
+        cfg["providers"][args.name]["enabled"] = (args.action == "enable")
+        save_config(cfg)
+        print(f"Provider {args.name} has been {args.action}d.")
+        return
+
+    if args.command == "memberships":
+        cfg = load_config()
+        mems = cfg.get("memberships", {})
+        print("Memberships:")
+        for m in ["rappi_pro", "uber_one"]:
+            status = mems.get(m, {}).get("status", "unknown")
+            print(f"  {m}: {status}")
+        return
+
+    if args.command == "membership":
+        cfg = load_config()
+        if "memberships" not in cfg:
+            cfg["memberships"] = {}
+        if args.name not in cfg["memberships"]:
+            cfg["memberships"][args.name] = {}
+        cfg["memberships"][args.name]["status"] = args.action
+        save_config(cfg)
+        print(f"Membership {args.name} is now {args.action}.")
+        return
+
+
+    if args.command == "identity":
+        if args.action == "evaluate":
+            if getattr(args, 'shadow', False):
+                from dealhunter.identity.evaluator import evaluate_shadow
+                evaluate_shadow(db_path)
+            else:
+                print("Production evaluation not enabled. Use --shadow.")
+        return
+
+    if args.command == "comparison":
+        cfg = load_config()
+        if "comparison" not in cfg:
+            cfg["comparison"] = {}
+        if args.policy == "membership-policy":
+            cfg["comparison"]["inactive_membership_offers"] = args.value
+        save_config(cfg)
+        print(f"Comparison policy updated.")
+        return
+
     if args.command == "db":
+
         import os
         db_path = os.environ.get("RAPPI_DB_PATH", os.path.expanduser("~/rappi-deal-hunter/rappi-deals.db"))
 
@@ -491,6 +578,15 @@ def main(args_list=None):
         elif args.action == "vacuum":
             db_vacuum(db_path)
             print("Vacuum complete")
+        return
+
+    elif args.command == "uber":
+        if args.action == "status":
+            from dealhunter.providers.uber_eats.status import print_status
+            print_status()
+        elif args.action == "setup":
+            from dealhunter.providers.uber_eats.setup import run_setup
+            run_setup()
         return
 
     elif args.command == "runs":
@@ -548,63 +644,81 @@ def main(args_list=None):
         mode = args.command if args.command else "discover"
         print(f"Running mode: {mode}", file=sys.stderr)
 
+        from dealhunter.eligibility import EligibilityEngine
+        engine = EligibilityEngine(config)
+        target_provider = getattr(args, "provider", "rappi")
+        
+        if not engine.is_provider_enabled(target_provider):
+            print(f"SKIPPED: Provider '{target_provider}' is disabled in configuration.", file=sys.stderr)
+            
+            # Still update run to COMPLETED so it doesn't stay RUNNING
+            c = conn.cursor()
+            c.execute("UPDATE runs SET status='SKIPPED', finished_at=? WHERE run_id=?", 
+                     (datetime.now().isoformat(), run_id))
+            conn.commit()
+            return 0
+
         try:
-            import asyncio
-            from dealhunter.auth import RappiSessionProvider
-            from dealhunter.account import SessionStatus
-
-            provider = RappiSessionProvider()
-            has_token = asyncio.run(provider.is_authenticated())
-            status = SessionStatus().get_current(check_network=False)
-            is_auth = has_token and status.get("status") in ("VALID", "UNVERIFIED", "CONFIGURED")
-            print(f"DEBUG: has_token={has_token}, status={status.get('status')}, is_auth={is_auth}", file=sys.stderr)
-
-            if is_auth and config.get("catalog_sync", {}).get("enabled", True):
-                print(f"SESSION_{status.get('status')}: Using ZONE_INVENTORY mode.", file=sys.stderr)
-                from dealhunter.crawler_zone import run_zone_inventory
-                state, reqs = run_zone_inventory(config, lat, lng, conn, run_id, dry_run=config.get("dry_run"))
-                if state == "SESSION_EXPIRED":
-                    print("SESSION_EXPIRED: Using SEARCH_DISCOVERY mode as fallback.", file=sys.stderr)
-                    
-                    from dealhunter.secret_store import SessionService
-                    from datetime import timezone
-                    svc = SessionService()
-                    if svc.get_mode() == "PERSISTENT":
-                        svc.update_validation("EXPIRED", datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ'))
+            if args.command == "sync" and target_provider == "uber_eats":
+                from dealhunter.providers.uber_eats.crawler import run_uber_sync
+                state, reqs = run_uber_sync(config, lat, lng, conn, run_id)
+            else:
+                import asyncio
+                from dealhunter.auth import RappiSessionProvider
+                from dealhunter.account import SessionStatus
+    
+                provider = RappiSessionProvider()
+                has_token = asyncio.run(provider.is_authenticated())
+                status = SessionStatus().get_current(check_network=False)
+                is_auth = has_token and status.get("status") in ("VALID", "UNVERIFIED", "CONFIGURED")
+                print(f"DEBUG: has_token={has_token}, status={status.get('status')}, is_auth={is_auth}", file=sys.stderr)
+    
+                if is_auth and config.get("catalog_sync", {}).get("enabled", True):
+                    print(f"SESSION_{status.get('status')}: Using ZONE_INVENTORY mode.", file=sys.stderr)
+                    from dealhunter.crawler_zone import run_zone_inventory
+                    state, reqs = run_zone_inventory(config, lat, lng, conn, run_id, dry_run=config.get("dry_run"))
+                    if state == "SESSION_EXPIRED":
+                        print("SESSION_EXPIRED: Using SEARCH_DISCOVERY mode as fallback.", file=sys.stderr)
                         
-                    c.execute('''UPDATE runs SET crawler_mode = ?, coverage_complete = ?, status = ?, finished_at = CURRENT_TIMESTAMP WHERE run_id = ?''',
-                              ("ZONE_INVENTORY", 0, "PARTIAL", run_id))
-                    conn.commit()
-
-                    import uuid
-                    fallback_run_id = str(uuid.uuid4())
-                    c.execute('INSERT INTO runs (run_id, started_at, status) VALUES (?, CURRENT_TIMESTAMP, "RUNNING")', (fallback_run_id,))
-                    conn.commit()
-
-                    from dealhunter.crawler import run_discover, run_update
-                    if mode == "discover":
-                        state, reqs = run_discover(config, lat, lng, conn, fallback_run_id, dry_run=config.get("dry_run"))
-                    else:
-                        state, reqs = run_update(config, lat, lng, conn, fallback_run_id, dry_run=config.get("dry_run"))
-
-                    # Update run_id variable so the final block uses the fallback run_id
-                    run_id = fallback_run_id
-                else:
-                    # If it succeeded without EXPIRED, and it was UNVERIFIED or CONFIGURED, mark as VALID
-                    if status.get("status") in ("UNVERIFIED", "CONFIGURED"):
                         from dealhunter.secret_store import SessionService
                         from datetime import timezone
                         svc = SessionService()
                         if svc.get_mode() == "PERSISTENT":
-                            svc.update_validation("VALID", datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ'))
-            else:
-                print("NOT_CONFIGURED or disabled: Using SEARCH_DISCOVERY mode as fallback.", file=sys.stderr)
-                from dealhunter.crawler import run_discover, run_update
-                if mode == "discover":
-                    state, reqs = run_discover(config, lat, lng, conn, run_id, dry_run=config.get("dry_run"))
+                            svc.update_validation("EXPIRED", datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ'))
+                            
+                        c.execute('''UPDATE runs SET crawler_mode = ?, coverage_complete = ?, status = ?, finished_at = CURRENT_TIMESTAMP WHERE run_id = ?''',
+                                  ("ZONE_INVENTORY", 0, "PARTIAL", run_id))
+                        conn.commit()
+    
+                        import uuid
+                        fallback_run_id = str(uuid.uuid4())
+                        c.execute('INSERT INTO runs (run_id, started_at, status) VALUES (?, CURRENT_TIMESTAMP, "RUNNING")', (fallback_run_id,))
+                        conn.commit()
+    
+                        from dealhunter.crawler import run_discover, run_update
+                        if mode == "discover":
+                            state, reqs = run_discover(config, lat, lng, conn, fallback_run_id, dry_run=config.get("dry_run"))
+                        else:
+                            state, reqs = run_update(config, lat, lng, conn, fallback_run_id, dry_run=config.get("dry_run"))
+    
+                        # Update run_id variable so the final block uses the fallback run_id
+                        run_id = fallback_run_id
+                    else:
+                        # If it succeeded without EXPIRED, and it was UNVERIFIED or CONFIGURED, mark as VALID
+                        if status.get("status") in ("UNVERIFIED", "CONFIGURED"):
+                            from dealhunter.secret_store import SessionService
+                            from datetime import timezone
+                            svc = SessionService()
+                            if svc.get_mode() == "PERSISTENT":
+                                svc.update_validation("VALID", datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ'))
                 else:
-                    state, reqs = run_update(config, lat, lng, conn, run_id, dry_run=config.get("dry_run"))
-
+                    print("NOT_CONFIGURED or disabled: Using SEARCH_DISCOVERY mode as fallback.", file=sys.stderr)
+                    from dealhunter.crawler import run_discover, run_update
+                    if mode == "discover":
+                        state, reqs = run_discover(config, lat, lng, conn, run_id, dry_run=config.get("dry_run"))
+                    else:
+                        state, reqs = run_update(config, lat, lng, conn, run_id, dry_run=config.get("dry_run"))
+    
         except Exception as exc:
             # Preserve already-committed observations; mark run as PARTIAL
             from .errors import classify_error

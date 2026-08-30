@@ -42,7 +42,7 @@ def test_schema_migration_preserves_legacy():
     # Run migration from db.py
     # Since setup_db modifies a physical file or uses connection, we extract the logic or patch it.
     from dealhunter.db import CURRENT_SCHEMA_VERSION
-    assert CURRENT_SCHEMA_VERSION in [11, 12, 13, 14]
+    assert CURRENT_SCHEMA_VERSION in [11, 12, 13, 14, 15, 16]
     
     # Just run the migration logic inline for in-memory testing
     if True:
@@ -109,7 +109,7 @@ def test_store_facets_and_vertical():
     
     c.execute('''INSERT INTO stores (store_id, name, brand, type, status, last_seen_at, vertical)
                  VALUES (?, ?, ?, ?, ?, ?, ?)
-                 ON CONFLICT(store_id) DO UPDATE SET
+                 ON CONFLICT(provider, store_id) DO UPDATE SET
                  name = COALESCE(excluded.name, name),
                  type = COALESCE(excluded.type, type),
                  vertical = COALESCE(excluded.vertical, vertical),
@@ -131,7 +131,7 @@ def test_store_facets_and_vertical():
     for val, src in facets:
         c.execute('''INSERT INTO store_facets (store_id, facet_type, raw_value, source, last_seen)
                      VALUES (?, ?, ?, ?, ?)
-                     ON CONFLICT(store_id, facet_type, raw_value) DO UPDATE SET
+                     ON CONFLICT(provider, store_id, facet_type, raw_value) DO UPDATE SET
                      last_seen=excluded.last_seen
                   ''', (s_id, "store_subcategory", val, src, datetime.datetime.now().isoformat()))
     conn.commit()
@@ -280,7 +280,7 @@ def _insert_store_mock(conn, m):
     parent_type = m.get("type", "supermercado")
     c.execute('''INSERT INTO stores (store_id, name, brand, type, status, last_seen_at, vertical)
                  VALUES (?, ?, ?, ?, ?, ?, ?)
-                 ON CONFLICT(store_id) DO UPDATE SET
+                 ON CONFLICT(provider, store_id) DO UPDATE SET
                  name = COALESCE(excluded.name, name),
                  type = COALESCE(excluded.type, type),
                  vertical = COALESCE(excluded.vertical, vertical),
@@ -305,7 +305,7 @@ def _insert_store_mock(conn, m):
     for val, src in facets:
         c.execute('''INSERT INTO store_facets (store_id, facet_type, raw_value, source, last_seen)
                      VALUES (?, ?, ?, ?, ?)
-                     ON CONFLICT(store_id, facet_type, raw_value) DO UPDATE SET
+                     ON CONFLICT(provider, store_id, facet_type, raw_value) DO UPDATE SET
                      last_seen=excluded.last_seen
                   ''', (s_id, "store_subcategory", val, src, now_store_facets))
                   

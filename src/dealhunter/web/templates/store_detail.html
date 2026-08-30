@@ -16,14 +16,14 @@
         </div>
         <div class="d-flex justify-content-between align-items-start">
             <h2 class="fw-bold mb-3">{{ detail.name }}</h2>
-            <form class="ms-3 d-inline rappi-launcher" data-store-id="{{ detail.store_id }}">
+            {% if detail.provider == 'rappi' %}<form class="ms-3 d-inline rappi-launcher" data-store-id="{{ detail.store_id }}">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                 <input type="hidden" name="store_id" value="{{ detail.store_id }}">
                 <button type="submit" class="btn btn-sm btn-danger fw-bold rounded-pill shadow-sm px-3 py-2">
                     🛵 Abrir Tienda
                 </button>
                 <span class="rappi-feedback ms-2 small"></span>
-            </form>
+            </form>{% endif %}
         </div>
         <div class="row g-3">
             <div class="col-6 col-md-3">
@@ -43,7 +43,7 @@
     <h5 class="fw-bold mb-3">Categorías disponibles</h5>
     <div class="d-flex flex-wrap gap-2">
         {% for cat in detail.categories %}
-        <a href="/stores/{{ detail.store_id }}?category={{ cat.name | urlencode }}" 
+        <a href="/stores/{{ detail.provider }}/{{ detail.store_id }}?category={{ cat.name | urlencode }}"
            class="btn btn-sm btn-outline-secondary">
             {{ cat.name }} <span class="badge text-bg-light ms-1">{{ cat.count }}</span>
         </a>
@@ -61,7 +61,7 @@
     <div class="col-12">
         <div class="card shadow-sm border-0">
             <div class="card-body py-2">
-                <form id="filter-form" hx-get="/stores/{{ detail.store_id }}" hx-target="#catalog-grid" hx-push-url="true" class="row g-3 align-items-center">
+                <form id="filter-form" hx-get="/stores/{{ detail.provider }}/{{ detail.store_id }}" hx-target="#catalog-grid" hx-push-url="true" class="row g-3 align-items-center">
                     <div class="col-auto">
                         <label class="form-label small text-secondary fw-bold mb-0 me-2">Ordenar por</label>
                     </div>

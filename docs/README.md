@@ -1,6 +1,8 @@
 # Documentation Index
 
-Este es el índice oficial de documentación para DealHunter v2.9.5.
+Este es el índice oficial de documentación para el RC objetivo v3.2.0
+(schema v16). El RC todavía no es una release pública; la última release
+publicada verificada es v3.0.1.
 
 ## Getting Started
 - [⚡ Very Very Easy Quick Start](VERY_EASY_QUICK_START.md) (Recomendado)

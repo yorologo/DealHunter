@@ -63,3 +63,54 @@ def test_normal_reference_price():
     # Median is 100. Max is 110. Original price is 110.
     res = compute_price_metrics(make_obs([100, 110, 100], orig_price=110))
     assert res["is_suspicious_reference"] == False
+
+
+# --- NULL price / timestamp regression tests ---
+
+def test_prices_with_none_skipped():
+    """[100, None, 90] → uses 100 and 90, no crash."""
+    obs = make_obs([100, None, 90])
+    res = compute_price_metrics(obs)
+    assert res is not None
+    assert res["current_price"] == 90
+    assert res["historical_min"] == 90
+    assert res["historical_max"] == 100
+    assert res["previous_price"] == 100  # last valid before current
+
+def test_all_none_prices():
+    """[None, None] → no crash, returns None."""
+    obs = make_obs([None, None])
+    res = compute_price_metrics(obs)
+    assert res is None
+
+def test_current_price_none():
+    """Last observation has None price → returns None."""
+    obs = make_obs([100, 90, None])
+    res = compute_price_metrics(obs)
+    assert res is None
+
+def test_single_valid_rest_none():
+    """Only one valid price among Nones → still works (INSUFFICIENT_HISTORY)."""
+    obs = make_obs([None, None, 50])
+    res = compute_price_metrics(obs)
+    assert res is not None
+    assert res["current_price"] == 50
+    assert res["status"] == "INSUFFICIENT_HISTORY"
+
+def test_legacy_null_timestamp_valid_price():
+    """Observations with None timestamp but valid price → price is usable."""
+    obs = [
+        {"price": 100, "timestamp": None, "original_price": None},
+        {"price": 110, "timestamp": None, "original_price": None},
+        {"price": 90, "timestamp": now, "original_price": None},
+    ]
+    res = compute_price_metrics(obs)
+    assert res is not None
+    assert res["current_price"] == 90
+    assert res["historical_min"] == 90
+    assert res["historical_max"] == 110
+
+def test_empty_list():
+    """Empty observation list returns None."""
+    res = compute_price_metrics([])
+    assert res is None

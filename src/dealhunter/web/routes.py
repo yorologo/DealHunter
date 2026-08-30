@@ -6,13 +6,22 @@ from dealhunter.web.queries import (
 )
 
 def register_routes(app):
+    def _base_filters(extra=None):
+        f = {}
+        provider = request.cookies.get('dh_provider', 'all')
+        if provider != 'all':
+            f['providers'] = [provider]
+        if extra:
+            f.update(extra)
+        return f
+
     
     @app.route('/')
     def home():
         db_path = current_app.config['DATABASE']
         metrics = get_home_metrics(db_path)
-        deals = get_home_deals(db_path)
-        watchlist = get_watchlist(db_path)
+        deals = get_home_deals(db_path, _base_filters())
+        watchlist = get_watchlist(db_path, _base_filters())
         return render_template('home.html', metrics=metrics, deals=deals, watchlist=watchlist, current_path='/')
         
     @app.route('/search')
@@ -24,7 +33,7 @@ def register_routes(app):
             return render_template('search_results.html', results={}, q=q, current_path='/search')
             
         db_path = current_app.config['DATABASE']
-        results = search_local(db_path, q)
+        results = search_local(db_path, q, _base_filters())
         
         if request.headers.get('HX-Request'):
             return render_template('partials/search_results.html', results=results, q=q)
@@ -33,13 +42,13 @@ def register_routes(app):
     @app.route('/products')
     def products():
         db_path = current_app.config['DATABASE']
-        results = search_local(db_path, "", limit=50)
+        results = search_local(db_path, "", _base_filters())
         return render_template('products.html', results=results, current_path='/products')
 
-    @app.route('/products/<store_id>/<product_id>')
-    def product_detail(store_id, product_id):
+    @app.route('/products/<provider>/<store_id>/<product_id>')
+    def product_detail(provider, store_id, product_id):
         db_path = current_app.config['DATABASE']
-        p = get_product_detail(db_path, store_id, product_id)
+        p = get_product_detail(db_path, provider, store_id, product_id)
         if not p:
             return render_template('404_product.html', current_path='/products'), 404
         return render_template('product_detail.html', p=p, current_path='/products')
@@ -53,7 +62,8 @@ def register_routes(app):
         db_path = current_app.config['DATABASE']
         
         if store_id and product_id:
-            res = get_anchor_compare(db_path, store_id, product_id)
+            provider = request.args.get('provider')
+            res = get_anchor_compare(db_path, provider, store_id, product_id)
             if request.headers.get('HX-Request'):
                 return render_template('partials/compare_results_anchor.html', res=res)
             return render_template('compare.html', res=res, anchor_mode=True, current_path='/compare')
@@ -74,7 +84,7 @@ def register_routes(app):
         category = request.args.getlist('category')
         store_type = request.args.get('store_type', '')
         
-        filters = {}
+        filters = _base_filters()
         if category: filters["category"] = category
         if store_type: filters["store_type"] = store_type
         
@@ -93,7 +103,7 @@ def register_routes(app):
         page = int(request.args.get('page', 1))
         sort = request.args.get('sort', 'opportunity')
         tab = request.args.get('tab', 'Todo')
-        data = get_deals(db_path, {"tab": tab}, sort, page)
+        data = get_deals(db_path, _base_filters({"tab": tab}), sort, page)
         if request.headers.get('HX-Request') and not request.headers.get('HX-Boosted'):
             return render_template('partials/catalog_grid.html', data=data, filters=filters, sort=sort, view_mode=request.cookies.get('view_mode', 'cards'))
         return render_template('deals.html', data=data, tab=tab, sort=sort, current_path='/deals')
@@ -105,7 +115,7 @@ def register_routes(app):
         sort = request.args.get('sort', 'opportunity')
         store = request.args.getlist('store')
         category = request.args.getlist('category')
-        filters = {"vertical": "market"}
+        filters = _base_filters({"vertical": "market"})
         if store: filters["store"] = store
         if category: filters["category"] = category
         if request.args.get('only_deals'): filters['only_deals'] = True
@@ -113,7 +123,7 @@ def register_routes(app):
         if request.headers.get('HX-Request') and not request.headers.get('HX-Boosted'):
             return render_template('partials/catalog_grid.html', data=data, filters=filters, sort=sort, view_mode=request.cookies.get('view_mode', 'cards'))
         facets = get_ui_facets(db_path, filters)
-        av_stores = [{"id": s["store_id"], "name": s["name"]} for s in facets["stores"]]
+        av_stores = [{"id": s["filter_key"], "name": s["name"]} for s in facets["stores"]]
         av_cats = facets["categories"]
         return render_template('catalog.html', data=data, sort=sort, filters=filters, av_stores=av_stores, av_cats=av_cats, av_collections=facets.get('collections', []), av_store_facets=facets.get('store_facets', []), title="Supermercados", current_path='/market', emoji="🛒").replace('av_cats=av_cats, ', 'av_cats=av_cats, av_collections=facets.get(\"collections\", []), av_store_facets=facets.get(\"store_facets\", []), ')
         
@@ -124,7 +134,7 @@ def register_routes(app):
         sort = request.args.get('sort', 'opportunity')
         store = request.args.getlist('store')
         category = request.args.getlist('category')
-        filters = {"vertical": "turbo"}
+        filters = _base_filters({"vertical": "turbo"})
         if store: filters["store"] = store
         if category: filters["category"] = category
         if request.args.get('only_deals'): filters['only_deals'] = True
@@ -132,7 +142,7 @@ def register_routes(app):
         if request.headers.get('HX-Request') and not request.headers.get('HX-Boosted'):
             return render_template('partials/catalog_grid.html', data=data, filters=filters, sort=sort, view_mode=request.cookies.get('view_mode', 'cards'))
         facets = get_ui_facets(db_path, filters)
-        av_stores = [{"id": s["store_id"], "name": s["name"]} for s in facets["stores"]]
+        av_stores = [{"id": s["filter_key"], "name": s["name"]} for s in facets["stores"]]
         av_cats = facets["categories"]
         return render_template('catalog.html', data=data, sort=sort, filters=filters, av_stores=av_stores, av_cats=av_cats, av_collections=facets.get('collections', []), av_store_facets=facets.get('store_facets', []), title="Rappi Turbo", current_path='/turbo', emoji="⚡").replace('av_cats=av_cats, ', 'av_cats=av_cats, av_collections=facets.get(\"collections\", []), av_store_facets=facets.get(\"store_facets\", []), ')
         
@@ -140,7 +150,7 @@ def register_routes(app):
     @app.route('/partials/categories')
     def partial_categories():
         db_path = current_app.config['DATABASE']
-        filters = {}
+        filters = _base_filters()
         if request.args.get('vertical'): filters["vertical"] = request.args.get('vertical')
         if request.args.getlist('store'): filters["store"] = request.args.getlist('store')
         facets = get_ui_facets(db_path, filters)
@@ -152,7 +162,7 @@ def register_routes(app):
 
     def categories():
         db_path = current_app.config['DATABASE']
-        cats = get_categories(db_path)
+        cats = get_categories(db_path, _base_filters())
         return render_template('categories.html', cats=cats, current_path='/categories')
         
     @app.route('/categories/<category>')
@@ -161,14 +171,14 @@ def register_routes(app):
         page = int(request.args.get('page', 1))
         sort = request.args.get('sort', 'opportunity')
         store = request.args.getlist('store')
-        filters = {"category": category}
+        filters = _base_filters({"category": category})
         if store: filters["store"] = store
         if request.args.get('only_deals'): filters['only_deals'] = True
         data = get_catalog(db_path, filters, sort, page)
         if request.headers.get('HX-Request') and not request.headers.get('HX-Boosted'):
             return render_template('partials/catalog_grid.html', data=data, filters=filters, sort=sort, view_mode=request.cookies.get('view_mode', 'cards'))
         facets = get_ui_facets(db_path, filters)
-        av_stores = [{"id": s["store_id"], "name": s["name"]} for s in facets["stores"]]
+        av_stores = [{"id": s["filter_key"], "name": s["name"]} for s in facets["stores"]]
         av_cats = facets["categories"]
         return render_template('catalog.html', data=data, sort=sort, filters=filters, av_stores=av_stores, av_cats=av_cats, av_collections=facets.get('collections', []), av_store_facets=facets.get('store_facets', []), title=f"Categoría: {category}", current_path='/categories', emoji="📦").replace('av_cats=av_cats, ', 'av_cats=av_cats, av_collections=facets.get(\"collections\", []), av_store_facets=facets.get(\"store_facets\", []), ')
         
@@ -176,18 +186,18 @@ def register_routes(app):
     def stores():
         db_path = current_app.config['DATABASE']
         show_all = request.args.get('all', '0') == '1'
-        stores_list = get_stores(db_path, hide_empty=not show_all)
+        stores_list = get_stores(db_path, hide_empty=not show_all, filters=_base_filters())
         return render_template('stores.html', stores=stores_list, current_path='/stores', show_all=show_all)
         
-    @app.route('/stores/<store_id>')
-    def store_detail(store_id):
+    @app.route('/stores/<provider>/<store_id>')
+    def store_detail(provider, store_id):
         db_path = current_app.config['DATABASE']
-        detail = get_store_detail(db_path, store_id)
+        detail = get_store_detail(db_path, provider, store_id)
         if not detail:
             return "Store not found", 404
         page = int(request.args.get('page', 1))
         sort = request.args.get('sort', 'opportunity')
-        filters = {"store": store_id}
+        filters = {"provider": provider, "store": store_id}
         data = get_catalog(db_path, filters, sort, page)
         if request.headers.get('HX-Request') and not request.headers.get('HX-Boosted'):
             return render_template('partials/catalog_grid.html', data=data, filters=filters, sort=sort, view_mode=request.cookies.get('view_mode', 'cards'))
@@ -205,7 +215,7 @@ def register_routes(app):
         sort = request.args.get('sort', 'discount')
         store = request.args.getlist('store')
         category = request.args.getlist('category')
-        filters = {"vertical": "restaurants"}
+        filters = _base_filters({"vertical": "restaurants"})
         if store: filters["store"] = store
         if category: filters["category"] = category
         if request.args.get('only_deals'): filters['only_deals'] = True
@@ -215,14 +225,14 @@ def register_routes(app):
             return render_template('partials/catalog_grid.html', data=data, filters=filters, sort=sort, current_path='/restaurants')
             
         facets = get_ui_facets(db_path, filters)
-        av_stores = [{"id": s["store_id"], "name": s["name"]} for s in facets["stores"]]
+        av_stores = [{"id": s["filter_key"], "name": s["name"]} for s in facets["stores"]]
         av_cats = facets["categories"]
         return render_template('catalog.html', data=data, sort=sort, filters=filters, av_stores=av_stores, av_cats=av_cats, av_collections=facets.get('collections', []), av_store_facets=facets.get('store_facets', []), title="Restaurantes", current_path='/restaurants', emoji="🍔").replace('av_cats=av_cats, ', 'av_cats=av_cats, av_collections=facets.get(\"collections\", []), av_store_facets=facets.get(\"store_facets\", []), ')
         
-    @app.route('/restaurants/<store_id>')
-    def restaurant_detail(store_id):
+    @app.route('/restaurants/<provider>/<store_id>')
+    def restaurant_detail(provider, store_id):
         db_path = current_app.config['DATABASE']
-        detail = get_restaurant_detail(db_path, store_id)
+        detail = get_restaurant_detail(db_path, provider, store_id)
         if not detail:
             return "Restaurant not found", 404
         return render_template('restaurant_detail.html', detail=detail, current_path='/restaurants')
@@ -266,7 +276,7 @@ def register_routes(app):
         import sqlite3
         with sqlite3.connect(current_app.config['DATABASE']) as conn:
             row = conn.execute(
-                "SELECT name, type FROM stores WHERE store_id = ?",
+                "SELECT name, type FROM stores WHERE provider = 'rappi' AND store_id = ?",
                 (store_id,),
             ).fetchone()
         if row is None:
@@ -294,4 +304,3 @@ def register_routes(app):
     @app.errorhandler(500)
     def internal_error(e):
         return render_template('placeholder.html', title="Error Interno", subtitle="No pudimos leer los datos.\nCódigo: DB_ERROR\nTus datos no fueron modificados.", current_path=""), 500
-

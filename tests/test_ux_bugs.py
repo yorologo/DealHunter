@@ -32,3 +32,23 @@ def test_stale_running_run_handling(db_conn):
     cur.execute("SELECT status FROM runs WHERE run_id = 'stale_run'")
     # We no longer mutate the database on GET
     assert cur.fetchone()[0] == 'RUNNING'
+
+
+def test_run_counts_use_provider_aware_identity(db_conn):
+    conn = sqlite3.connect(db_conn)
+    conn.execute(
+        "INSERT INTO runs (run_id, status, started_at) VALUES ('multi', 'COMPLETED', '2026-08-22 18:32:56')"
+    )
+    conn.execute(
+        "INSERT INTO observations (run_id, provider, store_id, product_id, price) VALUES ('multi', 'rappi', 'shared', 'same', 10)"
+    )
+    conn.execute(
+        "INSERT INTO observations (run_id, provider, store_id, product_id, price) VALUES ('multi', 'uber_eats', 'shared', 'same', 20)"
+    )
+    conn.commit()
+    conn.close()
+
+    run = get_run_detail(db_conn, 'multi')
+    assert run['observation_count'] == 2
+    assert run['product_count'] == 2
+    assert run['store_count'] == 2

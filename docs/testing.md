@@ -4,11 +4,12 @@ DealHunter se audita mediante una robusta batería de tests automatizados, dise�
 
 Comando canónico de validación:
 ```bash
-python3 -m compileall src bin
-PYTHONPATH=src pytest
+python -m compileall -q src tests
+PYTHONPATH=src pytest tests -q
 ```
 
-Estado actual v2.7.0: `180 passed, 0 failed`
+El criterio actual es que la suite completa pase. El conteo se obtiene de la
+ejecución/CI del HEAD exacto y no se duplica en este documento.
 
 ## Cobertura (Categorías)
 - Normalization (Métricas, conversión)

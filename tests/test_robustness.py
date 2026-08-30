@@ -109,14 +109,10 @@ def test_classify_unknown():
 # ============================================================
 
 def _make_test_db():
-    """Create a temp DB with runs table and return (conn, path)."""
+    from dealhunter.db import setup_db
     tmpdir = tempfile.mkdtemp()
     db_path = os.path.join(tmpdir, "test.db")
-    conn = sqlite3.connect(db_path)
-    c = conn.cursor()
-    c.execute('''CREATE TABLE runs (run_id TEXT PRIMARY KEY, started_at DATETIME, 
-                 finished_at DATETIME, lat REAL, lng REAL, radius REAL, vertical TEXT, status TEXT)''')
-    conn.commit()
+    conn = setup_db(db_path)
     return conn, db_path
 
 def test_checkpoint_roundtrip():

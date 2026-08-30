@@ -15,19 +15,17 @@ from dealhunter.web.app import create_app
 @pytest.fixture
 def client(tmp_path):
     db_path = tmp_path / "open-rappi.db"
+    from tests.helpers.db import create_current_schema_db, insert_store
     app = create_app({"TESTING": True, "DATABASE": str(db_path)})
-    with sqlite3.connect(db_path) as conn:
-        conn.execute("CREATE TABLE IF NOT EXISTS stores (store_id TEXT, name TEXT, type TEXT)")
-        conn.executemany(
-            "INSERT INTO stores (store_id, name, type) VALUES (?, ?, ?)",
-            (
-                ("111", "Tacos Moy Santa Esther", "restaurants"),
-                ("222", "City Market", "market"),
-                ("333", "Unsupported Store", "express_parent"),
-                ("444", "Turbo", "chiper_home"),
-                ("555", "Turbo Market", "chiper_extended"),
-            ),
-        )
+    conn = create_current_schema_db(str(db_path))
+    insert_store(conn, '111', name='Tacos Moy Santa Esther', type='restaurants')
+    insert_store(conn, '222', name='City Market', type='market')
+    insert_store(conn, '333', name='Unsupported Store', type='express_parent')
+    insert_store(conn, '444', name='Turbo', type='chiper_home')
+    insert_store(conn, '555', name='Turbo Market', type='chiper_extended')
+    insert_store(conn, '666', name='Uber Numeric Store', type='market', provider='uber_eats')
+    conn.commit()
+    conn.close()
     with app.test_client() as test_client:
         yield test_client
 
@@ -139,6 +137,15 @@ def test_open_rappi_store_lookup_is_server_side(mock_run, _mock_which, client):
 @patch("dealhunter.web.rappi_native.subprocess.run")
 def test_open_rappi_rejects_unknown_store(mock_run, client):
     response = _post(client, "999")
+
+    assert response.status_code == 404
+    assert response.get_json()["ok"] is False
+    mock_run.assert_not_called()
+
+
+@patch("dealhunter.web.rappi_native.subprocess.run")
+def test_open_rappi_rejects_non_rappi_provider_store(mock_run, client):
+    response = _post(client, "666")
 
     assert response.status_code == 404
     assert response.get_json()["ok"] is False

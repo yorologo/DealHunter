@@ -1,56 +1,82 @@
 import statistics
 from datetime import datetime, timedelta
 
+_EPOCH = datetime(1970, 1, 1)
+
+
+def _safe_ts(obs):
+    """Return the observation timestamp or epoch if None."""
+    ts = obs.get("timestamp")
+    return ts if ts is not None else _EPOCH
+
+
 def compute_price_metrics(obs_list):
     """
     obs_list: list of dicts with 'price', 'original_price', 'timestamp'
     ordered by timestamp ASC.
+
+    Observations whose price is None are excluded from all numeric
+    calculations (they represent missing data, NOT zero).
     """
     if not obs_list:
         return None
-        
+
     current_obs = obs_list[-1]
     current_price = current_obs["price"]
     original_price = current_obs.get("original_price")
-    
+
+    # If current price is missing we cannot produce meaningful metrics.
+    if current_price is None:
+        return None
+
+    # Build list of *valid* (non-None) prices for the full history.
+    prices_all = [o["price"] for o in obs_list if o["price"] is not None]
+    if not prices_all:
+        return None
+
+    # Previous price: walk backwards to find the most recent valid price
+    # before the current observation.
+    previous_price = current_price
+    prices_previous = []
     if len(obs_list) > 1:
-        previous_obs = obs_list[-2]
-        previous_price = previous_obs["price"]
-        prices_previous = [o["price"] for o in obs_list[:-1]]
-        historical_min_previous = min(prices_previous)
-    else:
-        previous_price = current_price
-        prices_previous = [current_price]
-        historical_min_previous = current_price
-        
-    prices_all = [o["price"] for o in obs_list]
+        for o in obs_list[:-1]:
+            if o["price"] is not None:
+                prices_previous.append(o["price"])
+        if prices_previous:
+            previous_price = prices_previous[-1]
+
+    historical_min_previous = min(prices_previous) if prices_previous else current_price
     historical_min = min(prices_all)
     historical_max = max(prices_all)
     historical_average = statistics.mean(prices_all)
-    
+
     now = datetime.now()
-    obs_30d = [o["price"] for o in obs_list if o["timestamp"] >= now - timedelta(days=30)]
+    obs_30d = [o["price"] for o in obs_list
+               if o["price"] is not None and _safe_ts(o) >= now - timedelta(days=30)]
     median_30d = statistics.median(obs_30d) if obs_30d else current_price
-    
+
     price_change = current_price - previous_price
-    price_change_percent = (price_change / previous_price * 100) if previous_price > 0 else 0
-    
-    discount_vs_median_30d = (1 - (current_price / median_30d)) * 100 if median_30d > 0 else 0
-    discount_vs_historical_average = (1 - (current_price / historical_average)) * 100 if historical_average > 0 else 0
-    distance_from_historical_min = ((current_price / historical_min) - 1) * 100 if historical_min > 0 else 0
-    
+    price_change_percent = (price_change / previous_price * 100) if previous_price and previous_price > 0 else 0
+
+    discount_vs_median_30d = (1 - (current_price / median_30d)) * 100 if median_30d and median_30d > 0 else 0
+    discount_vs_historical_average = (1 - (current_price / historical_average)) * 100 if historical_average and historical_average > 0 else 0
+    distance_from_historical_min = ((current_price / historical_min) - 1) * 100 if historical_min and historical_min > 0 else 0
+
     # Classify
     status = "NORMAL"
     reason = "Sin ventaja histórica demostrable"
-    
-    ts_min = obs_list[0]["timestamp"]
-    ts_max = obs_list[-1]["timestamp"]
+
+    ts_min = _safe_ts(obs_list[0])
+    ts_max = _safe_ts(obs_list[-1])
     delta_days = (ts_max - ts_min).total_seconds() / 86400.0
-    
-    # We require at least 3 observations AND spread over at least 24 hours to consider it has history
-    if len(obs_list) < 3 or delta_days < 1.0:
+
+    # Count observations with valid prices for history depth check
+    valid_count = len(prices_all)
+
+    # We require at least 3 *valid* observations AND spread over at least 24 hours to consider it has history
+    if valid_count < 3 or delta_days < 1.0:
         status = "INSUFFICIENT_HISTORY"
-        reason = f"Historial insuficiente ({len(obs_list)} obs en {delta_days:.1f} dias)"
+        reason = f"Historial insuficiente ({valid_count} obs en {delta_days:.1f} dias)"
     else:
         if current_price < historical_min_previous:
             status = "NEW_LOW"
@@ -61,17 +87,20 @@ def compute_price_metrics(obs_list):
         elif discount_vs_median_30d >= 5.0:
             status = "GOOD_PRICE"
             reason = f"Precio moderadamente inferior: {discount_vs_median_30d:.1f}% vs mediana 30d (${median_30d})"
-            
+
     # Suspicious reference price check
     is_suspicious = False
-    if original_price and original_price > 0 and len(obs_list) >= 3:
+    if original_price and original_price > 0 and valid_count >= 3:
         # If advertised original price is more than 20% higher than the historical max we've ever seen
         if original_price > historical_max * 1.2:
             is_suspicious = True
             if status != "INSUFFICIENT_HISTORY":
                 # We can append or override reason
                 reason += f" | SUSPICIOUS_REFERENCE_PRICE: Anunciado ${original_price} muy superior a max historico ${historical_max}"
-                
+
+    ts_first = _safe_ts(obs_list[0])
+    ts_last = _safe_ts(obs_list[-1])
+
     return {
         "current_price": current_price,
         "original_price": original_price,
@@ -89,5 +118,66 @@ def compute_price_metrics(obs_list):
         "reason": reason,
         "is_suspicious_reference": is_suspicious,
         "observations_count": len(obs_list),
-        "history_days": (obs_list[-1]["timestamp"] - obs_list[0]["timestamp"]).days if len(obs_list) > 1 else 0
+        "history_days": (ts_last - ts_first).days if len(obs_list) > 1 else 0
+    }
+
+def compare_eligible_offers(canonical_product, provider_offers, membership_context=None):
+    """
+    Experimental 5H: Cross-Provider Deal Scoring.
+    canonical_product: dict with canonical identity
+    provider_offers: list of current valid offers from different providers
+    membership_context: dict with eligibility status (e.g. {'rappi_pro': True, 'uber_one': False})
+    
+    Returns best offer and ranking.
+    """
+    if not provider_offers:
+        return None
+        
+    membership_context = membership_context or {}
+    scored_offers = []
+    
+    for offer in provider_offers:
+        provider = offer.get("provider")
+        raw_price = offer.get("price")
+        if raw_price is None or raw_price <= 0:
+            continue
+            
+        # Membership eligibility
+        eligible_price = raw_price
+        member_price = offer.get("member_price")
+        if member_price and member_price > 0 and member_price < raw_price:
+            if provider == "rappi" and membership_context.get("rappi_pro"):
+                eligible_price = member_price
+            elif provider == "uber_eats" and membership_context.get("uber_one"):
+                eligible_price = member_price
+                
+        # We can calculate unit price using canonical_product.quantity and canonical_product.unit
+        qty = offer.get("quantity") or canonical_product.get("quantity")
+        unit = offer.get("unit") or canonical_product.get("unit")
+        
+        unit_price = eligible_price
+        if qty and qty > 0:
+            unit_price = eligible_price / qty
+            
+        scored_offers.append({
+            "provider": provider,
+            "store_id": offer.get("store_id"),
+            "product_id": offer.get("product_id"),
+            "original_price": offer.get("original_price"),
+            "raw_price": raw_price,
+            "eligible_price": eligible_price,
+            "unit_price": unit_price,
+            "unit": unit
+        })
+        
+    if not scored_offers:
+        return None
+        
+    scored_offers.sort(key=lambda x: x["eligible_price"])
+    best_offer = scored_offers[0]
+    
+    return {
+        "best_offer": best_offer,
+        "ranking": scored_offers,
+        "spread_percent": ((scored_offers[-1]["eligible_price"] / best_offer["eligible_price"]) - 1) * 100 if best_offer["eligible_price"] > 0 else 0
     }

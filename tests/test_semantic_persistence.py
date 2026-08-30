@@ -16,6 +16,30 @@ def test_migration_v10_to_v11(tmp_path):
     # Setup v10
     c.execute("CREATE TABLE schema_version (version INTEGER)")
     c.execute("INSERT INTO schema_version VALUES (10)")
+    
+    # Mock full v10 schema for v15 migration pass
+    c.execute('CREATE TABLE stores (store_id TEXT PRIMARY KEY, name TEXT, brand TEXT, type TEXT, status TEXT, last_seen_at DATETIME, vertical TEXT)')
+    c.execute('''CREATE TABLE products (
+           product_id TEXT, store_id TEXT, name TEXT, brand TEXT, image TEXT,
+           normalized_name TEXT, quantity REAL, unit TEXT, 
+           normalized_quantity REAL, normalized_unit TEXT, fingerprint TEXT,
+           pack_count INTEGER, category TEXT, has_toppings INTEGER, category_source TEXT,
+           PRIMARY KEY (store_id, product_id))''')
+    c.execute('''CREATE TABLE runs (
+           run_id TEXT PRIMARY KEY, started_at DATETIME, finished_at DATETIME,
+           lat REAL, lng REAL, radius REAL, vertical TEXT, status TEXT, crawler_mode TEXT, coverage_complete INTEGER, run_metadata TEXT, source TEXT)''')
+    c.execute('''CREATE TABLE observations (
+           id INTEGER PRIMARY KEY AUTOINCREMENT, run_id TEXT, store_id TEXT,
+           product_id TEXT, price REAL, original_price REAL, stock INTEGER,
+           timestamp DATETIME, discount_price REAL, discount_promotion REAL,
+           discount_effective REAL, discount_source TEXT, promotion_type TEXT,
+           promotion_label TEXT, query_term TEXT, availability TEXT,
+           
+           UNIQUE(run_id, store_id, product_id))''')
+    c.execute('''CREATE TABLE store_facets (store_id TEXT, facet_type TEXT, raw_value TEXT, source TEXT, last_seen DATETIME)''')
+    c.execute('''CREATE TABLE alerts (id INTEGER PRIMARY KEY, product_id TEXT, store_id TEXT, alert_type TEXT, triggered_at DATETIME, price REAL, previous_price REAL, deal_status TEXT, reason TEXT, seen INTEGER)''')
+    c.execute('''CREATE TABLE alert_events (id INTEGER PRIMARY KEY, event_key TEXT, event_type TEXT, store_id TEXT, product_id TEXT, previous_observation_id INTEGER, current_observation_id INTEGER, channel TEXT, before_value TEXT, after_value TEXT, metadata TEXT, created_at DATETIME, delivery_status TEXT)''')
+
     c.execute('''CREATE TABLE product_memberships (
         store_id TEXT NOT NULL,
         product_id TEXT NOT NULL,
@@ -38,7 +62,7 @@ def test_migration_v10_to_v11(tmp_path):
     conn = sqlite3.connect(db_path)
     c = conn.cursor()
     c.execute("SELECT version FROM schema_version")
-    assert c.fetchone()[0] in [11, 12, 13, 14]
+    assert c.fetchone()[0] in [11, 12, 13, 14, 15, 16]
     
     # Check legacy data was preserved and got default values
     c.execute("SELECT semantic_type, semantic_reason FROM product_memberships WHERE raw_name='Sushi'")
@@ -47,14 +71,10 @@ def test_migration_v10_to_v11(tmp_path):
     assert row[1] == 'not_classified'
     conn.close()
 
-def test_semantic_persistence_rules(tmp_path):
-    db_path = str(tmp_path / "test_persistence.db")
-    setup_db(db_path)
-    conn = sqlite3.connect(db_path)
+def test_semantic_persistence_rules(current_schema_db):
+    conn = current_schema_db
     
     c = conn.cursor()
-    c.execute('''CREATE TABLE IF NOT EXISTS observations (id INTEGER PRIMARY KEY, store_id TEXT)''')
-    c.execute('''CREATE TABLE IF NOT EXISTS products (product_id TEXT PRIMARY KEY, store_id TEXT)''')
     
     seen = set()
     now = get_now()

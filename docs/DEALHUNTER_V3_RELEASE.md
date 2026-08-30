@@ -1,5 +1,9 @@
 # DealHunter v3.0.0 Release Documentation
 
+> [!IMPORTANT]
+> Historical v3.0.0 release-cycle snapshot. Pending markers and schema claims
+> below belong to that cycle, not the current v3.2.0/schema v16 RC.
+
 ## PATH TO STABLE
 - **RC1**: b1afaa94c8ccda57b600b2c00ca8a4103b2fc2a6 (CI: 32769390355)
 - **RC2**: 05397540ca931194d0925f9963c638b78ace41b2 (CI: 32771799961)

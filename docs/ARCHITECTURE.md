@@ -1,35 +1,39 @@
 # DealHunter Architecture
 
-## Provider Integration
+## High-Level Architecture
 ```mermaid
 graph TD
-    A[Rappi Android App] -->|Primary Authority| B(A5 Context Endpoint)
-    A -->|Static Discovery| C(B1/D1/H2 Surfaces)
-    B --> D[DealHunter Normalization]
-    C -.->|Deferred| D
-    E[Rappi Web Platform] -->|Secondary Oracle| D
-    D --> F[(SQLite rappi-deals.db)]
-    F --> G[Faceted Query Layer]
-    G --> H[Web Application Phase 5]
+    A[Providers: Rappi, Uber Eats] -->|Discovery & Sync| B(Provider-aware Persistence)
+    B --> C[(SQLite v16)]
+    C --> D[Query / Eligibility / Score]
+    D --> E[Web / Alerts / Watchlist]
 ```
 
-## Operational Pipeline
+Current RC boundary:
+
+- Rappi and Uber Eats acquisition are production-capable.
+- Raw identity is `(provider, store_id, product_id)`.
+- Provider selection and Rappi Pro/Uber One eligibility are production configuration.
+- Schema v16 canonical tables are implemented infrastructure.
+- Canonical matching remains shadow/experimental and cannot write memberships automatically.
+
+## Identity Side Pipeline (Shadow / Experimental)
 ```mermaid
-graph LR
-    A((Cron Scheduler)) --> B[Crawler]
-    B --> C[Observations API]
-    C --> D[Transition Events]
-    D --> E{Canary Watch Rules}
-    E -->|High Signal| F[Termux Delivery]
-    E -->|Low Signal| G[Suppressed]
+graph TD
+    A[Raw Products] --> B[Evidence Extraction]
+    B --> C[Normalization]
+    C --> D[Bounded Candidate Generation]
+    D --> E[Identity Decisions / Rules]
+    E --> F[Canonical Infrastructure]
+    F -.- G([Production Activation Gated])
 ```
 
 ## Schema Evolution
 ```mermaid
 graph LR
-    V9(v9 Legacy) --> V10(v10 Faceted Setup)
-    V10 --> V11(v11 M:N Taxonomy)
+    V9(v9 Legacy) --> V11(v11 Taxonomy)
     V11 --> V12(v12 Commercial Model)
-    V12 --> V13(v13 Index Optimizations)
-    V13 --> V14(v14 Alert Events)
+    V12 --> V14(v14 Alert Events)
+    V14 --> V15(v15 Membership)
+    V15 --> V16(v16 Canonical Identity)
 ```

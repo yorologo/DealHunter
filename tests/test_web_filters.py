@@ -5,71 +5,30 @@ import pytest
 from dealhunter.web.queries import get_catalog, get_available_categories
 import sqlite3
 
-@pytest.fixture
-def test_db(tmp_path):
-    db_path = tmp_path / "test.db"
-    conn = sqlite3.connect(db_path)
-    c = conn.cursor()
-    c.execute('''CREATE TABLE stores (
-        store_id TEXT PRIMARY KEY,
-        name TEXT,
-        brand TEXT,
-        type TEXT
-    )''')
-    c.execute('''CREATE TABLE products (
-        product_id TEXT,
-        store_id TEXT,
-        name TEXT,
-        brand TEXT,
-        category TEXT,
-        quantity REAL,
-        unit TEXT,
-        normalized_quantity REAL,
-        normalized_unit TEXT,
-        pack_count INTEGER,
-        PRIMARY KEY (store_id, product_id)
-    )''')
-    c.execute('''CREATE TABLE observations (
-        product_id TEXT,
-        store_id TEXT,
-        price REAL,
-        original_price REAL,
-        timestamp TEXT,
-        discount_effective REAL,
-        promotion_type TEXT,
-        promotion_label TEXT,
-        availability INTEGER,
-        has_toppings INTEGER
-    )''')
-    conn.commit()
+from tests.helpers.db import insert_store, insert_product, insert_observation
+import sqlite3
 
+@pytest.fixture
+def test_db(current_schema_db_path):
+    conn = sqlite3.connect(current_schema_db_path)
     
     # Store A: Café, Té
-    c.execute("INSERT INTO stores (store_id, name, brand, type) VALUES ('A', 'Store A', 'Brand A', 'restaurants')")
-    c.execute("INSERT INTO products VALUES ('p1', 'A', 'Cafe 1', 'B', 'Café', 1, 'u', 1, 'u', 1)")
-    c.execute("INSERT INTO products VALUES ('p2', 'A', 'Te 1', 'B', 'Té', 1, 'u', 1, 'u', 1)")
-    c.execute("INSERT INTO observations VALUES ('p1', 'A', 50, 100, '2023-01-01', 50, '', '', 1, 0)")
-    c.execute("INSERT INTO observations VALUES ('p2', 'A', 50, 100, '2023-01-01', 50, '', '', 1, 0)")
+    insert_store(conn, 'A', name='Store A', brand='Brand A', type='restaurants')
+    insert_product(conn, 'p1', 'A', name='Cafe 1', brand='B', category='Café', quantity=1.0, unit='u', normalized_quantity=1.0, normalized_unit='u', pack_count=1)
+    insert_product(conn, 'p2', 'A', name='Te 1', brand='B', category='Té', quantity=1.0, unit='u', normalized_quantity=1.0, normalized_unit='u', pack_count=1)
+    insert_observation(conn, run_id='run1', store_id='A', product_id='p1', price=50.0, original_price=100.0, timestamp='2023-01-01T12:00:00Z', discount_effective=50.0)
+    insert_observation(conn, run_id='run1', store_id='A', product_id='p2', price=50.0, original_price=100.0, timestamp='2023-01-01T12:00:00Z', discount_effective=50.0)
     
     # Store B: Hamburguesas, Postres
-    c.execute("INSERT INTO stores (store_id, name, brand, type) VALUES ('B', 'Store B', 'Brand B', 'restaurants')")
-    c.execute("INSERT INTO products VALUES ('p3', 'B', 'Burger 1', 'B', 'Hamburguesas', 1, 'u', 1, 'u', 1)")
-    c.execute("INSERT INTO products VALUES ('p4', 'B', 'Postre 1', 'B', 'Postres', 1, 'u', 1, 'u', 1)")
-    c.execute("INSERT INTO observations VALUES ('p3', 'B', 50, 100, '2023-01-01', 50, '', '', 1, 0)")
-    c.execute("INSERT INTO observations VALUES ('p4', 'B', 50, 100, '2023-01-01', 50, '', '', 1, 0)")
+    insert_store(conn, 'B', name='Store B', brand='Brand B', type='restaurants')
+    insert_product(conn, 'p3', 'B', name='Burger 1', brand='B', category='Hamburguesas', quantity=1.0, unit='u', normalized_quantity=1.0, normalized_unit='u', pack_count=1)
+    insert_product(conn, 'p4', 'B', name='Postre 1', brand='B', category='Postres', quantity=1.0, unit='u', normalized_quantity=1.0, normalized_unit='u', pack_count=1)
+    insert_observation(conn, run_id='run1', store_id='B', product_id='p3', price=50.0, original_price=100.0, timestamp='2023-01-01T12:00:00Z', discount_effective=50.0)
+    insert_observation(conn, run_id='run1', store_id='B', product_id='p4', price=50.0, original_price=100.0, timestamp='2023-01-01T12:00:00Z', discount_effective=50.0)
     
     conn.commit()
-
-    
-    try:
-        from dealhunter.db import migrate
-        if 'db_path' in locals(): migrate(conn, db_path)
-        elif 'test_db' in locals() and isinstance(test_db, str): migrate(conn, test_db)
-    except Exception as e:
-        print('MIGRATE ERROR:', e)
-    
     conn.close()
-    return str(db_path)
+    return current_schema_db_path
 
 def test_zero_stores_means_all(test_db):
     filters = {"store": []}

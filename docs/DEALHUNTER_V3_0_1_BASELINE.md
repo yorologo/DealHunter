@@ -1,5 +1,9 @@
 # DEALHUNTER_V3_0_1_BASELINE
 
+> [!IMPORTANT]
+> Historical record of the v3.0.1 public baseline. It is intentionally retained
+> and does not describe the current v3.2.0/schema v16 RC.
+
 ## METADATA
 - **VERSION**: v3.0.1
 - **COMMIT**: 4f270876bf41edd26ec1f96c830350e91b49baa3

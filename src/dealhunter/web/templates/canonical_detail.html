@@ -1,0 +1,93 @@
+{% extends 'base.html' %}
+{% block content %}
+<!-- Phase 5I MOCKUP: Canonical Product Detail -->
+<nav aria-label="breadcrumb" class="mb-3">
+  <ol class="breadcrumb small">
+    <li class="breadcrumb-item"><a href="/" class="text-decoration-none">Inicio</a></li>
+    <li class="breadcrumb-item"><a href="/canonical" class="text-decoration-none">Productos Globales</a></li>
+    <li class="breadcrumb-item active text-truncate d-inline-block" style="max-width: 200px;" aria-current="page">{{ p.name }}</li>
+  </ol>
+</nav>
+
+<div class="card shadow-sm border-0 mb-4">
+    <div class="card-body p-4">
+        <div class="row">
+            <div class="col-md-8">
+                <div class="d-flex align-items-center gap-2 mb-2">
+                    <span class="badge bg-dark text-white"><i class="bi bi-diagram-3"></i> Canonical</span>
+                    {% if p.brand %}<span class="badge text-bg-light border">{{ p.brand }}</span>{% endif %}
+                    {% if p.category %}<span class="badge text-bg-light border">{{ p.category }}</span>{% endif %}
+                    {% if p.quantity and p.unit %}
+                        <span class="badge text-bg-light border">{{ p.quantity }} {{ p.unit }}</span>
+                    {% endif %}
+                </div>
+                <h2 class="mb-2">{{ p.name }}</h2>
+                <div class="text-muted small">
+                    Canonical ID: {{ p.canonical_id }} <br>
+                    Global Unit Price: {% if p.unit_price %}${{ "%.2f"|format(p.unit_price) }} / {{ p.unit }}{% else %}N/A{% endif %}
+                </div>
+            </div>
+            <div class="col-md-4 text-md-end mt-3 mt-md-0">
+                <h5 class="text-muted mb-1">Mejor Precio Global</h5>
+                <h1 class="display-6 fw-bold mb-0 text-success">
+                    {% if best_offer %}
+                        ${{ "%.2f"|format(best_offer.eligible_price) }}
+                    {% else %}
+                        N/A
+                    {% endif %}
+                </h1>
+                {% if best_offer %}
+                    <span class="badge text-bg-light border mt-1">en {{ best_offer.provider }} ({{ best_offer.store_id }})</span>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card shadow-sm border-0 mb-4">
+    <div class="card-header bg-white border-bottom-0 py-3">
+        <h5 class="mb-0">Ofertas Multi-Provider <span class="badge bg-secondary ms-2">{{ ranking|length }}</span></h5>
+    </div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0 border-top">
+                <thead class="table-light">
+                    <tr>
+                        <th class="ps-4">Provider</th>
+                        <th>Store</th>
+                        <th>Eligible Price</th>
+                        <th>Unit Price</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for offer in ranking %}
+                    <tr>
+                        <td class="ps-4">
+                            {% if offer.provider == 'rappi' %}
+                                <span class="badge text-bg-danger"><i class="bi bi-bag"></i> Rappi</span>
+                            {% elif offer.provider == 'uber_eats' %}
+                                <span class="badge text-bg-success"><i class="bi bi-bag"></i> Uber Eats</span>
+                            {% else %}
+                                <span class="badge text-bg-secondary">{{ offer.provider }}</span>
+                            {% endif %}
+                        </td>
+                        <td>{{ offer.store_id }}</td>
+                        <td class="fw-bold">${{ "%.2f"|format(offer.eligible_price) }}</td>
+                        <td class="text-muted">${{ "%.2f"|format(offer.unit_price) }} / {{ offer.unit }}</td>
+                        <td>
+                            <a href="/products/{{ offer.provider }}/{{ offer.store_id }}/{{ offer.product_id }}" class="btn btn-sm btn-outline-primary">Ver Producto</a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                    {% if not ranking %}
+                    <tr>
+                        <td colspan="5" class="text-center py-4 text-muted">No se encontraron ofertas en este momento.</td>
+                    </tr>
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

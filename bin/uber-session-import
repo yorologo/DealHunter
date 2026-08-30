@@ -1,0 +1,479 @@
+#!/usr/bin/env python3
+"""
+Uber Eats Session Bridge — optional secure setup/session renewal.
+
+Usage:
+    bin/uber-session-import [--discovery] [--port PORT]
+
+Modes:
+    (default)   Capture auth context from browser DevTools snippet
+    --discovery Print discovery-only snippet (no secrets captured)
+"""
+
+import sys
+import os
+import json
+import time
+import secrets
+import http.server
+import threading
+import argparse
+from datetime import datetime, timezone
+
+# --- Constants ---
+DEFAULT_PORT = 5050
+UBER_SESSION_DIR = os.path.expanduser("~/.local/share/DealHunter/secrets")
+UBER_SESSION_FILE = os.path.join(UBER_SESSION_DIR, "uber-session.enc")
+MAX_PAYLOAD_BYTES = 512_000  # 512 KB
+
+# --- Redaction ---
+REDACT_KEYS = frozenset([
+    'authorization', 'cookie', 'x-csrf-token', 'set-cookie',
+    'bearer', 'token', 'session', 'secret',
+])
+
+def is_secret_key(key: str) -> bool:
+    lower = key.lower()
+    return any(s in lower for s in REDACT_KEYS)
+
+def redact_value(key: str, value) -> str:
+    if is_secret_key(key):
+        if isinstance(value, str):
+            return f"<REDACTED len={len(value)}>"
+        return "<REDACTED>"
+    return value
+
+# --- Session Storage (isolated from Rappi SecretStore) ---
+class UberSessionStore:
+    """Minimal encrypted store for Uber session context, separate from Rappi."""
+
+    def __init__(self):
+        os.makedirs(UBER_SESSION_DIR, mode=0o700, exist_ok=True)
+        self._salt_file = os.path.join(UBER_SESSION_DIR, ".uber_salt")
+
+    def _get_entropy(self) -> bytes:
+        import platform, getpass
+        parts = [
+            getpass.getuser(),
+            platform.node(),
+            'uber-eats-session-v1-pepper',
+        ]
+        mid_paths = ['/etc/machine-id', '/var/lib/dbus/machine-id']
+        for p in mid_paths:
+            try:
+                if os.path.exists(p):
+                    parts.append(open(p).read().strip())
+                    break
+            except Exception:
+                pass
+        return "|".join(parts).encode()
+
+    def _get_salt(self) -> bytes:
+        if os.path.exists(self._salt_file):
+            with open(self._salt_file, 'rb') as f:
+                return f.read()
+        salt = os.urandom(16)
+        with open(self._salt_file, 'wb') as f:
+            f.write(salt)
+        os.chmod(self._salt_file, 0o600)
+        return salt
+
+    def _derive_key(self) -> bytes:
+        import hashlib, base64
+        salt = self._get_salt()
+        dk = hashlib.pbkdf2_hmac('sha256', self._get_entropy(), salt, 100_000)
+        return base64.urlsafe_b64encode(dk)
+
+    def store(self, auth_context: dict) -> bool:
+        try:
+            key = self._derive_key()
+            data = {
+                'stored_at': datetime.now(timezone.utc).isoformat(),
+                'auth_context': auth_context,
+            }
+            raw = json.dumps(data).encode()
+            try:
+                from cryptography.fernet import Fernet
+                encrypted = Fernet(key).encrypt(raw)
+            except ImportError:
+                import base64
+                encrypted = base64.b64encode(raw)
+
+            with open(UBER_SESSION_FILE, 'wb') as f:
+                f.write(encrypted)
+            os.chmod(UBER_SESSION_FILE, 0o600)
+            return True
+        except Exception as e:
+            print(f"[!] Store failed: {e}", file=sys.stderr)
+            return False
+
+    def load(self) -> dict:
+        if not os.path.exists(UBER_SESSION_FILE):
+            return None
+        try:
+            key = self._derive_key()
+            with open(UBER_SESSION_FILE, 'rb') as f:
+                encrypted = f.read()
+            try:
+                from cryptography.fernet import Fernet
+                raw = Fernet(key).decrypt(encrypted)
+            except ImportError:
+                import base64
+                raw = base64.b64decode(encrypted)
+            return json.loads(raw)
+        except Exception:
+            return None
+
+    def exists(self) -> bool:
+        return os.path.exists(UBER_SESSION_FILE)
+
+    def delete(self) -> bool:
+        for f in [UBER_SESSION_FILE, self._salt_file]:
+            if os.path.exists(f):
+                os.remove(f)
+        return True
+
+    def status(self) -> dict:
+        if not self.exists():
+            return {'configured': False}
+        data = self.load()
+        if not data:
+            return {'configured': True, 'valid': False, 'error': 'CORRUPTED'}
+        ctx = data.get('auth_context', {})
+        return {
+            'configured': True,
+            'valid': True,
+            'stored_at': data.get('stored_at'),
+            'authorization_present': bool(ctx.get('authorization')),
+            'cookie_present': bool(ctx.get('cookies')),
+            'csrf_present': bool(ctx.get('csrf_token')),
+            'header_count': len(ctx.get('headers', {})),
+        }
+
+
+# --- Discovery Snippet ---
+DISCOVERY_SNIPPET = r"""
+(function(){
+  if (window.__ue_dh_disc) { console.log('[DH] Discovery already active.'); return; }
+  window.__ue_dh_disc = true;
+  const log = [];
+  const seen = new Set();
+  function isUber(url) {
+    return /uber(eats)?\.com/i.test(url) || /\/_p\/api\//i.test(url);
+  }
+  function record(method, url, headerNames, bodyKeys, hasAuth, hasCookie, csrfHeader) {
+    const key = method + '|' + url.split('?')[0];
+    if (seen.has(key)) return;
+    seen.add(key);
+    log.push({method, url: url.split('?')[0], headerNames, bodyKeys, hasAuth, hasCookie, csrfHeader, ts: Date.now()});
+    console.log('[DH]', method, url.split('?')[0], hasAuth ? 'AUTH' : '', hasCookie ? 'COOKIE' : '', csrfHeader || '');
+  }
+  function getHeaderInfo(headers) {
+    let names = [], hasAuth = false, hasCookie = false, csrf = null;
+    if (headers instanceof Headers) {
+      headers.forEach((v, k) => { names.push(k); if (/^authorization$/i.test(k)) hasAuth = true; if (/^cookie$/i.test(k)) hasCookie = true; if (/csrf|xsrf/i.test(k)) csrf = k; });
+    } else if (typeof headers === 'object' && headers) {
+      const entries = Array.isArray(headers) ? headers : Object.entries(headers);
+      entries.forEach(([k, v]) => { names.push(k); if (/^authorization$/i.test(k)) hasAuth = true; if (/^cookie$/i.test(k)) hasCookie = true; if (/csrf|xsrf/i.test(k)) csrf = k; });
+    }
+    return {names, hasAuth, hasCookie, csrf};
+  }
+  const origFetch = window.fetch;
+  window.fetch = async function(...args) {
+    try {
+      const url = typeof args[0] === 'string' ? args[0] : args[0]?.url || '';
+      const opts = args[1] || {};
+      if (isUber(url)) {
+        const hi = getHeaderInfo(opts.headers);
+        let bodyKeys = [];
+        if (opts.body) { try { const b = JSON.parse(opts.body); bodyKeys = Object.keys(b); } catch(e) {} }
+        record(opts.method || 'GET', url, hi.names, bodyKeys, hi.hasAuth, hi.hasCookie, hi.csrf);
+      }
+    } catch(e) {}
+    return origFetch.apply(this, args);
+  };
+  const origOpen = XMLHttpRequest.prototype.open;
+  const origSend = XMLHttpRequest.prototype.send;
+  const origSetH = XMLHttpRequest.prototype.setRequestHeader;
+  XMLHttpRequest.prototype.open = function(m, u) { this.__dh_method = m; this.__dh_url = u; this.__dh_headers = []; return origOpen.apply(this, arguments); };
+  XMLHttpRequest.prototype.setRequestHeader = function(h, v) { if (this.__dh_headers) this.__dh_headers.push(h); return origSetH.apply(this, arguments); };
+  XMLHttpRequest.prototype.send = function(body) {
+    try {
+      if (this.__dh_url && isUber(this.__dh_url)) {
+        const hasAuth = this.__dh_headers.some(h => /^authorization$/i.test(h));
+        const hasCookie = this.__dh_headers.some(h => /^cookie$/i.test(h));
+        const csrf = this.__dh_headers.find(h => /csrf|xsrf/i.test(h)) || null;
+        let bodyKeys = [];
+        if (body) { try { bodyKeys = Object.keys(JSON.parse(body)); } catch(e) {} }
+        record(this.__dh_method, this.__dh_url, this.__dh_headers, bodyKeys, hasAuth, hasCookie, csrf);
+      }
+    } catch(e) {}
+    return origSend.apply(this, arguments);
+  };
+  window.__ue_dh_getLog = () => JSON.parse(JSON.stringify(log));
+  console.log('[DH] Uber Eats Discovery Interceptor active. Navigate the site, then run: copy(JSON.stringify(__ue_dh_getLog(), null, 2))');
+})();
+""".strip()
+
+
+def build_capture_snippet(nonce: str, port: int) -> str:
+    """Build the targeted capture snippet that sends auth context to our listener."""
+    return f"""
+(function(){{
+  if (window.__ue_dh_cap) {{ console.log('[DH] Capture already active.'); return; }}
+  window.__ue_dh_cap = true;
+  const NONCE = '{nonce}';
+  const ENDPOINT = 'http://127.0.0.1:{port}/commit';
+  let sent = false;
+
+  function sendContext(authCtx) {{
+    if (sent) return;
+    sent = true;
+    const payload = JSON.stringify({{nonce: NONCE, version: 1, auth_context: authCtx}});
+    const b64 = btoa(encodeURIComponent(payload));
+    window.location.href = 'http://127.0.0.1:{port}/import#' + b64;
+  }}
+
+  function extractHeaders(headers) {{
+    const result = {{}};
+    if (headers instanceof Headers) {{
+      headers.forEach((v, k) => {{ result[k.toLowerCase()] = v; }});
+    }} else if (typeof headers === 'object' && headers) {{
+      const entries = Array.isArray(headers) ? headers : Object.entries(headers);
+      entries.forEach(([k, v]) => {{ result[k.toLowerCase()] = v; }});
+    }}
+    return result;
+  }}
+
+  const origFetch = window.fetch;
+  window.fetch = async function(...args) {{
+    try {{
+      const url = typeof args[0] === 'string' ? args[0] : args[0]?.url || '';
+      const opts = args[1] || {{}};
+      if (/\\/_p\\/api\\//i.test(url) && !sent) {{
+        const hdrs = extractHeaders(opts.headers);
+        const ctx = {{
+          captured_from: url.split('?')[0],
+          headers: hdrs,
+        }};
+        if (hdrs['authorization']) ctx.authorization = hdrs['authorization'];
+        if (hdrs['x-csrf-token']) ctx.csrf_token = hdrs['x-csrf-token'];
+        // Capture cookies visible to JS
+        if (document.cookie) ctx.cookies = document.cookie;
+        sendContext(ctx);
+      }}
+    }} catch(e) {{}}
+    return origFetch.apply(this, args);
+  }};
+
+  const origSetH = XMLHttpRequest.prototype.setRequestHeader;
+  const origOpen = XMLHttpRequest.prototype.open;
+  const origSend = XMLHttpRequest.prototype.send;
+  XMLHttpRequest.prototype.open = function(m, u) {{ this.__dh_url = u; this.__dh_hdrs = {{}}; return origOpen.apply(this, arguments); }};
+  XMLHttpRequest.prototype.setRequestHeader = function(h, v) {{ if (this.__dh_hdrs) this.__dh_hdrs[h.toLowerCase()] = v; return origSetH.apply(this, arguments); }};
+  XMLHttpRequest.prototype.send = function(body) {{
+    try {{
+      if (this.__dh_url && /\\/_p\\/api\\//i.test(this.__dh_url) && !sent) {{
+        const ctx = {{
+          captured_from: this.__dh_url.split('?')[0],
+          headers: this.__dh_hdrs,
+        }};
+        if (this.__dh_hdrs['authorization']) ctx.authorization = this.__dh_hdrs['authorization'];
+        if (this.__dh_hdrs['x-csrf-token']) ctx.csrf_token = this.__dh_hdrs['x-csrf-token'];
+        if (document.cookie) ctx.cookies = document.cookie;
+        sendContext(ctx);
+      }}
+    }} catch(e) {{}}
+    return origSend.apply(this, arguments);
+  }};
+
+  console.log('[DH] Uber Eats Capture Interceptor active.');
+  console.log('[DH] Now navigate to a store page or perform a search to trigger an API call.');
+}})();
+""".strip()
+
+
+# --- One-shot listener ---
+def run_listener(port: int, nonce: str, store: UberSessionStore, timeout: int = 300):
+    success_event = threading.Event()
+    result = {'ok': False, 'ctx': None}
+
+    class Handler(http.server.BaseHTTPRequestHandler):
+        def do_OPTIONS(self):
+            self.send_response(200)
+            self.send_header('Access-Control-Allow-Origin', '*')
+            self.send_header('Access-Control-Allow-Methods', 'POST, OPTIONS')
+            self.send_header('Access-Control-Allow-Headers', 'Content-Type')
+            self.end_headers()
+
+        def do_GET(self):
+            if self.path == '/import':
+                self.send_response(200)
+                self.send_header('Content-Type', 'text/html')
+                self.end_headers()
+                html = """<!DOCTYPE html>
+                <html><head><title>Importing...</title></head><body>
+                <h2>✅ DealHunter: Processing Session...</h2>
+                <script>
+                if (window.location.hash.length > 1) {
+                    try {
+                        const b64 = window.location.hash.substring(1);
+                        const payload = decodeURIComponent(atob(b64));
+                        fetch('/commit', {
+                            method: 'POST',
+                            headers: {'Content-Type': 'application/json'},
+                            body: payload
+                        }).then(r => r.json()).then(d => {
+                            if (d.status === 'ok') {
+                                document.body.innerHTML = '<h2 style="color:green">✅ Session Captured and Stored Securely!</h2><p>You can close this tab and return to Termux.</p>';
+                                window.history.replaceState(null, '', '/import');
+                            } else {
+                                document.body.innerHTML = '<h2 style="color:red">❌ Failed: ' + d.error + '</h2>';
+                            }
+                        }).catch(e => {
+                            document.body.innerHTML = '<h2 style="color:red">❌ Error: ' + e + '</h2>';
+                        });
+                    } catch(e) {
+                        document.body.innerHTML = '<h2 style="color:red">❌ Decode error: ' + e + '</h2>';
+                    }
+                }
+                </script>
+                </body></html>"""
+                self.wfile.write(html.encode('utf-8'))
+            else:
+                self.send_response(404)
+                self.end_headers()
+
+        def do_POST(self):
+            if self.path != '/commit':
+                self.send_response(404)
+                self.end_headers()
+                return
+
+            length = int(self.headers.get('Content-Length', 0))
+            if length > MAX_PAYLOAD_BYTES:
+                self._reject("Payload too large")
+                return
+
+            body = self.rfile.read(length)
+            try:
+                data = json.loads(body.decode('utf-8'))
+            except Exception:
+                self._reject("Invalid JSON")
+                return
+
+            if data.get('nonce') != nonce:
+                self._reject("Invalid nonce")
+                return
+
+            ctx = data.get('auth_context', {})
+            if not ctx:
+                self._reject("Empty auth context")
+                return
+
+            # Store securely
+            if store.store(ctx):
+                result['ok'] = True
+                result['ctx'] = ctx
+                self.send_response(200)
+                self.send_header('Content-Type', 'application/json')
+                self.send_header('Access-Control-Allow-Origin', '*')
+                self.end_headers()
+                self.wfile.write(b'{"status": "ok"}')
+                success_event.set()
+                threading.Thread(target=self.server.shutdown).start()
+            else:
+                self._reject("Storage failed")
+
+        def _reject(self, msg):
+            self.send_response(400)
+            self.send_header('Content-Type', 'application/json')
+            self.send_header('Access-Control-Allow-Origin', '*')
+            self.end_headers()
+            self.wfile.write(json.dumps({"status": "error", "error": msg}).encode())
+            print(f"[!] Rejected: {msg}", file=sys.stderr)
+
+        def log_message(self, fmt, *args):
+            pass  # Suppress HTTP logs
+
+    server = http.server.HTTPServer(('127.0.0.1', port), Handler)
+    t = threading.Thread(target=server.serve_forever)
+    t.daemon = True
+    t.start()
+
+    print(f"[*] Listening on 127.0.0.1:{port} (timeout: {timeout}s)")
+    ok = success_event.wait(timeout)
+    server.shutdown()
+    server.server_close()
+    return result if ok else None
+
+
+def print_sanitized_status(ctx: dict):
+    """Print captured context metadata without secrets."""
+    print("\n--- Captured Auth Context (Sanitized) ---")
+    print(f"  AUTHORIZATION_PRESENT: {bool(ctx.get('authorization'))}")
+    print(f"  COOKIE_PRESENT:        {bool(ctx.get('cookies'))}")
+    print(f"  CSRF_PRESENT:          {bool(ctx.get('csrf_token'))}")
+    hdrs = ctx.get('headers', {})
+    safe_names = [k for k in hdrs.keys()]
+    print(f"  HEADER_NAMES:          {', '.join(safe_names)}")
+    print(f"  CAPTURED_FROM:         {ctx.get('captured_from', 'unknown')}")
+    if ctx.get('cookies'):
+        cookie_names = [c.split('=')[0].strip() for c in ctx['cookies'].split(';') if '=' in c]
+        print(f"  COOKIE_NAMES:          {', '.join(cookie_names)}")
+    print("---")
+
+
+def main():
+    parser = argparse.ArgumentParser(
+        description="Optional Uber Eats secure setup/session renewal bridge"
+    )
+    parser.add_argument('--discovery', action='store_true', help='Print discovery-only snippet')
+    parser.add_argument('--port', type=int, default=DEFAULT_PORT, help='Listener port')
+    parser.add_argument('--timeout', type=int, default=300, help='Listener timeout in seconds')
+    args = parser.parse_args()
+
+    if args.discovery:
+        print("=" * 60)
+        print("UBER EATS DISCOVERY SNIPPET")
+        print("Paste this in DevTools Console on www.ubereats.com")
+        print("Navigate the site, then run:")
+        print("  copy(JSON.stringify(__ue_dh_getLog(), null, 2))")
+        print("=" * 60)
+        print(DISCOVERY_SNIPPET)
+        return
+
+    # --- Capture mode ---
+    nonce = secrets.token_hex(16)
+    store = UberSessionStore()
+
+    print("=" * 60)
+    print("UBER EATS SESSION BRIDGE — OPTIONAL SETUP / SESSION RENEWAL")
+    print("=" * 60)
+    print()
+    print("STEP 1 — On your Windows PC, open PowerShell and run:")
+    print()
+    print(f'  ssh -N -L {args.port}:127.0.0.1:{args.port} -p 8022 -i "$env:USERPROFILE\\.ssh\\termux_ed25519" <TERMUX_USER>@<PHONE_IP>')
+    print()
+    print("STEP 2 — Open https://www.ubereats.com/mx in your browser and sign in.")
+    print()
+    print("STEP 3 — Open DevTools (F12) → Console, paste this snippet:")
+    print()
+    snippet = build_capture_snippet(nonce, args.port)
+    print(snippet)
+    print()
+    print("STEP 4 — Navigate to a store page or search for something.")
+    print("         The snippet will auto-capture on the first API call.")
+    print()
+
+    result = run_listener(args.port, nonce, store, args.timeout)
+    if result and result['ok']:
+        print("\n[+] Session captured and stored securely!")
+        print_sanitized_status(result['ctx'])
+    else:
+        print("\n[!] Capture timed out or failed.")
+        sys.exit(1)
+
+
+if __name__ == '__main__':
+    main()

@@ -1,40 +1,33 @@
 import pytest
 import sqlite3
 from dealhunter.query_layer import build_faceted_query, get_facet_counts
+from tests.helpers.db import insert_store, insert_store_facet, insert_product, insert_observation, insert_membership
 
 @pytest.fixture
-def db_conn():
-    conn = sqlite3.connect(':memory:')
-    c = conn.cursor()
-    # Schema
-    c.execute("""CREATE TABLE observations (id INTEGER PRIMARY KEY, run_id TEXT, store_id TEXT, product_id TEXT, price REAL, original_price REAL, stock INTEGER, timestamp DATETIME, discount_price REAL, discount_promotion REAL, discount_effective REAL, discount_source TEXT, promotion_type TEXT, promotion_label TEXT, query_term TEXT, availability TEXT, has_pro_offer INTEGER DEFAULT NULL, pro_price REAL, pro_discount_effective REAL, limit_info TEXT)""")
-    c.execute("""CREATE TABLE products (product_id TEXT, store_id TEXT, name TEXT, brand TEXT, image TEXT, normalized_name TEXT, quantity REAL, unit TEXT, normalized_quantity REAL, normalized_unit TEXT, fingerprint TEXT, pack_count INTEGER, category TEXT, has_toppings INTEGER DEFAULT 0, category_source TEXT)""")
-    c.execute("""CREATE TABLE stores (store_id TEXT, name TEXT, type TEXT, vertical TEXT, brand TEXT)""")
-    c.execute("""CREATE TABLE store_facets (store_id TEXT, facet_type TEXT, raw_value TEXT, source TEXT, last_seen DATETIME)""")
-    c.execute("""CREATE TABLE product_memberships (store_id TEXT, product_id TEXT, raw_type TEXT, raw_name TEXT, raw_id TEXT, path TEXT, source TEXT, last_seen DATETIME, semantic_type TEXT, semantic_reason TEXT)""")
+def db_conn(current_schema_db):
+    conn = current_schema_db
     
-    # Data
     # Store 1 (vertical: Supermercado, facet: Express)
-    c.execute("INSERT INTO stores (store_id, name, type, vertical) VALUES ('s1', 'Store 1', 'market', 'Supermercado')")
-    c.execute("INSERT INTO store_facets (store_id, facet_type, raw_value) VALUES ('s1', 'speed', 'Express')")
+    insert_store(conn, 's1', name='Store 1', type='market', vertical='Supermercado')
+    insert_store_facet(conn, 's1', 'speed', 'Express')
     
     # Store 2 (vertical: Restaurantes, type: restaurants)
-    c.execute("INSERT INTO stores (store_id, name, type, vertical) VALUES ('s2', 'Store 2', 'restaurants', 'Restaurantes')")
+    insert_store(conn, 's2', name='Store 2', type='restaurants', vertical='Restaurantes')
     
     # Product 1 (s1): Legacy category 'A', no memberships. Public deal 50%, no pro.
-    c.execute("INSERT INTO products (product_id, store_id, name, category) VALUES ('p1', 's1', 'Prod 1', 'Cat A')")
-    c.execute("INSERT INTO observations (product_id, store_id, timestamp, price, original_price, discount_effective, availability, has_pro_offer, pro_price, pro_discount_effective) VALUES ('p1', 's1', '2023-01-01', 50, 100, 50, 'AVAILABLE', 0, NULL, NULL)")
+    insert_product(conn, 'p1', 's1', name='Prod 1', category='Cat A')
+    insert_observation(conn, run_id='test', store_id='s1', product_id='p1', price=50, original_price=100, discount_effective=50, availability='AVAILABLE', has_pro_offer=0, timestamp='2023-01-01T00:00:00Z')
     
     # Product 2 (s1): Legacy category 'A', but trusted category 'B'. Pro deal 60%, public 10%.
-    c.execute("INSERT INTO products (product_id, store_id, name, category) VALUES ('p2', 's1', 'Prod 2', 'Cat A')")
-    c.execute("INSERT INTO observations (product_id, store_id, timestamp, price, original_price, discount_effective, availability, has_pro_offer, pro_price, pro_discount_effective) VALUES ('p2', 's1', '2023-01-01', 90, 100, 10, 'AVAILABLE', 1, 40, 60)")
-    c.execute("INSERT INTO product_memberships (product_id, store_id, semantic_type, raw_name) VALUES ('p2', 's1', 'CATEGORY', 'Cat B')")
+    insert_product(conn, 'p2', 's1', name='Prod 2', category='Cat A')
+    insert_observation(conn, run_id='test', store_id='s1', product_id='p2', price=90, original_price=100, discount_effective=10, availability='AVAILABLE', has_pro_offer=1, pro_price=40, pro_discount_effective=60, timestamp='2023-01-01T00:00:00Z')
+    insert_membership(conn, 's1', 'p2', raw_type='CATEGORY', raw_name='Cat B', semantic_type='CATEGORY')
     
     # Product 3 (s2): Trusted category 'C', Collection 'Col 1'. No deals.
-    c.execute("INSERT INTO products (product_id, store_id, name, category) VALUES ('p3', 's2', 'Prod 3', 'Cat A')")
-    c.execute("INSERT INTO observations (product_id, store_id, timestamp, price, original_price, discount_effective, availability, has_pro_offer, pro_price, pro_discount_effective) VALUES ('p3', 's2', '2023-01-01', 100, 100, 0, 'AVAILABLE', NULL, NULL, NULL)")
-    c.execute("INSERT INTO product_memberships (product_id, store_id, semantic_type, raw_name) VALUES ('p3', 's2', 'CATEGORY', 'Cat C')")
-    c.execute("INSERT INTO product_memberships (product_id, store_id, semantic_type, raw_name) VALUES ('p3', 's2', 'COLLECTION', 'Col 1')")
+    insert_product(conn, 'p3', 's2', name='Prod 3', category='Cat A')
+    insert_observation(conn, run_id='test', store_id='s2', product_id='p3', price=100, original_price=100, discount_effective=0, availability='AVAILABLE', timestamp='2023-01-01T00:00:00Z')
+    insert_membership(conn, 's2', 'p3', raw_type='CATEGORY', raw_name='Cat C', semantic_type='CATEGORY')
+    insert_membership(conn, 's2', 'p3', raw_type='COLLECTION', raw_name='Col 1', semantic_type='COLLECTION')
     
     conn.commit()
     return conn
@@ -112,9 +105,8 @@ def test_injection_safety(db_conn):
 
 
 def test_mn_duplicates(db_conn):
-    c = db_conn.cursor()
     # Add another facet to s1
-    c.execute("INSERT INTO store_facets (store_id, facet_type, raw_value) VALUES ('s1', 'food', 'Food')")
+    insert_store_facet(db_conn, 's1', 'food', 'Food')
     db_conn.commit()
     
     rows, total = execute_filters(db_conn, {"store_facets": ["Express", "Food"]})
@@ -134,10 +126,9 @@ def test_and_across_dimensions(db_conn):
 
 def test_pagination(db_conn):
     # Create 30 products in s2
-    c = db_conn.cursor()
     for i in range(10, 40):
-        c.execute(f"INSERT INTO products (product_id, store_id, name, category) VALUES ('p{i}', 's2', 'Prod {i}', 'Cat X')")
-        c.execute(f"INSERT INTO observations (product_id, store_id, timestamp, price, original_price, discount_effective, availability) VALUES ('p{i}', 's2', '2023-01-01', 100, 100, 0, 'AVAILABLE')")
+        insert_product(db_conn, f'p{i}', 's2', name=f'Prod {i}', category='Cat X')
+        insert_observation(db_conn, run_id='test', store_id='s2', product_id=f'p{i}', price=100, original_price=100, discount_effective=0, availability='AVAILABLE', timestamp='2023-01-01T00:00:00Z')
     db_conn.commit()
     
     rows, total = execute_filters(db_conn, {"categories": ["Cat X"], "limit": 10, "offset": 0})
@@ -163,3 +154,59 @@ def test_facet_counts_exclude_dim(db_conn):
     assert "Cat A" in counts["categories"]
     assert "Cat B" in counts["categories"]
 
+
+def test_provider_collision_isolated_in_queries_and_facets(db_conn):
+    insert_store(
+        db_conn, 's1', name='Uber Store 1', type='market',
+        vertical='Supermercado', provider='uber_eats',
+    )
+    insert_store_facet(
+        db_conn, 's1', 'speed', 'Uber Only Facet', provider='uber_eats',
+    )
+    insert_product(
+        db_conn, 'p1', 's1', name='Uber Product 1', category='Uber Legacy',
+        provider='uber_eats',
+    )
+    insert_observation(
+        db_conn, run_id='uber-test', store_id='s1', product_id='p1',
+        price=777, original_price=800, discount_effective=2.875,
+        availability='AVAILABLE', timestamp='2023-01-02T00:00:00Z',
+        provider='uber_eats',
+    )
+    insert_membership(
+        db_conn, 's1', 'p1', raw_type='CATEGORY', raw_name='Uber Only Category',
+        semantic_type='CATEGORY', provider='uber_eats',
+    )
+    db_conn.commit()
+
+    rows, total = execute_filters(db_conn, {})
+    assert total == 4
+    assert len(rows) == 4
+
+    rows, total = execute_filters(db_conn, {"providers": ["uber_eats"]})
+    assert total == 1
+    assert len(rows) == 1
+    assert rows[0][2] == 'Uber Product 1'
+    assert rows[0][3] == 'Uber Store 1'
+    assert rows[0][8] == 777
+    assert rows[0][23] == 'uber_eats'
+
+    rows, total = execute_filters(db_conn, {"categories": ["Uber Only Category"]})
+    assert total == 1
+    assert rows[0][23] == 'uber_eats'
+
+    rows, total = execute_filters(db_conn, {"store_facets": ["Uber Only Facet"]})
+    assert total == 1
+    assert rows[0][23] == 'uber_eats'
+
+    rows, total = execute_filters(
+        db_conn, {"store_identities": [("uber_eats", "s1")]}
+    )
+    assert total == 1
+    assert rows[0][23] == 'uber_eats'
+
+    rappi_facets = get_facet_counts(db_conn, {"providers": ["rappi"]})
+    assert "Uber Only Category" not in rappi_facets["categories"]
+    assert "Uber Only Facet" not in rappi_facets["store_facets"]
+    assert all(store["provider"] == "rappi" for store in rappi_facets["stores"])
+    assert all(store["filter_key"].startswith("rappi::") for store in rappi_facets["stores"])

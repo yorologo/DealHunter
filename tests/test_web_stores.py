@@ -38,14 +38,14 @@ def test_stores_index_shows_all_with_flag(app_and_db):
 def test_store_detail_empty_state(app_and_db):
     app, db_path = app_and_db
     with app.test_client() as c:
-        response = c.get('/stores/STORE1')
+        response = c.get('/stores/rappi/STORE1')
         html = response.get_data(as_text=True)
         assert 'Esta tienda aún no tiene datos suficientes' in html
 
 def test_store_detail_full_state(app_and_db):
     app, db_path = app_and_db
     with app.test_client() as c:
-        response = c.get('/stores/STORE2')
+        response = c.get('/stores/rappi/STORE2')
         html = response.get_data(as_text=True)
         assert 'Esta tienda aún no tiene datos suficientes' not in html
         assert 'catalog-grid' in html

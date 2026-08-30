@@ -26,7 +26,8 @@ flowchart TB
 
 ```mermaid
 flowchart LR
-    PROVIDER[Rappi APIs]
+    RAPPI[Rappi acquisition]
+    UBER[Uber Eats phone-only CDP acquisition]
     CRAWLER[Crawler]
     NORMALIZE[Normalization]
     DB[(SQLite)]
@@ -36,7 +37,8 @@ flowchart LR
     CLI[CLI]
     WEB[Web UI]
 
-    PROVIDER --> CRAWLER
+    RAPPI --> CRAWLER
+    UBER --> CRAWLER
     CRAWLER --> NORMALIZE
     NORMALIZE --> DB
 
@@ -54,6 +56,14 @@ flowchart LR
 ```
 
 Todos los servicios acceden a una misma base de datos `SQLite`, minimizando dependencias externas y permitiendo portabilidad.
+
+La identidad raw se conserva como `(provider, store_id, product_id)`. Schema
+v16 añade infraestructura canónica sin reemplazar esa clave. La selección de
+provider y la elegibilidad de Rappi Pro/Uber One se aplican después de identidad;
+el matcher canónico continúa en shadow y no escribe memberships automáticamente.
+
+Los runs normales de Uber usan Chromium headless nativo de Termux y CDP, sin PC
+ni servidor X. Carbonyl se usa sólo para setup o renovación del perfil.
 
 ### Crawler Architecture & Session Flow
 

@@ -88,7 +88,7 @@ def test_stores_page(client):
     assert b'Turbo Store' in rv.data
 
 def test_store_detail(client):
-    rv = client.get('/stores/s1')
+    rv = client.get('/stores/rappi/s1')
     assert rv.status_code == 200
     assert b'Soriana' in rv.data
     assert b'Prod 1' in rv.data

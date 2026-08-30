@@ -1,5 +1,10 @@
 # DEALHUNTER_PHASE5A0_V3_BASELINE_HARDENING
 
+> [!IMPORTANT]
+> Historical phase snapshot from the v3.0/schema v14 baseline. It is not a
+> statement of current RC metadata. Current truth is v3.2.0/schema v16; Uber
+> acquisition is production-capable and canonical matching remains shadow-only.
+
 ## BASELINE
 - version: v3.0.0
 - starting HEAD: cfa8393620dacd03ad52501ca4ded8e9c726ff73

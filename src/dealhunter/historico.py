@@ -10,12 +10,12 @@ def analyze_history(db_path, config, store=None, product=None):
     c = conn.cursor()
     
     query = '''
-        SELECT o.store_id, o.product_id, p.name, s.name, o.price, o.timestamp, o.discount_effective, o.original_price,
+        SELECT o.provider, o.store_id, o.product_id, p.name, s.name, o.price, o.timestamp, o.discount_effective, o.original_price,
                p.brand, p.normalized_name, p.quantity, p.unit, p.normalized_quantity, p.normalized_unit,
                p.fingerprint, p.pack_count, s.type as store_type, p.category
         FROM observations o
-        JOIN products p ON o.product_id = p.product_id AND o.store_id = p.store_id
-        JOIN stores s ON o.store_id = s.store_id
+        JOIN products p ON o.product_id = p.product_id AND o.store_id = p.store_id AND o.provider = p.provider
+        JOIN stores s ON o.store_id = s.store_id AND o.provider = s.provider
     '''
     
     params = []
@@ -27,6 +27,11 @@ def analyze_history(db_path, config, store=None, product=None):
         conditions.append("o.product_id = ?")
         params.append(product)
         
+
+    providers = config.get("providers", [])
+    if providers:
+        conditions.append("o.provider IN ({})".format(','.join(['?'] * len(providers))))
+        params.extend(providers)
     if conditions:
         query += " WHERE " + " AND ".join(conditions)
         
@@ -36,8 +41,8 @@ def analyze_history(db_path, config, store=None, product=None):
     
     grouped = {}
     for r in rows:
-        store_id, product_id, p_name, s_name, price, ts_str, d_eff, orig_price, brand, norm_name, qty, unit, n_qty, n_unit, fp, pack_count, store_type, category = r
-        key = (store_id, product_id)
+        provider, store_id, product_id, p_name, s_name, price, ts_str, d_eff, orig_price, brand, norm_name, qty, unit, n_qty, n_unit, fp, pack_count, store_type, category = r
+        key = (provider, store_id, product_id)
         if key not in grouped:
             grouped[key] = {
                 "product_name": p_name, "store_name": s_name, "store_type": store_type, "category": category,
@@ -73,8 +78,8 @@ def analyze_history(db_path, config, store=None, product=None):
         unit_price = format_unit_price(metrics["current_price"], data["normalized_quantity"], data.get("normalized_unit"))
         
         res = {
-            "store_id": key[0],
-            "product_id": key[1],
+            "provider": key[0], "store_id": key[1], "product_id": key[2],
+            
             "product_name": data["product_name"],
             "store_name": data["store_name"],
             "store_type": data.get("store_type"),
@@ -115,11 +120,11 @@ def compare_stores(db_path, query, exact_only=False, no_fuzzy=False):
     c = conn.cursor()
     # We fetch all observations for products matching the query to compute metrics
     c.execute('''
-        SELECT p.product_id, p.store_id, p.name, s.name,
+        SELECT p.provider, p.product_id, p.store_id, p.name, s.name,
                p.brand, p.normalized_name, p.quantity, p.unit, p.normalized_quantity, p.normalized_unit,
                p.fingerprint, p.pack_count
         FROM products p
-        JOIN stores s ON p.store_id = s.store_id
+        JOIN stores s ON p.provider = s.provider AND p.store_id = s.store_id
         WHERE p.name LIKE ? OR p.brand LIKE ?
     ''', (f"%{query}%", f"%{query}%"))
     
@@ -129,29 +134,34 @@ def compare_stores(db_path, query, exact_only=False, no_fuzzy=False):
         
     products_map = {}
     for r in rows:
-        key = (r[0], r[1]) # product_id, store_id
+        key = (r[0], r[1], r[2])
         products_map[key] = {
-            "product_id": r[0], "store_id": r[1], "product_name": r[2], "store_name": r[3],
-            "brand": r[4], "normalized_name": r[5], "quantity": r[6], "unit": r[7],
-            "normalized_quantity": r[8], "normalized_unit": r[9], "fingerprint": r[10],
-            "pack_count": r[11], "obs": []
+            "provider": r[0], "product_id": r[1], "store_id": r[2], "product_name": r[3], "store_name": r[4],
+            "brand": r[5], "normalized_name": r[6], "quantity": r[7], "unit": r[8],
+            "normalized_quantity": r[9], "normalized_unit": r[10], "fingerprint": r[11],
+            "pack_count": r[12], "obs": []
         }
         
     c.execute('''
-        SELECT product_id, store_id, price, timestamp, original_price
+        SELECT provider, product_id, store_id, price, timestamp, original_price
         FROM observations
         ORDER BY timestamp ASC, ROWID ASC
     ''')
     obs_rows = c.fetchall()
     
     for r in obs_rows:
-        pid, sid, price, ts_str, orig_price = r
-        key = (pid, sid)
+        provider, pid, sid, price, ts_str, orig_price = r
+        key = (provider, pid, sid)
         if key in products_map:
-            try:
-                ts = datetime.fromisoformat(ts_str.replace("Z", ""))
-            except:
-                ts = datetime.now()
+
+            if ts_str:
+                try:
+                    ts = datetime.fromisoformat(ts_str.replace("Z", ""))
+                except:
+                    ts = datetime.now()
+            else:
+                ts = datetime(1970, 1, 1)
+
             products_map[key]["obs"].append({"price": price, "timestamp": ts, "original_price": orig_price})
             
     products = []
@@ -222,30 +232,30 @@ def compare_stores(db_path, query, exact_only=False, no_fuzzy=False):
     return res
 
 
-def compare_with_anchor(db_path, store_id, product_id):
+def compare_with_anchor(db_path, provider, store_id, product_id):
     from dealhunter.normalization import compute_match
     conn = setup_db(db_path)
     c = conn.cursor()
     
     # 1. Fetch anchor product
     c.execute('''
-        SELECT p.product_id, p.store_id, p.name, s.name,
+        SELECT p.provider, p.product_id, p.store_id, p.name, s.name,
                p.brand, p.normalized_name, p.quantity, p.unit, p.normalized_quantity, p.normalized_unit,
                p.fingerprint, p.pack_count
         FROM products p
-        JOIN stores s ON p.store_id = s.store_id
-        WHERE p.product_id = ? AND p.store_id = ?
-    ''', (product_id, store_id))
+        JOIN stores s ON p.provider = s.provider AND p.store_id = s.store_id
+        WHERE p.provider = ? AND p.store_id = ? AND p.product_id = ?
+    ''', (provider, store_id, product_id))
     
     row = c.fetchone()
     if not row:
         return []
         
     anchor = {
-        "product_id": row[0], "store_id": row[1], "product_name": row[2], "store_name": row[3],
-        "brand": row[4], "normalized_name": row[5], "quantity": row[6], "unit": row[7],
-        "normalized_quantity": row[8], "normalized_unit": row[9], "fingerprint": row[10],
-        "pack_count": row[11], "obs": []
+        "provider": row[0], "product_id": row[1], "store_id": row[2], "product_name": row[3], "store_name": row[4],
+        "brand": row[5], "normalized_name": row[6], "quantity": row[7], "unit": row[8],
+        "normalized_quantity": row[9], "normalized_unit": row[10], "fingerprint": row[11],
+        "pack_count": row[12], "obs": []
     }
     
     # 2. Find candidates (use brand if available, otherwise name parts, limited to avoid full DB scan)
@@ -264,11 +274,11 @@ def compare_with_anchor(db_path, store_id, product_id):
         params.extend([f"%{w}%", f"%{w}%", f"%{w}%"])
         
     query = f'''
-        SELECT p.product_id, p.store_id, p.name, s.name,
+        SELECT p.provider, p.product_id, p.store_id, p.name, s.name,
                p.brand, p.normalized_name, p.quantity, p.unit, p.normalized_quantity, p.normalized_unit,
                p.fingerprint, p.pack_count
         FROM products p
-        JOIN stores s ON p.store_id = s.store_id
+        JOIN stores s ON p.provider = s.provider AND p.store_id = s.store_id
         WHERE {' AND '.join(conditions)}
         LIMIT 200
     '''
@@ -277,27 +287,27 @@ def compare_with_anchor(db_path, store_id, product_id):
     
     products_map = {}
     for r in candidate_rows:
-        key = (r[0], r[1])
+        key = (r[0], r[1], r[2])
         products_map[key] = {
-            "product_id": r[0], "store_id": r[1], "product_name": r[2], "store_name": r[3],
-            "brand": r[4], "normalized_name": r[5], "quantity": r[6], "unit": r[7],
-            "normalized_quantity": r[8], "normalized_unit": r[9], "fingerprint": r[10],
-            "pack_count": r[11], "obs": []
+            "provider": r[0], "product_id": r[1], "store_id": r[2], "product_name": r[3], "store_name": r[4],
+            "brand": r[5], "normalized_name": r[6], "quantity": r[7], "unit": r[8],
+            "normalized_quantity": r[9], "normalized_unit": r[10], "fingerprint": r[11],
+            "pack_count": r[12], "obs": []
         }
         
     # Ensure anchor is in map even if search missed it
-    products_map[(anchor["product_id"], anchor["store_id"])] = anchor
+    products_map[(anchor["provider"], anchor["product_id"], anchor["store_id"])] = anchor
         
     # Fetch observations for these candidates
     c.execute('''
-        SELECT product_id, store_id, price, timestamp, original_price
+        SELECT provider, product_id, store_id, price, timestamp, original_price
         FROM observations
         ORDER BY timestamp ASC, ROWID ASC
     ''')
     obs_rows = c.fetchall()
     for r in obs_rows:
-        pid, sid, price, ts_str, orig_price = r
-        key = (pid, sid)
+        provider, pid, sid, price, ts_str, orig_price = r
+        key = (provider, pid, sid)
         if key in products_map:
             try:
                 from datetime import datetime
@@ -317,7 +327,11 @@ def compare_with_anchor(db_path, store_id, product_id):
     for key, p in products_map.items():
         if not p["obs"]:
             continue
-        if p["product_id"] == anchor["product_id"] and p["store_id"] == anchor["store_id"]:
+        if (
+            p["provider"] == anchor["provider"]
+            and p["product_id"] == anchor["product_id"]
+            and p["store_id"] == anchor["store_id"]
+        ):
             m_type = "EXACT_MATCH"
         else:
             m_type, m_conf = compute_match(anchor, p)
@@ -333,23 +347,26 @@ def compare_with_anchor(db_path, store_id, product_id):
     if not valid_matches:
         return []
         
-    # Deduplicate by store_id
+    # Deduplicate by provider/store identity.
     store_best = {}
     for p in valid_matches:
-        sid = p["store_id"]
-        if sid not in store_best:
-            store_best[sid] = p
+        store_key = (p["provider"], p["store_id"])
+        if store_key not in store_best:
+            store_best[store_key] = p
         else:
             # If we already have the anchor for this store, keep it
-            if store_best[sid]["product_id"] == anchor["product_id"]:
+            if (
+                store_best[store_key]["provider"] == anchor["provider"]
+                and store_best[store_key]["product_id"] == anchor["product_id"]
+            ):
                 continue
             # If the new one is the anchor, use it
-            if p["product_id"] == anchor["product_id"]:
-                store_best[sid] = p
+            if p["provider"] == anchor["provider"] and p["product_id"] == anchor["product_id"]:
+                store_best[store_key] = p
             else:
                 # Pick the cheaper one
-                if p["price"] < store_best[sid]["price"]:
-                    store_best[sid] = p
+                if p["price"] < store_best[store_key]["price"]:
+                    store_best[store_key] = p
                     
     final_matches = list(store_best.values())
     
@@ -372,6 +389,7 @@ def compare_with_anchor(db_path, store_id, product_id):
             vs_median_str = "0%"
             
         res.append({
+            "provider": item["provider"],
             "product_id": item["product_id"],
             "store_id": item["store_id"],
             "TIENDA": item["store_name"][:15],
@@ -391,4 +409,3 @@ def compare_with_anchor(db_path, store_id, product_id):
         "anchor_name": anchor["product_name"],
         "matches": res
     }
-

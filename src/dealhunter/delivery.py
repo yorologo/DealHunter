@@ -40,17 +40,24 @@ def matches_canary_watch(ev):
 def format_event(ev, db_cursor=None):
     t = ev['event_type']
     meta = ev.get('metadata', {})
+    provider = ev.get('provider', 'rappi')
     
     # Try to get product info for better formatting
     product_name = ev['product_id']
     store_name = ev['store_id']
     if db_cursor:
         try:
-            db_cursor.execute("SELECT name FROM products WHERE product_id = ? AND store_id = ?", (ev['product_id'], ev['store_id']))
+            db_cursor.execute(
+                "SELECT name FROM products WHERE provider = ? AND product_id = ? AND store_id = ?",
+                (provider, ev['product_id'], ev['store_id']),
+            )
             p_row = db_cursor.fetchone()
             if p_row: product_name = p_row[0]
             
-            db_cursor.execute("SELECT name FROM stores WHERE store_id = ?", (ev['store_id'],))
+            db_cursor.execute(
+                "SELECT name FROM stores WHERE provider = ? AND store_id = ?",
+                (provider, ev['store_id']),
+            )
             s_row = db_cursor.fetchone()
             if s_row: store_name = s_row[0]
         except Exception:
@@ -93,7 +100,7 @@ def send_pending_events(db_path, limit=5, dry_run=False):
     conn = sqlite3.connect(db_path)
     c = conn.cursor()
     
-    c.execute("SELECT id, event_type, store_id, product_id, before_value, after_value, metadata, current_observation_id FROM alert_events WHERE delivery_status = 'pending' ORDER BY created_at ASC")
+    c.execute("SELECT id, provider, event_type, store_id, product_id, before_value, after_value, metadata, current_observation_id FROM alert_events WHERE delivery_status = 'pending' ORDER BY created_at ASC")
     rows = c.fetchall()
     
     delivered_count = 0
@@ -101,13 +108,14 @@ def send_pending_events(db_path, limit=5, dry_run=False):
     for r in rows:
         ev = {
             'id': r[0],
-            'event_type': r[1],
-            'store_id': r[2],
-            'product_id': r[3],
-            'before_value': r[4],
-            'after_value': r[5],
-            'metadata': json.loads(r[6]) if r[6] else {},
-            'current_observation_id': r[7]
+            'provider': r[1],
+            'event_type': r[2],
+            'store_id': r[3],
+            'product_id': r[4],
+            'before_value': r[5],
+            'after_value': r[6],
+            'metadata': json.loads(r[7]) if r[7] else {},
+            'current_observation_id': r[8]
         }
         
         if not matches_canary_watch(ev):

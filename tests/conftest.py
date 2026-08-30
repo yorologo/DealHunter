@@ -19,3 +19,20 @@ def isolate_config_and_env(tmp_path, monkeypatch):
         
     with patch('os.path.expanduser', side_effect=mock_expanduser):
         yield
+
+from tests.helpers.db import create_current_schema_db
+
+@pytest.fixture
+def current_schema_db(tmp_path):
+    """Provides an isolated connection to a fresh DB initialized with the current canonical schema."""
+    db_file = tmp_path / "dealhunter_test.db"
+    conn = create_current_schema_db(str(db_file))
+    yield conn
+    conn.close()
+@pytest.fixture
+def current_schema_db_path(tmp_path):
+    """Provides the file path to a fresh DB initialized with the current canonical schema."""
+    db_file = str(tmp_path / "dealhunter_test.db")
+    conn = create_current_schema_db(db_file)
+    conn.close()
+    return db_file

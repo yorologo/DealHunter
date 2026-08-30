@@ -1,5 +1,28 @@
 # Changelog
 
+## [v3.2.0] - Unreleased release candidate
+
+`v3.2.0` is the current development target. It has not been merged to `main`,
+tagged or released.
+
+### Added
+- **Multi-Provider Architecture**: Implemented robust provider registry and decoupled core logic from specific providers.
+- **Uber Eats Integration (Phone-Only)**: Added production headless synchronization for Uber Eats via native Termux Chromium and local CDP. Normal runs require neither a PC nor an X server; Carbonyl is limited to phone-local setup/session renewal.
+- **Provider & Membership Settings**: Added the `provider` and `membership` CLI configuration commands to select providers and keep Rappi Pro/Uber One eligibility separate from identity.
+- **Provider-Safe IDs**: Migrated product identity to `(provider, store_id, product_id)` across the DB, history, alerts, query layer and routes. The query-based watchlist remains a separate concern.
+- **Schema v16 Migration**: Added canonical product, family, external identifier, member and identity-decision infrastructure while preserving raw provider IDs.
+- **Canonical Shadow Infrastructure**: Implemented in-memory candidate generation and evidence evaluation for experimental cross-provider correlation.
+
+### Changed
+- Isolated Deal Score logic to `compare_eligible_offers` to avoid polluting the core query layer.
+- The shadow exact gate requires set-token parity, explicit brand/size evidence and no detected package contradiction. This is a conservative implementation rule, not evidence of measured human precision.
+
+### Limitations
+- **Auto Canonicalization OFF**: No automatic canonical membership write path is implemented. The matcher and canonical UI remain shadow/experimental.
+- **Human Ground Truth**: Insufficient; the statistical identity gate is `NOT_MET`.
+- **Production Boundary**: Rappi acquisition, Uber Eats acquisition, provider configuration and membership configuration are production-capable. Canonical matching is not.
+
+
 ## v3.0.1 - 2026-08-24
 ### Fixed
 - Prevented admin crawler start without explicit valid location.
@@ -101,7 +124,11 @@ Patch release.
 - Web crawler action fix (PYTHONPATH propagado correctamente);
 - corrección de runs silenciosos (0s) al usar botón Web.
 
-## [Unreleased]
+## Historical pre-v3.0 development notes (formerly "Unreleased")
+
+This preserved snapshot predates the current v3.2.0 RC block above and is not a
+second current release target.
+
 - feat: Deal Score V1 stabilization and Deal/Market Advantage isolation
 - feat: Advanced Restaurant Taxonomy extraction directly from NextJS metadata
 - feat: Native multiselect filtering (UNION logic) for Stores and Categories

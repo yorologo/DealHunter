@@ -1,6 +1,6 @@
 # Web Routes
 
-Este es el mapa completo de rutas Web operativas en v2.7.0.
+Este es el mapa de rutas Web operativas del RC v3.2.0.
 
 | Route | Method | Purpose | Source / Network |
 |---|---|---|---|
@@ -9,13 +9,13 @@ Este es el mapa completo de rutas Web operativas en v2.7.0.
 | `/market` | GET | Productos supermercado | DB |
 | `/turbo` | GET | Productos Turbo | DB |
 | `/restaurants` | GET | Lista de restaurantes | DB |
-| `/restaurants/<store_id>` | GET | Menú del restaurante | DB |
+| `/restaurants/<provider>/<store_id>` | GET | Menú del restaurante | DB |
 | `/categories` | GET | Resumen de categorías | DB |
 | `/categories/<category>` | GET | Productos de la categoría | DB |
 | `/products` | GET | Directorio de productos | DB |
-| `/products/<store_id>/<product_id>` | GET | Product Detail, historial, comparativas | DB |
+| `/products/<provider>/<store_id>/<product_id>` | GET | Product Detail, historial, comparativas | DB |
 | `/stores` | GET | Lista de tiendas | DB |
-| `/stores/<store_id>` | GET | Vista de tienda | DB |
+| `/stores/<provider>/<store_id>` | GET | Vista de tienda | DB |
 | `/compare` | GET | Comparador global de productos | DB |
 | `/watchlist` | GET | *Placeholder (Próximamente)* | - |
 | `/alerts` | GET | *Placeholder (Próximamente)* | - |

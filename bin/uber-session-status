@@ -1,0 +1,50 @@
+#!/usr/bin/env python3
+"""
+Uber Eats Session Status — Check stored session metadata without revealing secrets.
+"""
+import sys, os, json
+
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'bin'))
+
+# Inline the store class to avoid import complexity
+UBER_SESSION_DIR = os.path.expanduser("~/.local/share/DealHunter/secrets")
+UBER_SESSION_FILE = os.path.join(UBER_SESSION_DIR, "uber-session.enc")
+
+def main():
+    if not os.path.exists(UBER_SESSION_FILE):
+        print("SESSION:                  NOT_CONFIGURED")
+        return
+
+    # Import the store from the bridge script
+    import importlib.util
+    spec = importlib.util.spec_from_file_location("bridge", os.path.join(os.path.dirname(__file__), "uber-session-import"))
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+
+    store = mod.UberSessionStore()
+    status = store.status()
+
+    print(f"SESSION:                  {'PRESENT' if status.get('configured') else 'NOT_CONFIGURED'}")
+    if not status.get('configured'):
+        return
+
+    print(f"VALID:                    {status.get('valid', False)}")
+    print(f"CAPTURED_AT:              {status.get('stored_at', 'unknown')}")
+    print(f"AUTHORIZATION_PRESENT:    {status.get('authorization_present', False)}")
+    print(f"COOKIE_PRESENT:           {status.get('cookie_present', False)}")
+    print(f"CSRF_PRESENT:             {status.get('csrf_present', False)}")
+    print(f"HEADER_COUNT:             {status.get('header_count', 0)}")
+
+    if status.get('valid'):
+        data = store.load()
+        if data:
+            ctx = data.get('auth_context', {})
+            if ctx.get('cookies'):
+                cookie_names = [c.split('=')[0].strip() for c in ctx['cookies'].split(';') if '=' in c]
+                print(f"COOKIE_NAMES:             {', '.join(cookie_names)}")
+            hdrs = ctx.get('headers', {})
+            if hdrs:
+                print(f"HEADER_NAMES:             {', '.join(hdrs.keys())}")
+
+if __name__ == '__main__':
+    main()

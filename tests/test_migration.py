@@ -214,13 +214,48 @@ def test_v5_to_v7_migration():
     c.execute('CREATE TABLE schema_version (version INTEGER PRIMARY KEY)')
     c.execute('INSERT INTO schema_version VALUES (5)')
     
-    c.execute('''CREATE TABLE products
-                 (product_id TEXT, store_id TEXT, name TEXT, brand TEXT, image TEXT,
-                  normalized_name TEXT, quantity REAL, unit TEXT, 
-                  normalized_quantity REAL, normalized_unit TEXT, fingerprint TEXT,
-                  pack_count INTEGER,
-                  PRIMARY KEY (store_id, product_id))''')
+    c.execute('CREATE TABLE stores (store_id TEXT PRIMARY KEY, name TEXT, brand TEXT, type TEXT)')
+    c.execute('''CREATE TABLE products (
+           product_id TEXT, store_id TEXT, name TEXT, brand TEXT, image TEXT,
+           normalized_name TEXT, quantity REAL, unit TEXT, 
+           normalized_quantity REAL, normalized_unit TEXT, fingerprint TEXT,
+           pack_count INTEGER,
+           PRIMARY KEY (store_id, product_id))''')
     
+    c.execute('''CREATE TABLE alerts (
+                 id INTEGER PRIMARY KEY AUTOINCREMENT,
+                 provider TEXT DEFAULT 'rappi',
+                 product_id TEXT,
+                 store_id TEXT,
+                 alert_type TEXT,
+                 triggered_at DATETIME,
+                 price REAL,
+                 previous_price REAL,
+                 deal_status TEXT,
+                 reason TEXT,
+                 seen INTEGER DEFAULT 0,
+                 UNIQUE(provider, product_id, store_id, alert_type, price)
+                 )''')
+    c.execute('''CREATE TABLE watchlist (
+                 id INTEGER PRIMARY KEY AUTOINCREMENT,
+                 query TEXT,
+                 store_filter TEXT,
+                 target_price REAL,
+                 min_discount REAL,
+                 created_at DATETIME,
+                 enabled INTEGER DEFAULT 1)''')
+
+    c.execute('''CREATE TABLE runs (
+           run_id TEXT PRIMARY KEY, started_at DATETIME, finished_at DATETIME,
+           lat REAL, lng REAL, radius REAL, vertical TEXT, status TEXT)''')
+    c.execute('''CREATE TABLE observations (
+           id INTEGER PRIMARY KEY AUTOINCREMENT, run_id TEXT, store_id TEXT,
+           product_id TEXT, price REAL, original_price REAL, stock INTEGER,
+           timestamp DATETIME, discount_price REAL, discount_promotion REAL,
+           discount_effective REAL, discount_source TEXT, promotion_type TEXT,
+           promotion_label TEXT, query_term TEXT, availability TEXT,
+           UNIQUE(run_id, store_id, product_id))''')
+           
     c.execute("INSERT INTO products VALUES ('p1', 's1', 'Prod 1', 'Brand 1', 'img', 'prod 1', 1.0, 'L', 1.0, 'L', 'fp', 1)")
     conn.commit()
     conn.close()
