@@ -1,3 +1,4 @@
+from unittest.mock import patch
 import sqlite3
 import pytest
 from dealhunter.web.queries import (
@@ -33,7 +34,13 @@ def test_get_product_detail_mapping(current_schema_db_path):
     assert p["normalized_unit"] == "kg"
     assert p["pack_count"] == 1
 
-def test_get_catalog_sorting(current_schema_db_path):
+@patch("dealhunter.config.get_merged_config")
+def test_get_catalog_sorting(mock_config, current_schema_db_path):
+    mock_config.return_value = {
+        "provider": {"rappi": {"enabled": True}, "uber_eats": {"enabled": True}},
+        "comparison": {"inactive_membership_offers": "show_but_exclude"},
+        "membership": {"rappi_pro": {"status": "active"}, "uber_one": {"status": "active"}}
+    }
     conn = sqlite3.connect(current_schema_db_path)
     
     insert_store(conn, 's1', 'MyStore', 'market', 'BrandStore')
@@ -57,7 +64,12 @@ def test_get_catalog_sorting(current_schema_db_path):
     assert cat_sav["items"][2]["product_id"] == "p1"
 
 
-def test_web_queries_keep_colliding_provider_ids_isolated(current_schema_db_path):
+@patch("dealhunter.config.get_merged_config")
+def test_web_queries_keep_colliding_provider_ids_isolated(mock_config, current_schema_db_path):
+    mock_config.return_value = {
+        "provider": {"rappi": {"enabled": True}, "uber_eats": {"enabled": True}},
+        "membership": {"rappi_pro": {"status": "active"}, "uber_one": {"status": "active"}}
+    }
     conn = sqlite3.connect(current_schema_db_path)
     insert_store(conn, 'shared', 'Rappi Shared', 'market', provider='rappi')
     insert_store(conn, 'shared', 'Uber Shared', 'market', provider='uber_eats')
