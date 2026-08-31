@@ -31,7 +31,7 @@ The project must prioritize demonstrable value, not the largest advertised disco
 - **Target version**: v3.2.0
 - **Schema**: 16
 - **Last public release**: v3.0.1
-- **Release status**: v3.2.0 is not merged, tagged or released yet.
+- **Release status**: v3.2.0 is currently in main but not tagged or released yet.
 - **Version source of truth**: `src/dealhunter/metadata.py`.
 - **Schema source of truth**: `src/dealhunter/db.py::CURRENT_SCHEMA_VERSION`.
 

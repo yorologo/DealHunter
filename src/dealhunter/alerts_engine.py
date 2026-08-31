@@ -22,7 +22,7 @@ class DealWatcher:
         c.execute("SELECT started_at FROM runs WHERE run_id = ?", (run_id,))
         run_started_at = c.fetchone()[0]
         
-        c.execute("SELECT DISTINCT provider, store_id FROM observations WHERE run_id = ?", (run_id,))
+        c.execute("SELECT DISTINCT provider, store_id FROM trusted_observations WHERE run_id = ?", (run_id,))
         completed_scopes = [(r[0], r[1]) for r in c.fetchall()]
         if not completed_scopes:
             return []
@@ -33,7 +33,7 @@ class DealWatcher:
         c.execute(f'''
             SELECT id, store_id, product_id, price, original_price, discount_effective, 
                    has_pro_offer, pro_price, pro_discount_effective, promotion_type, availability, provider
-            FROM observations 
+            FROM trusted_observations 
             WHERE run_id = ?
         ''', (run_id,))
         
@@ -49,10 +49,10 @@ class DealWatcher:
         c.execute(f'''
             SELECT o.id, o.store_id, o.product_id, o.price, o.original_price, o.discount_effective, 
                    o.has_pro_offer, o.pro_price, o.pro_discount_effective, o.promotion_type, o.availability, o.provider
-            FROM observations o
+            FROM trusted_observations o
             INNER JOIN (
                 SELECT provider, store_id, product_id, MAX(timestamp) as max_ts
-                FROM observations
+                FROM trusted_observations
                 WHERE ({scope_sql}) AND run_id != ? AND timestamp < (SELECT started_at FROM runs WHERE run_id = ?)
                 GROUP BY provider, store_id, product_id
             ) prev ON o.provider = prev.provider AND o.store_id = prev.store_id AND o.product_id = prev.product_id AND o.timestamp = prev.max_ts

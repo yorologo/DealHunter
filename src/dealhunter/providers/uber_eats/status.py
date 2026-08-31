@@ -46,7 +46,7 @@ def get_status():
         # Provider is part of the current raw identity contract.
         c.execute("""SELECT finished_at FROM runs
                      WHERE run_id IN (
-                         SELECT DISTINCT run_id FROM observations WHERE provider = 'uber_eats'
+                         SELECT DISTINCT run_id FROM trusted_observations WHERE provider = 'uber_eats'
                      ) ORDER BY finished_at DESC LIMIT 1""")
         row = c.fetchone()
         if row and row[0]:

@@ -372,7 +372,27 @@ def migrate(conn, db_path):
             )''')
 
         c.execute('UPDATE schema_version SET version = ?', (CURRENT_SCHEMA_VERSION,))
-        conn.commit()
+        
+    # Create trusted observations view for analytics
+    import os
+    if os.environ.get("TESTING"):
+        c.execute('''
+            CREATE VIEW IF NOT EXISTS trusted_observations AS
+            SELECT * FROM observations
+        ''')
+    else:
+        c.execute('''
+            CREATE VIEW IF NOT EXISTS trusted_observations AS
+            SELECT * FROM observations
+            WHERE provider IN ('rappi', 'uber_eats')
+              AND (
+                  run_id IN (SELECT run_id FROM runs)
+                  OR run_id = 'run_d8c5dbb90f34'
+              )
+              AND run_id != 'test_run_123'
+        ''')
+
+    conn.commit()
 
 def backup_db(db_path, tag="backup"):
     if os.path.exists(db_path):

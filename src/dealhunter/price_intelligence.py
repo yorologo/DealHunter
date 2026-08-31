@@ -14,13 +14,9 @@ def is_valid_commercial_price(price):
         return False
 
 
-_EPOCH = datetime(1970, 1, 1)
-
-
 def _safe_ts(obs):
-    """Return the observation timestamp or epoch if None."""
-    ts = obs.get("timestamp")
-    return ts if ts is not None else _EPOCH
+    """Return the observation timestamp or None if missing."""
+    return obs.get("timestamp")
 
 
 def compute_price_metrics(obs_list):
@@ -62,7 +58,7 @@ def compute_price_metrics(obs_list):
 
     now = datetime.now()
     obs_30d = [o["price"] for o in obs_list
-               if is_valid_commercial_price(o["price"]) and _safe_ts(o) >= now - timedelta(days=30)]
+               if is_valid_commercial_price(o["price"]) and _safe_ts(o) and _safe_ts(o) >= now - timedelta(days=30)]
     median_30d = statistics.median(obs_30d) if obs_30d else current_price
 
     price_change = current_price - previous_price
@@ -78,7 +74,7 @@ def compute_price_metrics(obs_list):
 
     ts_min = _safe_ts(obs_list[0])
     ts_max = _safe_ts(obs_list[-1])
-    delta_days = (ts_max - ts_min).total_seconds() / 86400.0
+    delta_days = (ts_max - ts_min).total_seconds() / 86400.0 if ts_max and ts_min else 0
 
     # Count observations with valid prices for history depth check
     valid_count = len(prices_all)
@@ -128,7 +124,7 @@ def compute_price_metrics(obs_list):
         "reason": reason,
         "is_suspicious_reference": is_suspicious,
         "observations_count": len(obs_list),
-        "history_days": (ts_last - ts_first).days if len(obs_list) > 1 else 0
+        "history_days": (ts_last - ts_first).days if len(obs_list) > 1 and ts_last and ts_first else 0
     }
 
 def compare_eligible_offers(canonical_product, provider_offers, membership_context=None):
