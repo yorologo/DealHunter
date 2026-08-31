@@ -252,7 +252,7 @@ def run_update(config, lat, lng, conn, run_id, dry_run=False):
     # We fetch products grouped by store, or just use the names of stores as queries
     # since we can't fetch product IDs directly without the store endpoint.
     # We will use store names and most frequent product queries from observations.
-    c.execute("SELECT DISTINCT query_term FROM observations ORDER BY id DESC LIMIT 50")
+    c.execute("SELECT DISTINCT query_term FROM trusted_observations ORDER BY id DESC LIMIT 50")
     queries = [r[0] for r in c.fetchall() if r[0]]
     
     if not queries:

@@ -15,7 +15,7 @@
             <div class="small text-secondary">ID: {{ detail.store_id }}</div>
         </div>
         <div class="d-flex justify-content-between align-items-start">
-            <h2 class="fw-bold mb-3">{{ detail.name }}</h2>
+            <h2 class="fw-bold mb-3">{{ detail.name }} <span class="badge bg-secondary ms-2">{{ detail.provider }}</span></h2>
             {% if detail.provider == 'rappi' %}<form class="ms-3 d-inline rappi-launcher" data-store-id="{{ detail.store_id }}">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                 <input type="hidden" name="store_id" value="{{ detail.store_id }}">

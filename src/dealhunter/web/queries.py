@@ -78,9 +78,9 @@ def get_product_detail(db_path, provider, store_id, product_id):
     # Get obs
     c.execute('''
         SELECT price, timestamp, original_price, availability, discount_promotion, promotion_type, promotion_label, run_id, has_pro_offer, pro_price, pro_discount_effective
-        FROM observations
+        FROM trusted_observations
         WHERE provider = ? AND store_id = ? AND product_id = ?
-        ORDER BY timestamp ASC, ROWID ASC
+        ORDER BY timestamp ASC, id ASC
     ''', (provider, store_id, product_id))
     
     obs_rows = c.fetchall()
@@ -167,7 +167,7 @@ def enrich_products_with_metrics(db_path, products):
         conds.append("(provider = ? AND product_id = ? AND store_id = ?)")
         params.extend([p["provider"], p["product_id"], p["store_id"]])
         
-    query = f"SELECT provider, store_id, product_id, price, timestamp, original_price FROM observations WHERE {' OR '.join(conds)} ORDER BY timestamp ASC, ROWID ASC"
+    query = f"SELECT provider, store_id, product_id, price, timestamp, original_price FROM trusted_observations WHERE {' OR '.join(conds)} ORDER BY timestamp ASC, id ASC"
     c.execute(query, params)
     obs_rows = c.fetchall()
     
@@ -471,7 +471,7 @@ def get_categories(db_path, filters=None):
                COUNT(DISTINCT p.provider || char(31) || p.store_id)
         FROM products p
         WHERE EXISTS (
-            SELECT 1 FROM observations o
+            SELECT 1 FROM trusted_observations o
             WHERE o.provider = p.provider AND o.product_id = p.product_id AND o.store_id = p.store_id
         )
         {provider_sql}
@@ -517,7 +517,7 @@ def get_store_detail(db_path, provider, store_id):
     c.execute("SELECT COUNT(product_id) FROM products WHERE provider = ? AND store_id = ?", (provider, store_id))
     p_count = c.fetchone()[0]
     
-    c.execute("SELECT MAX(timestamp) FROM observations WHERE provider = ? AND store_id = ?", (provider, store_id))
+    c.execute("SELECT MAX(timestamp) FROM trusted_observations WHERE provider = ? AND store_id = ?", (provider, store_id))
     last_obs = c.fetchone()[0]
     
     # categories
@@ -575,18 +575,18 @@ def get_restaurants_home(db_path, filters=None):
         # Count available dishes
         c.execute('''
             SELECT COUNT(DISTINCT o.product_id)
-            FROM observations o
+            FROM trusted_observations o
             WHERE o.provider = ? AND o.store_id = ? AND o.availability = 'AVAILABLE'
-            AND o.timestamp = (SELECT MAX(timestamp) FROM observations WHERE provider = o.provider AND product_id = o.product_id AND store_id = o.store_id)
+            AND o.timestamp = (SELECT MAX(timestamp) FROM trusted_observations WHERE provider = o.provider AND product_id = o.product_id AND store_id = o.store_id)
         ''', (provider, store_id))
         available = c.fetchone()[0]
         
         # Count promotions
         c.execute('''
             SELECT COUNT(DISTINCT o.product_id)
-            FROM observations o
+            FROM trusted_observations o
             WHERE o.provider = ? AND o.store_id = ? AND o.discount_effective > 0
-            AND o.timestamp = (SELECT MAX(timestamp) FROM observations WHERE provider = o.provider AND product_id = o.product_id AND store_id = o.store_id)
+            AND o.timestamp = (SELECT MAX(timestamp) FROM trusted_observations WHERE provider = o.provider AND product_id = o.product_id AND store_id = o.store_id)
         ''', (provider, store_id))
         promos = c.fetchone()[0]
         
@@ -608,7 +608,7 @@ def get_restaurant_detail(db_path, provider, store_id):
     conn = sqlite3.connect(db_path)
     c = conn.cursor()
     
-    c.execute("SELECT name, brand, type FROM stores WHERE provider = ? AND store_id = ? AND type = 'restaurants'", (provider, store_id,))
+    c.execute("SELECT name, brand, type FROM stores WHERE provider = ? AND store_id = ? AND LOWER(type) IN ('restaurant', 'restaurants')", (provider, store_id,))
     row = c.fetchone()
     if not row:
         return None
@@ -766,7 +766,7 @@ def get_available_stores(db_path, vertical=None, filters=None):
         if vertical == "turbo":
             c.execute("SELECT store_id, name FROM stores WHERE type IN ('chiper_home', 'chiper_extended', 'chiper_express') ORDER BY name")
         elif vertical == "market":
-            c.execute("SELECT store_id, name FROM stores WHERE type NOT IN ('chiper_home', 'chiper_extended', 'chiper_express', 'restaurants') ORDER BY name")
+            c.execute("SELECT store_id, name FROM stores WHERE LOWER(type) NOT IN ('chiper_home', 'chiper_extended', 'chiper_express', 'restaurants', 'restaurant') ORDER BY name")
         else:
             c.execute("SELECT store_id, name FROM stores WHERE type = ? ORDER BY name", (vertical,))
     else:
@@ -782,7 +782,7 @@ def get_available_categories(db_path, vertical=None, store_ids=None, filters=Non
         if vertical == "turbo":
             query += " AND s.type IN ('chiper_home', 'chiper_extended', 'chiper_express')"
         elif vertical == "market":
-            query += " AND s.type NOT IN ('chiper_home', 'chiper_extended', 'chiper_express', 'restaurants')"
+            query += " AND s.LOWER(type) NOT IN ('chiper_home', 'chiper_extended', 'chiper_express', 'restaurants', 'restaurant')"
         else:
             query += " AND s.type = ?"
             params.append(vertical)

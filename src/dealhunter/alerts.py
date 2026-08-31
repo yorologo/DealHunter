@@ -26,7 +26,7 @@ class AlertEngine:
         # We need historical availability to check BACK_IN_STOCK. We'll fetch the last two observations for each product.
         c.execute('''
             SELECT provider, store_id, product_id, availability
-            FROM observations
+            FROM trusted_observations
             ORDER BY timestamp ASC
         ''')
         avail_history = {}

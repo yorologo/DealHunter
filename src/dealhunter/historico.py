@@ -13,7 +13,7 @@ def analyze_history(db_path, config, store=None, product=None):
         SELECT o.provider, o.store_id, o.product_id, p.name, s.name, o.price, o.timestamp, o.discount_effective, o.original_price,
                p.brand, p.normalized_name, p.quantity, p.unit, p.normalized_quantity, p.normalized_unit,
                p.fingerprint, p.pack_count, s.type as store_type, p.category
-        FROM observations o
+        FROM trusted_observations o
         JOIN products p ON o.product_id = p.product_id AND o.store_id = p.store_id AND o.provider = p.provider
         JOIN stores s ON o.store_id = s.store_id AND o.provider = s.provider
     '''
@@ -35,7 +35,7 @@ def analyze_history(db_path, config, store=None, product=None):
     if conditions:
         query += " WHERE " + " AND ".join(conditions)
         
-    query += " ORDER BY o.timestamp ASC, o.ROWID ASC"
+    query += " ORDER BY o.timestamp ASC, o.id ASC"
     c.execute(query, params)
     rows = c.fetchall()
     
@@ -144,8 +144,8 @@ def compare_stores(db_path, query, exact_only=False, no_fuzzy=False):
         
     c.execute('''
         SELECT provider, product_id, store_id, price, timestamp, original_price
-        FROM observations
-        ORDER BY timestamp ASC, ROWID ASC
+        FROM trusted_observations
+        ORDER BY timestamp ASC, id ASC
     ''')
     obs_rows = c.fetchall()
     
@@ -308,8 +308,8 @@ def compare_with_anchor(db_path, provider, store_id, product_id):
     # Fetch observations for these candidates
     c.execute('''
         SELECT provider, product_id, store_id, price, timestamp, original_price
-        FROM observations
-        ORDER BY timestamp ASC, ROWID ASC
+        FROM trusted_observations
+        ORDER BY timestamp ASC, id ASC
     ''')
     obs_rows = c.fetchall()
     for r in obs_rows:
@@ -352,7 +352,7 @@ def compare_with_anchor(db_path, provider, store_id, product_id):
                 valid_matches.append(p)
                 
     if not valid_matches:
-        return []
+        return {"anchor_name": anchor["product_name"], "matches": []}
         
     # Deduplicate by provider/store identity.
     store_best = {}

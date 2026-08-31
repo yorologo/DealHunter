@@ -25,8 +25,8 @@ def _build_where(filters: dict, config: dict = None, exclude_dim=None):
     verticals = filters.get("verticals")
     if verticals and exclude_dim != "verticals":
         placeholders = ",".join(["?"] * len(verticals))
-        where_clauses.append(f"(s.vertical IN ({placeholders}) OR (s.vertical IS NULL AND s.type IN ({placeholders})))")
-        params.extend(verticals * 2)
+        where_clauses.append(f"(LOWER(s.vertical) IN ({placeholders}) OR (s.vertical IS NULL AND LOWER(s.type) IN ({placeholders})))")
+        params.extend([v.lower() for v in verticals] * 2)
         
     # 2. Stores
     store_ids = filters.get("store_ids") or []
@@ -90,30 +90,30 @@ def _build_where(filters: dict, config: dict = None, exclude_dim=None):
         
         if channel == "PUBLIC":
             if min_discount is not None:
-                where_clauses.append("o.discount_effective >= ?")
+                where_clauses.append("o.discount_effective >= ? AND o.price > 0")
                 params.append(min_discount)
             if max_price is not None:
-                where_clauses.append("o.price <= ?")
+                where_clauses.append("o.price <= ? AND o.price > 0")
                 params.append(max_price)
                 
         elif channel == "PRO":
             where_clauses.append("o.has_pro_offer = 1")
             if min_discount is not None:
-                where_clauses.append("o.pro_discount_effective >= ?")
+                where_clauses.append("o.pro_discount_effective >= ? AND o.pro_price > 0")
                 params.append(min_discount)
             if max_price is not None:
-                where_clauses.append("o.pro_price <= ?")
+                where_clauses.append("o.pro_price <= ? AND o.pro_price > 0")
                 params.append(max_price)
                 
         elif channel == "ALL":
             if min_discount is not None and max_price is not None:
-                where_clauses.append("((o.discount_effective >= ? AND o.price <= ?) OR (o.has_pro_offer = 1 AND o.pro_discount_effective >= ? AND o.pro_price <= ?))")
+                where_clauses.append("((o.discount_effective >= ? AND o.price <= ? AND o.price > 0) OR (o.has_pro_offer = 1 AND o.pro_discount_effective >= ? AND o.pro_price <= ? AND o.pro_price > 0))")
                 params.extend([min_discount, max_price, min_discount, max_price])
             elif min_discount is not None:
-                where_clauses.append("(o.discount_effective >= ? OR (o.has_pro_offer = 1 AND o.pro_discount_effective >= ?))")
+                where_clauses.append("((o.discount_effective >= ? AND o.price > 0) OR (o.has_pro_offer = 1 AND o.pro_discount_effective >= ? AND o.pro_price > 0))")
                 params.extend([min_discount, min_discount])
             elif max_price is not None:
-                where_clauses.append("(o.price <= ? OR (o.has_pro_offer = 1 AND o.pro_price <= ?))")
+                where_clauses.append("((o.price <= ? AND o.price > 0) OR (o.has_pro_offer = 1 AND o.pro_price <= ? AND o.pro_price > 0))")
                 params.extend([max_price, max_price])
                 
     where_sql = ""
@@ -124,16 +124,22 @@ def _build_where(filters: dict, config: dict = None, exclude_dim=None):
 def _base_query():
     return '''
         SELECT p.product_id, p.store_id, p.name, s.name as store_name, s.type as store_type, s.vertical as store_vertical, p.brand, p.category as legacy_category,
-               o.price as current_price, o.original_price, o.discount_effective, o.promotion_type, o.promotion_label,
-               o.has_pro_offer, o.pro_price, o.pro_discount_effective, o.limit_info, o.availability, o.timestamp as ts,
+               CASE WHEN o.price > 0 THEN o.price ELSE NULL END as current_price,
+               CASE WHEN o.price > 0 THEN o.original_price ELSE NULL END as original_price,
+               CASE WHEN o.price > 0 THEN o.discount_effective ELSE 0 END as discount_effective,
+               o.promotion_type, o.promotion_label,
+               o.has_pro_offer,
+               CASE WHEN o.pro_price > 0 THEN o.pro_price ELSE NULL END as pro_price,
+               CASE WHEN o.pro_price > 0 THEN o.pro_discount_effective ELSE 0 END as pro_discount_effective,
+               o.limit_info, o.availability, o.timestamp as ts,
                p.quantity, p.unit, p.normalized_quantity, p.normalized_unit, p.provider
         FROM products p
         JOIN stores s ON p.provider = s.provider AND p.store_id = s.store_id
         JOIN (
             SELECT provider, product_id, store_id, price, original_price, discount_effective, promotion_type, promotion_label,
                    has_pro_offer, pro_price, pro_discount_effective, limit_info, availability, timestamp,
-                   ROW_NUMBER() OVER (PARTITION BY provider, store_id, product_id ORDER BY timestamp DESC, ROWID DESC) as rn
-            FROM observations
+                   ROW_NUMBER() OVER (PARTITION BY provider, store_id, product_id ORDER BY timestamp DESC, id DESC) as rn
+            FROM trusted_observations
         ) o ON p.provider = o.provider AND p.product_id = o.product_id AND p.store_id = o.store_id AND o.rn = 1
     '''
 
@@ -167,6 +173,12 @@ def build_faceted_query(filters: dict, config: dict = None):
     # Sort uneligible to the bottom always
     order_sql = f"ORDER BY {ranking_eligible_expr} DESC, "
     
+    # Guard against invalid prices dominating sorts
+    if channel == "PRO":
+        order_sql += "CASE WHEN o.pro_price > 0 THEN 1 ELSE 0 END DESC, "
+    else:
+        order_sql += "CASE WHEN o.price > 0 THEN 1 ELSE 0 END DESC, "
+
     if sort == "discount":
         if channel == "PRO":
             order_sql += f"o.pro_discount_effective {dir_sql}, o.pro_price ASC"
@@ -200,8 +212,8 @@ def build_faceted_query(filters: dict, config: dict = None):
         JOIN (
             SELECT provider, product_id, store_id, price, original_price, discount_effective, promotion_type, promotion_label,
                    has_pro_offer, pro_price, pro_discount_effective, limit_info, availability, timestamp,
-                   ROW_NUMBER() OVER (PARTITION BY provider, store_id, product_id ORDER BY timestamp DESC, ROWID DESC) as rn
-            FROM observations
+                   ROW_NUMBER() OVER (PARTITION BY provider, store_id, product_id ORDER BY timestamp DESC, id DESC) as rn
+            FROM trusted_observations
         ) o ON p.provider = o.provider AND p.product_id = o.product_id AND p.store_id = o.store_id AND o.rn = 1
         {where_sql}
     """
@@ -210,17 +222,27 @@ def build_faceted_query(filters: dict, config: dict = None):
 
 def get_facet_counts(conn, filters: dict, config: dict = None):
     config = config or {}
-    base_join = '''
-        FROM products p
-        JOIN stores s ON p.provider = s.provider AND p.store_id = s.store_id
-        JOIN (
-            SELECT provider, product_id, store_id, price, original_price, discount_effective, promotion_type, promotion_label,
-                   has_pro_offer, pro_price, pro_discount_effective, limit_info, availability, timestamp,
-                   ROW_NUMBER() OVER (PARTITION BY provider, store_id, product_id ORDER BY timestamp DESC, ROWID DESC) as rn
-            FROM observations
-        ) o ON p.provider = o.provider AND p.product_id = o.product_id AND p.store_id = o.store_id AND o.rn = 1
-    '''
+    
+    def get_base_join(w_sql):
+        if "o." in w_sql:
+            return '''
+                FROM products p
+                JOIN stores s ON p.provider = s.provider AND p.store_id = s.store_id
+                JOIN (
+                    SELECT provider, product_id, store_id, price, original_price, discount_effective, promotion_type, promotion_label,
+                           has_pro_offer, pro_price, pro_discount_effective, limit_info, availability, timestamp,
+                           ROW_NUMBER() OVER (PARTITION BY provider, store_id, product_id ORDER BY timestamp DESC, id DESC) as rn
+                    FROM trusted_observations
+                ) o ON p.provider = o.provider AND p.product_id = o.product_id AND p.store_id = o.store_id AND o.rn = 1
+            '''
+        else:
+            return '''
+                FROM products p
+                JOIN stores s ON p.provider = s.provider AND p.store_id = s.store_id
+            '''
+    
     counts = {}
+
     
     # Categories (excluding category filter so we see all available for current scope)
     where_sql, params = _build_where(filters, config, exclude_dim="categories")
@@ -229,14 +251,14 @@ def get_facet_counts(conn, filters: dict, config: dict = None):
     cat_query = f"""
         SELECT DISTINCT cat_name FROM (
             SELECT pm.raw_name as cat_name
-            {base_join}
+            {get_base_join(where_sql)}
             JOIN product_memberships pm ON p.provider = pm.provider AND p.store_id = pm.store_id AND p.product_id = pm.product_id
             {where_sql} {'AND' if where_sql else 'WHERE'} pm.semantic_type = 'CATEGORY'
             
             UNION ALL
             
             SELECT p.category as cat_name
-            {base_join}
+            {get_base_join(where_sql)}
             {where_sql} {'AND' if where_sql else 'WHERE'} p.category IS NOT NULL AND p.category != ''
             AND NOT EXISTS (
                 SELECT 1 FROM product_memberships pm2 
@@ -252,7 +274,7 @@ def get_facet_counts(conn, filters: dict, config: dict = None):
     where_sql, params = _build_where(filters, config, exclude_dim="collections")
     col_query = f"""
         SELECT DISTINCT pm.raw_name
-        {base_join}
+        {get_base_join(where_sql)}
         JOIN product_memberships pm ON p.provider = pm.provider AND p.store_id = pm.store_id AND p.product_id = pm.product_id
         {where_sql} {'AND' if where_sql else 'WHERE'} pm.semantic_type = 'COLLECTION'
         ORDER BY pm.raw_name
@@ -264,7 +286,7 @@ def get_facet_counts(conn, filters: dict, config: dict = None):
     where_sql, params = _build_where(filters, config, exclude_dim="verticals")
     vert_query = f"""
         SELECT DISTINCT COALESCE(s.vertical, s.type)
-        {base_join}
+        {get_base_join(where_sql)}
         {where_sql}
     """
     c.execute(vert_query, params)
@@ -274,7 +296,7 @@ def get_facet_counts(conn, filters: dict, config: dict = None):
     where_sql, params = _build_where(filters, config, exclude_dim="store_facets")
     sf_query = f"""
         SELECT DISTINCT sf.raw_value
-        {base_join}
+        {get_base_join(where_sql)}
         JOIN store_facets sf ON p.provider = sf.provider AND p.store_id = sf.store_id
         {where_sql}
     """
@@ -286,7 +308,7 @@ def get_facet_counts(conn, filters: dict, config: dict = None):
     where_sql, params = _build_where(filters, config, exclude_dim="store_ids")
     store_query = f'''
         SELECT DISTINCT p.provider, p.store_id, s.name
-        {base_join}
+        {get_base_join(where_sql)}
         {where_sql}
         ORDER BY s.name
     '''

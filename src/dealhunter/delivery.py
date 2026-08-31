@@ -70,7 +70,7 @@ def format_event(ev, db_cursor=None):
         price_str = ""
         if db_cursor and ev.get('current_observation_id'):
             try:
-                db_cursor.execute("SELECT original_price, price FROM observations WHERE id = ?", (ev['current_observation_id'],))
+                db_cursor.execute("SELECT original_price, price FROM trusted_observations WHERE id = ?", (ev['current_observation_id'],))
                 obs_row = db_cursor.fetchone()
                 if obs_row and obs_row[0] and obs_row[1]:
                     price_str = f" · ${obs_row[0]} → ${obs_row[1]}"
