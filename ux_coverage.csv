@@ -1,4 +1,5 @@
 component,route_or_feature,status,notes
+system,/admin/settings,PASS,HTTP 200
 rappi,/categories/Food,PASS,HTTP 200
 rappi,/stores/rappi/1306701854,PASS,HTTP 200
 rappi,/products/rappi/1306701854/1306701854_1563685267,PASS,HTTP 200
@@ -10,7 +11,6 @@ uber_eats,/products/uber_eats/03521919-0ef9-4f94-94c7-39bdfa126298/0a3c5930-54b7
 uber_eats,/compare?q=Pizza,PASS,HTTP 200
 uber_eats,/categories/Uncategorized,PASS,HTTP 200
 system,/,PASS,HTTP 200
-system,/settings,PASS,HTTP 200
 system,/admin/runs,PASS,HTTP 200
 system,/admin/catalog-sync,PASS,HTTP 200
 ui,navigation,PASS,Verified manually/mechanically
@@ -23,3 +23,6 @@ ui,empty state,PASS,Verified manually/mechanically
 ui,error state,PASS,Verified manually/mechanically
 ui,provider badge,PASS,Verified manually/mechanically
 ui,membership display,PASS,Verified manually/mechanically
+system,/best,PASS,HTTP 200 (Best Buys)
+system,/deals,PASS,HTTP 200 (Opportunities)
+system,/deals [HTMX],PASS,HTTP 200 Partial

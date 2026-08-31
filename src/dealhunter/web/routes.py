@@ -73,8 +73,6 @@ def register_routes(app):
                 return render_template('partials/compare_results.html', results=res, q=q)
             return render_template('compare.html', results=res, q=q, anchor_mode=False, current_path='/compare')
 
-    @app.route('/deals')
-    
     @app.route('/best')
     def best():
         from dealhunter.web.best import get_best_buys
@@ -103,7 +101,8 @@ def register_routes(app):
         page = int(request.args.get('page', 1))
         sort = request.args.get('sort', 'opportunity')
         tab = request.args.get('tab', 'Todo')
-        data = get_deals(db_path, _base_filters({"tab": tab}), sort, page)
+        filters = _base_filters({"tab": tab})
+        data = get_deals(db_path, filters, sort, page)
         if request.headers.get('HX-Request') and not request.headers.get('HX-Boosted'):
             return render_template('partials/catalog_grid.html', data=data, filters=filters, sort=sort, view_mode=request.cookies.get('view_mode', 'cards'))
         return render_template('deals.html', data=data, tab=tab, sort=sort, current_path='/deals')
