@@ -45,7 +45,7 @@
                 {% endif %}
 
                 <div class="d-flex justify-content-between align-items-start">
-                    <h2 class="fw-bold mb-3">{{ p.product_name }} <span class="badge bg-secondary ms-2">{{ p.provider }}</span></h2>
+                    <h2 class="fw-bold mb-3">{{ p.product_name }} <span class="badge bg-secondary ms-2">{% if p.provider == 'uber_eats' %}Uber Eats{% else %}Rappi{% endif %}</span></h2>
                     {% if p.provider == 'rappi' %}<form class="ms-3 d-inline rappi-launcher" data-store-id="{{ p.store_id }}">
                         <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                         <input type="hidden" name="store_id" value="{{ p.store_id }}">

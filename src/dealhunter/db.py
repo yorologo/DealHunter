@@ -373,8 +373,9 @@ def migrate(conn, db_path):
 
         c.execute('UPDATE schema_version SET version = ?', (CURRENT_SCHEMA_VERSION,))
         
+    c.execute('DROP VIEW IF EXISTS trusted_observations')
     c.execute('''
-        CREATE VIEW IF NOT EXISTS trusted_observations AS
+        CREATE VIEW trusted_observations AS
         SELECT o.* FROM observations o
         JOIN runs r ON o.run_id = r.run_id
         WHERE o.provider IN ('rappi', 'uber_eats')
