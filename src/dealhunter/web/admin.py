@@ -565,10 +565,11 @@ def catalog_sync():
         cur.execute("SELECT COUNT(*) FROM stores")
         stores_count = cur.fetchone()[0]
 
-        cur.execute("SELECT started_at, status FROM runs WHERE crawler_mode='ZONE_INVENTORY' ORDER BY started_at DESC LIMIT 1")
+        cur.execute("SELECT started_at, status, coverage_complete FROM runs WHERE crawler_mode='ZONE_INVENTORY' ORDER BY started_at DESC LIMIT 1")
         row = cur.fetchone()
         last_zone_attempt = row[0] if row else None
         last_zone_status = row[1] if row else None
+        last_zone_coverage = row[2] if row else 0
 
         cur.execute("SELECT started_at FROM runs WHERE crawler_mode='ZONE_INVENTORY' AND status='COMPLETED' AND coverage_complete=1 ORDER BY started_at DESC LIMIT 1")
         row2 = cur.fetchone()
@@ -580,10 +581,6 @@ def catalog_sync():
         last_zone_attempt = None
         last_zone_status = None
         last_zone_complete = None
-    except Exception:
-        stores_count = 0
-        last_zone = None
-        last_zone_status = None
         last_zone_coverage = 0
 
     from dealhunter.scheduler import is_scheduler_enabled, get_next_run

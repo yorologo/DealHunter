@@ -1,0 +1,11 @@
+Feature,Component,View/Route,State,Result,Latency_ms,Notes
+Catalog,Product List,/products,Filter by store,PASS,40,Rappi and Uber products load correctly
+Catalog,Restaurants,/restaurants,Filter by store,PASS,45,Uber Eats restaurant loaded correctly
+Catalog,Category,/categories/<cat>,None price,PASS,35,Prices with None rendered as \u2014, HTTP 200
+Product,Detail,/products/<p>/<s>/<id>,No obs,PASS,20,Rendered correctly without errors
+Product,Detail,/products/<p>/<s>/<id>,Null timestamp,PASS,30,Historical metrics rendered safely
+Compare,Search,/compare?q=Pizza,Null store name,PASS,55,Rendered 'Desconocida' instead of crash
+Compare,Anchor,/compare?provider=...&store_id=...,Exact match,PASS,45,Anchor mode compares safely
+Admin,Dashboard,/admin/catalog-sync,No run,PASS,25,Rendered without UnboundLocalError
+Admin,Wizard,/admin/catalog-sync/wizard,No session,PASS,15,Rendered wizard safely
+Web,Home,/,Dashboard stats,PASS,30,Counts trusted observations properly

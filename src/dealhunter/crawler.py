@@ -242,7 +242,7 @@ def run_discover(config, lat, lng, conn, run_id, dry_run=False):
         return "PARTIAL", 0
     except BaseException:
         c = conn.cursor()
-        c.execute("UPDATE runs SET status = 'ERROR', coverage_complete = 0, finished_at = CURRENT_TIMESTAMP WHERE run_id = ?", (run_id,))
+        c.execute("UPDATE runs SET status = 'FAILED', coverage_complete = 0, finished_at = CURRENT_TIMESTAMP WHERE run_id = ?", (run_id,))
         conn.commit()
         raise
 def run_update(config, lat, lng, conn, run_id, dry_run=False):
