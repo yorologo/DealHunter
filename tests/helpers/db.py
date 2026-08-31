@@ -32,6 +32,7 @@ def insert_observation(conn, run_id, store_id, product_id, price, original_price
                        discount_effective=None, discount_source=None, promotion_type=None, 
                        promotion_label=None, availability="IN_STOCK", query_term=None,
                        has_pro_offer=None, pro_price=None, pro_discount_effective=None, limit_info=None, provider="rappi"):
+    conn.execute("INSERT OR IGNORE INTO runs (run_id, started_at, status) VALUES (?, '2024-01-01T12:00:00Z', 'SUCCESS')", (run_id,))
     conn.execute(
         """INSERT INTO observations (
             run_id, provider, store_id, product_id, price, original_price, stock, timestamp, 

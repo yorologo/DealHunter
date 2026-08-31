@@ -37,7 +37,7 @@ def test_stale_running_run_handling(db_conn):
 def test_run_counts_use_provider_aware_identity(db_conn):
     conn = sqlite3.connect(db_conn)
     conn.execute(
-        "INSERT INTO runs (run_id, status, started_at) VALUES ('multi', 'COMPLETED', '2026-08-22 18:32:56')"
+        "INSERT INTO runs (run_id, status, started_at) VALUES ('multi', 'SUCCESS', '2026-08-22 18:32:56')"
     )
     conn.execute(
         "INSERT INTO observations (run_id, provider, store_id, product_id, price) VALUES ('multi', 'rappi', 'shared', 'same', 10)"

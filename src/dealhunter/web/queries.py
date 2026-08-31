@@ -560,8 +560,8 @@ def get_restaurants_home(db_path, filters=None):
                MAX(o.timestamp) as last_obs
         FROM stores s
         LEFT JOIN products p ON s.provider = p.provider AND s.store_id = p.store_id
-        LEFT JOIN observations o ON p.provider = o.provider AND p.product_id = o.product_id AND p.store_id = o.store_id
-        WHERE s.type = 'restaurants'
+        LEFT JOIN trusted_observations o ON p.provider = o.provider AND p.product_id = o.product_id AND p.store_id = o.store_id
+        WHERE LOWER(s.type) IN ('restaurant', 'restaurants')
         {provider_sql}
         GROUP BY s.provider, s.store_id
         HAVING COUNT(DISTINCT p.product_id) > 0
@@ -627,7 +627,7 @@ def get_restaurant_detail(db_path, provider, store_id):
                o.price, o.original_price, o.discount_effective, o.promotion_label, o.promotion_type, o.availability,
                MAX(o.timestamp) as ts, p.has_toppings
         FROM products p
-        JOIN observations o ON p.provider = o.provider AND p.product_id = o.product_id AND p.store_id = o.store_id
+        JOIN trusted_observations o ON p.provider = o.provider AND p.product_id = o.product_id AND p.store_id = o.store_id
         WHERE p.provider = ? AND p.store_id = ?
         GROUP BY p.provider, p.product_id
         ORDER BY category ASC, p.name ASC
@@ -782,7 +782,7 @@ def get_available_categories(db_path, vertical=None, store_ids=None, filters=Non
         if vertical == "turbo":
             query += " AND s.type IN ('chiper_home', 'chiper_extended', 'chiper_express')"
         elif vertical == "market":
-            query += " AND s.LOWER(type) NOT IN ('chiper_home', 'chiper_extended', 'chiper_express', 'restaurants', 'restaurant')"
+            query += " AND LOWER(s.type) NOT IN ('chiper_home', 'chiper_extended', 'chiper_express', 'restaurants', 'restaurant')"
         else:
             query += " AND s.type = ?"
             params.append(vertical)

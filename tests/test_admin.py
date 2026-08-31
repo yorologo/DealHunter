@@ -35,7 +35,9 @@ def app():
     c.execute("INSERT INTO runs (run_id, started_at, finished_at, status, vertical) VALUES ('run3', '2026-08-19T12:00:00', '2026-08-19T12:00:10', 'FAILED', '{\"error_code\": \"NETWORK_ERROR\", \"component\": \"turbo\"}')")
 
     # Observations
+    c.execute("INSERT OR IGNORE INTO runs (run_id, started_at, status) VALUES ('run1', '2024-01-01', 'SUCCESS')")
     c.execute("INSERT INTO observations (run_id, store_id, product_id, price, original_price, timestamp) VALUES ('run1', 's1', 'p1', 25.0, 30.0, '2026-08-19T10:01:00')")
+    c.execute("INSERT OR IGNORE INTO runs (run_id, started_at, status) VALUES ('run1', '2024-01-01', 'SUCCESS')")
     c.execute("INSERT INTO observations (run_id, store_id, product_id, price, original_price, timestamp) VALUES ('run1', 's2', 'p2', 22.0, 28.0, '2026-08-19T10:02:00')")
 
     conn.commit()

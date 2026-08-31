@@ -66,6 +66,7 @@ def test_trademark_to_brand_upsert():
         
         # We need a query in observation config or run_update looks up DB
         # run_update looks at past observations. We need to create one.
+        c.execute("INSERT OR IGNORE INTO runs (run_id, started_at, status) VALUES ('old_run', '2020-01-01', 'SUCCESS')")
         c.execute('''INSERT INTO observations (run_id, store_id, product_id, price, timestamp, query_term, availability) 
                      VALUES ('old_run', 's1', 'p1', 40.0, '2020-01-01', 'coca cola', 'AVAILABLE')''')
         conn.commit()
