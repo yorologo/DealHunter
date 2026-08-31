@@ -28,10 +28,9 @@ The project must prioritize demonstrable value, not the largest advertised disco
 
 ## CURRENT DEVELOPMENT / RC
 
-- **Target version**: v3.2.0
+- **Current version**: v3.2.0
 - **Schema**: 16
-- **Last public release**: v3.0.1
-- **Release status**: v3.2.0 is currently in main but not tagged or released yet.
+- **Release status**: Publication determined by Git tag and GitHub Releases.
 - **Version source of truth**: `src/dealhunter/metadata.py`.
 - **Schema source of truth**: `src/dealhunter/db.py::CURRENT_SCHEMA_VERSION`.
 
@@ -159,11 +158,7 @@ instead of guessing.
 - **PUBLIC RELEASE** means a published Git tag/release.
 - **LAST PUBLIC RELEASE** is derived from Git/GitHub metadata, not inferred from README text.
 
-Last verified public release:
-
-DealHunter v3.0.1
-
-Main capabilities include:
+Capabilities of the v3.2.0 foundation include:
 
 - persistent TOML configuration;
 - profiles;

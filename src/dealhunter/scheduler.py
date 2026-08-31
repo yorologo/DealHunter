@@ -2,7 +2,8 @@ import subprocess
 import datetime
 import os
 
-CRON_CMD = "cd /data/data/com.termux/files/home/rappi-deal-hunter && DEALHUNTER_SOURCE=SCHEDULED /data/data/com.termux/files/usr/bin/flock -n /tmp/dealhunter.lock ./bin/rappi-ofertas discover --vertical general >> logs/crawler-cron.log 2>&1"
+tmp_dir = os.environ.get("TMPDIR", "/tmp")
+CRON_CMD = f"cd /data/data/com.termux/files/home/rappi-deal-hunter && DEALHUNTER_SOURCE=SCHEDULED /data/data/com.termux/files/usr/bin/flock -n {tmp_dir}/dealhunter.lock ./bin/rappi-ofertas discover --vertical general >> logs/crawler-cron.log 2>&1"
 CRON_COMMENT = "# DealHunter Daily Sweep"
 
 def get_crontab():

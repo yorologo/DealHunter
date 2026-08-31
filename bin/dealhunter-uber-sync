@@ -13,4 +13,4 @@ export DEALHUNTER_SOURCE=SCHEDULED
 
 # Use a separate lock for Uber, but wait if Rappi is running to prevent DB contention
 # Wait up to 30 mins for the general lock just in case they overlap
-flock -w 1800 /tmp/dealhunter.lock bash -c "python3 -m dealhunter.cli sync --provider uber_eats"
+flock -w 1800 "${TMPDIR:-/tmp}/dealhunter.lock" bash -c "python3 -m dealhunter.cli sync --provider uber_eats"

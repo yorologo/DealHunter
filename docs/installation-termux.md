@@ -15,8 +15,9 @@ pkg install git python sqlite
 
 ## 3. Clonar Repositorio
 ```bash
-git clone https://github.com/USERNAME/rappi-deal-hunter.git
+git clone https://github.com/yorologo/DealHunter.git
 cd rappi-deal-hunter
+pip install -r requirements.txt
 ```
 
 ## 4. Configurar Permisos
@@ -31,18 +32,18 @@ chmod +x bin/rappi-historico
 ## 5. Pruebas de Arranque (Test Run)
 Haz una minería microscópica controlada que no te hará chocar con un rate limit:
 ```bash
-./bin/rappi-ofertas --test
+./bin/rappi-ofertas doctor
 ```
 Verifica que la base de datos se haya creado.
 
 ## 6. Primer Run Real
 Escanea tu área. Alimenta tus coordenadas reales usando `--lat` y `--lng`. Si prefieres testear la funcionalidad `general` que recorre todos los verticales:
 ```bash
-./bin/rappi-ofertas --vertical general --lat TU_LATITUD --lng TU_LONGITUD
+./bin/rappi-ofertas discover --vertical general --lat TU_LATITUD --lng TU_LONGITUD
 ```
 
 ## 7. Ejecución de Históricos (Day 2 onwards)
 Al día siguiente, corre el comando anterior de nuevo. Al finalizar, audita los resultados reales:
 ```bash
-./bin/rappi-historico
+./bin/rappi-historico deals
 ```
