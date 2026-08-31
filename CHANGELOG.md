@@ -1,6 +1,6 @@
 # Changelog
 
-## [v3.2.0] - Unreleased release candidate
+## [v3.2.0] - 2026-08-31
 
 `v3.2.0` is the current development target. It is currently in `main`, but has not been tagged or released.
 

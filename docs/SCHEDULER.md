@@ -28,10 +28,10 @@ crontab -e
 **Enable (Example Entry):**
 ```bash
 # Rappi Sync
-0 7,10,13,19 * * * cd /data/data/com.termux/files/home/rappi-deal-hunter && DEALHUNTER_SOURCE=SCHEDULED /data/data/com.termux/files/usr/bin/flock -n /tmp/dealhunter.lock bash -c "PYTHONPATH=src python3 -m dealhunter.cli sync --provider rappi && ./bin/dealwatcher" >> logs/crawler-cron.log 2>&1
+0 7,10,13,19 * * * cd /data/data/com.termux/files/home/rappi-deal-hunter && DEALHUNTER_SOURCE=SCHEDULED /data/data/com.termux/files/usr/bin/flock -n ${TMPDIR:-/tmp}/dealhunter.lock bash -c "PYTHONPATH=src python3 -m dealhunter.cli sync --provider rappi && ./bin/dealwatcher" >> logs/crawler-cron.log 2>&1
 
 # Uber Eats Sync
-30 7,10,13,19 * * * cd /data/data/com.termux/files/home/rappi-deal-hunter && DEALHUNTER_SOURCE=SCHEDULED /data/data/com.termux/files/usr/bin/flock -n /tmp/dealhunter.lock bash -c "PYTHONPATH=src python3 -m dealhunter.cli sync --provider uber_eats && ./bin/dealwatcher" >> logs/crawler-cron.log 2>&1
+30 7,10,13,19 * * * cd /data/data/com.termux/files/home/rappi-deal-hunter && DEALHUNTER_SOURCE=SCHEDULED /data/data/com.termux/files/usr/bin/flock -n ${TMPDIR:-/tmp}/dealhunter.lock bash -c "PYTHONPATH=src python3 -m dealhunter.cli sync --provider uber_eats && ./bin/dealwatcher" >> logs/crawler-cron.log 2>&1
 ```
 
 **Disable:**
@@ -53,7 +53,7 @@ Android enforces strict power management (Deep Sleep / Doze mode) when the scree
 - **Database Tracking**: `sqlite3 rappi-deals.db "SELECT run_id, started_at, status FROM runs ORDER BY started_at DESC LIMIT 5;"`
 
 ## Singleton Lock (Concurrency Protection)
-We use `flock -n /tmp/dealhunter.lock` to guarantee that only one crawler can run at a time. If a crawl takes longer than the interval or is triggered manually while the cron is running, the secondary execution is safely rejected to avoid database locking issues or duplicate observations.
+We use `flock -n ${TMPDIR:-/tmp}/dealhunter.lock` to guarantee that only one crawler can run at a time. If a crawl takes longer than the interval or is triggered manually while the cron is running, the secondary execution is safely rejected to avoid database locking issues or duplicate observations.
 
 ## Delivery Failures
 Failures in the Termux notification delivery (e.g. API crash) will mark the event's `delivery_status` as `failed` inside `alert_events`, but will *not* crash the crawler or corrupt historical observations. DealHunter does not implement aggressive infinite retries to avoid delayed spam floods.

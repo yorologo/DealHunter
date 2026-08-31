@@ -76,6 +76,7 @@
                                 <div class="small text-muted">Provider principal</div>
                             </div>
                             <form method="POST" action="/admin/settings/provider">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                                 <input type="hidden" name="provider" value="rappi">
                                 <input type="hidden" name="enabled" value="{{ 'false' if p_rappi else 'true' }}">
                                 <button type="submit" class="btn btn-sm {{ 'btn-success' if p_rappi else 'btn-outline-secondary' }}">
@@ -90,6 +91,7 @@
                                 <div class="small text-muted">Integración secundaria</div>
                             </div>
                             <form method="POST" action="/admin/settings/provider">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                                 <input type="hidden" name="provider" value="uber_eats">
                                 <input type="hidden" name="enabled" value="{{ 'false' if p_uber else 'true' }}">
                                 <button type="submit" class="btn btn-sm {{ 'btn-success' if p_uber else 'btn-outline-secondary' }}">
@@ -115,6 +117,7 @@
                     {% set c_policy = raw_config.get("comparison", {}).get("inactive_membership_offers", "show_but_exclude") %}
                     
                     <form method="POST" action="/admin/settings/membership" class="mb-3 d-flex gap-2">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                         <select name="membership" class="form-select form-select-sm" style="width: auto;">
                             <option value="rappi_pro">Rappi Pro</option>
                             <option value="uber_one">Uber One</option>
@@ -130,6 +133,7 @@
                     <hr>
                     
                     <form method="POST" action="/admin/settings/comparison">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                         <label class="form-label small fw-bold">Política para ofertas de membresías inactivas/desconocidas</label>
                         <div class="d-flex gap-2">
                             <select name="policy" class="form-select form-select-sm">

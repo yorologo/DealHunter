@@ -28,7 +28,7 @@ DealHunter es un motor local-first de inteligencia de precios y oportunidades pa
 
 ### Última release pública
 
-- **Tag/release verificado**: `v3.0.1`.
+- **Release publication**: Determinado por Git tag y GitHub Releases.
 
 ### Estado de capacidades
 
@@ -142,9 +142,9 @@ Para mantener DealHunter Web activo en Android/Termux, DealHunter adquiere el `t
 DealHunter Phase 4I supports automated background execution and push notifications via `termux-notification`.
 See [docs/SCHEDULER.md](docs/SCHEDULER.md) for instructions on setting up `cron`, configuring the DealWatcher, and managing Termux battery optimizations.
 
-## DealHunter v3.0.1 — baseline histórico de la última release pública
+## DealHunter v3.2.0 — Release Target
 
-La release pública `v3.0.1` utilizó **schema v14**. Esta subsección conserva su contexto histórico; el RC actual usa schema v16.
+Esta versión estabiliza la infraestructura de multi-proveedor e introduce el schema v16.
 
 ### Key Features
 - **A5** endpoint for primary CPG discovery with safe fallback.

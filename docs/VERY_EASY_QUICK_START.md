@@ -27,118 +27,7 @@ con permisos ADB sin root.
 DealHunter lo utiliza, entre otras cosas, para integrarse con la aplicación
 oficial de Rappi.
 
-### Codex / Antigravity
 
-Son agentes de programación capaces de trabajar directamente dentro de
-Termux.
-
-Sólo necesitas UNO.
-
-Puedes instalar:
-
-- Codex
-- Google Antigravity
-- o ambos
-
-Después simplemente pegarás el prompt de instalación de DealHunter.
-
----
-
-# PASO 1 — Instala Termux
-
-Instálalo desde una fuente oficial.
-
-Recomendado:
-
-1. F-Droid
-2. GitHub Releases oficial de Termux
-
-NO mezcles Termux y sus plugins descargados desde fuentes diferentes.
-
-Abre Termux una vez después de instalarlo.
-
-[Descargar Termux desde F-Droid](https://f-droid.org/packages/com.termux/)
-
-[Descargar Termux desde GitHub oficial](https://github.com/termux/termux-app/releases)
-
----
-
-# PASO 2 — Instala Shizuku
-
-Instala Shizuku desde su distribución oficial.
-
-Después:
-
-1. Abre Shizuku.
-2. Sigue la guía para iniciarlo mediante Depuración inalámbrica (Android 11+).
-3. Comprueba que Shizuku indique que está funcionando.
-4. Autoriza Termux cuando Shizuku lo solicite.
-
-En Shizuku busca:
-
-Usar Shizuku en aplicaciones de terminal
-→ Exportar archivos
-
-Guárdalos en:
-
-Downloads/shizuku
-
-Deben aparecer:
-
-rish
-rish_shizuku.dex
-
-No necesitas editar estos archivos manualmente.
-La IA lo hará después.
-
-[Descargar Shizuku](https://shizuku.rikka.app/download/)
-
----
-
-# PASO 3 — Prepara Termux
-
-Abre Termux y ejecuta:
-
-```bash
-pkg update && pkg upgrade -y
-termux-setup-storage
-```
-
-Acepta el permiso de almacenamiento si Android lo solicita.
-
----
-
-# PASO 4 — Instala una IA
-
-Puedes escoger Codex, Antigravity o ambos. (Nota: Los ports para Termux son comunitarios y no son distribuciones oficiales de OpenAI o Google, pero funcionan de manera equivalente en este entorno).
-
-## Opción A — Codex
-
-Sigue la guía: [Instalación de Termux y AI](installation-termux.md) → sección Codex
-
-Cuando termine:
-
-```bash
-codex login --device-auth
-```
-
-Completa el inicio de sesión en el navegador.
-
-Comprueba:
-
-```bash
-codex login status
-```
-
-Después inicia:
-
-```bash
-codex
-```
-
-## Opción B — Antigravity
-
-Sigue la guía: [Instalación de Termux y AI](installation-termux.md) → sección Antigravity
 
 Comprueba:
 
@@ -171,7 +60,6 @@ NO escribas cron.
 NO instales dependencias manualmente.
 NO necesitas saber Python.
 
-Abre Codex o Antigravity y pega COMPLETO el siguiente prompt.
 
 ***
 
@@ -181,7 +69,6 @@ Repositorio oficial:
 
 https://github.com/yorologo/DealHunter.git
 
-Estoy ejecutando esta instrucción desde Termux mediante Codex o Antigravity.
 
 OBJETIVO:
 
@@ -719,6 +606,5 @@ Si algo falla, consulta estas soluciones comunes:
 
 - **Shizuku no está running o Termux no autorizado**: Vuelve a iniciar la app Shizuku, conecta la depuración inalámbrica y permite el acceso a Termux. [Más info](https://shizuku.rikka.app/guide/setup/).
 - **Archivos `rish` no exportados**: Entra a Shizuku y usa la opción explícita "Exportar archivos" desde "Usar Shizuku en aplicaciones de terminal".
-- **Problemas iniciando Codex/Antigravity**: Si el comando de inicio o el login fallan, consulta el [manual completo de Instalación en Termux](installation-termux.md).
-- **El scheduler no corre tras reiniciar**: Android apaga `crond` y Termux al reiniciar. Debes volver a abrir Termux, iniciar Shizuku, y ejecutar el comando del daemon (por ejemplo `crond`). [Revisa la guía completa para persistencia](installation-termux.md).
+- **El scheduler no corre tras reiniciar**: Android apaga `crond` y Termux al reiniciar. Debes volver a abrir Termux, iniciar Shizuku, y ejecutar el comando del daemon (por ejemplo `crond`). [Revisa la guía completa](installation-termux.md).
 - **Sesión de Rappi expirada**: La IA te pedirá revalidarla y actualizarla usando el mecanismo oficial de DealHunter, o puedes consultar los [Diagnósticos de Cuenta](account-diagnostics.md) para hacerlo tú mismo.
