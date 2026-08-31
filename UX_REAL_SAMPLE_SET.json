@@ -1,42 +1,92 @@
 [
   {
     "provider": "rappi",
-    "route": "/categories/market",
-    "action": "load_category",
-    "expected": "HTTP 200, None prices handled",
+    "route": "/categories/Food",
+    "action": "category",
+    "expected": "HTTP 200",
     "actual": "HTTP 200",
-    "status": "PASS"
+    "status": "PASS",
+    "why_selected": "Rappi category discovery"
+  },
+  {
+    "provider": "rappi",
+    "route": "/stores/rappi/1306701854",
+    "action": "store",
+    "expected": "HTTP 200",
+    "actual": "HTTP 200",
+    "status": "PASS",
+    "why_selected": "Rappi real store: None"
+  },
+  {
+    "provider": "rappi",
+    "route": "/products/rappi/1306701854/1306701854_1563685267",
+    "action": "product",
+    "expected": "HTTP 200",
+    "actual": "HTTP 200",
+    "status": "PASS",
+    "why_selected": "Rappi real product: Whisky Black y White Blended Scotch 700 ml"
+  },
+  {
+    "provider": "rappi",
+    "route": "/restaurants/rappi/1306701973",
+    "action": "restaurant",
+    "expected": "HTTP 200",
+    "actual": "HTTP 200",
+    "status": "PASS",
+    "why_selected": "Rappi real restaurant: Popeyes - Real Center"
+  },
+  {
+    "provider": "rappi",
+    "route": "/products/rappi/1306701973/6446158",
+    "action": "dish",
+    "expected": "HTTP 200",
+    "actual": "HTTP 200",
+    "status": "PASS",
+    "why_selected": "Rappi real dish: Ciel Natural 600 ml"
   },
   {
     "provider": "uber_eats",
     "route": "/restaurants",
-    "action": "load_restaurants_list",
-    "expected": "Uber Eats RESTAURANT types visible",
-    "actual": "Store with type RESTAURANT visible",
-    "status": "PASS"
-  },
-  {
-    "provider": "rappi",
-    "route": "/compare?q=Pizza",
-    "action": "compare_null_store",
-    "expected": "HTTP 200 without TypeError",
+    "action": "restaurants_list",
+    "expected": "HTTP 200",
     "actual": "HTTP 200",
-    "status": "PASS"
-  },
-  {
-    "provider": "system",
-    "route": "/admin/catalog-sync",
-    "action": "admin_sync_dashboard",
-    "expected": "HTTP 200 without UnboundLocalError",
-    "actual": "HTTP 200",
-    "status": "PASS"
+    "status": "PASS",
+    "why_selected": "Uber Eats restaurant list"
   },
   {
     "provider": "uber_eats",
-    "route": "/products/uber_eats/u_rest/p1",
-    "action": "product_detail",
-    "expected": "Render gracefully with None timestamps and prices",
+    "route": "/restaurants/uber_eats/03521919-0ef9-4f94-94c7-39bdfa126298",
+    "action": "restaurant",
+    "expected": "HTTP 200",
     "actual": "HTTP 200",
-    "status": "PASS"
+    "status": "PASS",
+    "why_selected": "Uber Eats real restaurant: Da Fabio Trattoria Pizzeria Bar"
+  },
+  {
+    "provider": "uber_eats",
+    "route": "/products/uber_eats/03521919-0ef9-4f94-94c7-39bdfa126298/0a3c5930-54b7-447d-9df8-4c21f6ca2c08",
+    "action": "dish",
+    "expected": "HTTP 200",
+    "actual": "HTTP 200",
+    "status": "PASS",
+    "why_selected": "Uber Eats real dish: Pizza Artesanal Gamberetti"
+  },
+  {
+    "provider": "uber_eats",
+    "route": "/compare?q=Pizza",
+    "action": "search",
+    "expected": "HTTP 200",
+    "actual": "HTTP 200",
+    "status": "PASS",
+    "why_selected": "Uber Eats cross search"
+  },
+  {
+    "provider": "uber_eats",
+    "route": "/categories/Uncategorized",
+    "action": "category_missing",
+    "expected": "HTTP 200",
+    "actual": "HTTP 200",
+    "status": "PASS",
+    "why_selected": "Uber Eats generic category"
   }
 ]

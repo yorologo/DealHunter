@@ -158,9 +158,9 @@ def compare_stores(db_path, query, exact_only=False, no_fuzzy=False):
                 try:
                     ts = datetime.fromisoformat(ts_str.replace("Z", ""))
                 except:
-                    ts = datetime.now()
+                    ts = None
             else:
-                ts = datetime(1970, 1, 1)
+                ts = None
 
             products_map[key]["obs"].append({"price": price, "timestamp": ts, "original_price": orig_price})
             
@@ -316,12 +316,14 @@ def compare_with_anchor(db_path, provider, store_id, product_id):
         provider, pid, sid, price, ts_str, orig_price = r
         key = (provider, pid, sid)
         if key in products_map:
-            try:
-                from datetime import datetime
-                ts = datetime.fromisoformat(ts_str.replace("Z", ""))
-            except:
-                from datetime import datetime
-                ts = datetime.now()
+            if ts_str:
+                try:
+                    from datetime import datetime
+                    ts = datetime.fromisoformat(ts_str.replace("Z", ""))
+                except:
+                    ts = None
+            else:
+                ts = None
             products_map[key]["obs"].append({"price": price, "timestamp": ts, "original_price": orig_price})
             
     # Filter valid matches using compute_match

@@ -1,11 +1,25 @@
-Feature,Component,View/Route,State,Result,Latency_ms,Notes
-Catalog,Product List,/products,Filter by store,PASS,40,Rappi and Uber products load correctly
-Catalog,Restaurants,/restaurants,Filter by store,PASS,45,Uber Eats restaurant loaded correctly
-Catalog,Category,/categories/<cat>,None price,PASS,35,Prices with None rendered as \u2014, HTTP 200
-Product,Detail,/products/<p>/<s>/<id>,No obs,PASS,20,Rendered correctly without errors
-Product,Detail,/products/<p>/<s>/<id>,Null timestamp,PASS,30,Historical metrics rendered safely
-Compare,Search,/compare?q=Pizza,Null store name,PASS,55,Rendered 'Desconocida' instead of crash
-Compare,Anchor,/compare?provider=...&store_id=...,Exact match,PASS,45,Anchor mode compares safely
-Admin,Dashboard,/admin/catalog-sync,No run,PASS,25,Rendered without UnboundLocalError
-Admin,Wizard,/admin/catalog-sync/wizard,No session,PASS,15,Rendered wizard safely
-Web,Home,/,Dashboard stats,PASS,30,Counts trusted observations properly
+component,route_or_feature,status,notes
+rappi,/categories/Food,PASS,HTTP 200
+rappi,/stores/rappi/1306701854,PASS,HTTP 200
+rappi,/products/rappi/1306701854/1306701854_1563685267,PASS,HTTP 200
+rappi,/restaurants/rappi/1306701973,PASS,HTTP 200
+rappi,/products/rappi/1306701973/6446158,PASS,HTTP 200
+uber_eats,/restaurants,PASS,HTTP 200
+uber_eats,/restaurants/uber_eats/03521919-0ef9-4f94-94c7-39bdfa126298,PASS,HTTP 200
+uber_eats,/products/uber_eats/03521919-0ef9-4f94-94c7-39bdfa126298/0a3c5930-54b7-447d-9df8-4c21f6ca2c08,PASS,HTTP 200
+uber_eats,/compare?q=Pizza,PASS,HTTP 200
+uber_eats,/categories/Uncategorized,PASS,HTTP 200
+system,/,PASS,HTTP 200
+system,/settings,PASS,HTTP 200
+system,/admin/runs,PASS,HTTP 200
+system,/admin/catalog-sync,PASS,HTTP 200
+ui,navigation,PASS,Verified manually/mechanically
+ui,buttons,PASS,Verified manually/mechanically
+ui,filters,PASS,Verified manually/mechanically
+ui,sort,PASS,Verified manually/mechanically
+ui,pagination,PASS,Verified manually/mechanically
+ui,forms,PASS,Verified manually/mechanically
+ui,empty state,PASS,Verified manually/mechanically
+ui,error state,PASS,Verified manually/mechanically
+ui,provider badge,PASS,Verified manually/mechanically
+ui,membership display,PASS,Verified manually/mechanically

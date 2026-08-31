@@ -92,9 +92,9 @@ def get_product_detail(db_path, provider, store_id, product_id):
             try:
                 ts = datetime.fromisoformat(r[1].replace("Z", ""))
             except:
-                ts = datetime.now()
+                ts = None
         else:
-            ts = datetime(1970, 1, 1)
+            ts = None
 
         obs.append({
             "price": r[0],

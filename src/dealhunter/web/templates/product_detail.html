@@ -220,7 +220,7 @@
                 <div class="card h-100 bg-body-tertiary border-0 shadow-sm">
                     <div class="card-body d-flex justify-content-between align-items-center">
                         <span class="text-secondary">Primera vez:</span>
-                        <span class="fw-bold">{{ p.observations[0].timestamp.strftime('%Y-%m-%d') }}</span>
+                        <span class="fw-bold">{% if p.observations[0].timestamp %}{{ p.observations[0].timestamp.strftime('%Y-%m-%d') }}{% else %}Desconocido{% endif %}</span>
                     </div>
                 </div>
             </div>
@@ -228,7 +228,7 @@
                 <div class="card h-100 bg-body-tertiary border-0 shadow-sm">
                     <div class="card-body d-flex justify-content-between align-items-center">
                         <span class="text-secondary">Última vez:</span>
-                        <span class="fw-bold">{{ p.observations[-1].timestamp.strftime('%Y-%m-%d') }}</span>
+                        <span class="fw-bold">{% if p.observations[-1].timestamp %}{{ p.observations[-1].timestamp.strftime('%Y-%m-%d') }}{% else %}Desconocido{% endif %}</span>
                     </div>
                 </div>
             </div>
@@ -290,7 +290,7 @@
                     <tbody>
                         {% for obs in p.observations|reverse %}
                         <tr>
-                            <td class="small">{{ obs.timestamp.strftime('%Y-%m-%d %H:%M') }}</td>
+                            <td class="small">{% if obs.timestamp %}{{ obs.timestamp.strftime('%Y-%m-%d %H:%M') }}{% else %}-{% endif %}</td>
                             <td class="fw-bold">${{ "%.2f"|format(obs.price) }}</td>
                             <td class="small text-secondary">{{ "${:,.2f}".format(obs.original_price) if obs.original_price else '-' }}</td>
                             <td>
@@ -316,12 +316,14 @@
 <script>
     const obsData = [
         {% for obs in p.observations %}
+        {% if obs.timestamp %}
         {
             x: '{{ obs.timestamp.isoformat() }}',
             y: {{ obs.price }},
             orig: {{ obs.original_price or 'null' }},
             promo: '{{ obs.promotion_label or "" }}'
         },
+        {% endif %}
         {% endfor %}
     ];
     
