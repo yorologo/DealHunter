@@ -1,0 +1,42 @@
+[
+  {
+    "provider": "rappi",
+    "route": "/categories/market",
+    "action": "load_category",
+    "expected": "HTTP 200, None prices handled",
+    "actual": "HTTP 200",
+    "status": "PASS"
+  },
+  {
+    "provider": "uber_eats",
+    "route": "/restaurants",
+    "action": "load_restaurants_list",
+    "expected": "Uber Eats RESTAURANT types visible",
+    "actual": "Store with type RESTAURANT visible",
+    "status": "PASS"
+  },
+  {
+    "provider": "rappi",
+    "route": "/compare?q=Pizza",
+    "action": "compare_null_store",
+    "expected": "HTTP 200 without TypeError",
+    "actual": "HTTP 200",
+    "status": "PASS"
+  },
+  {
+    "provider": "system",
+    "route": "/admin/catalog-sync",
+    "action": "admin_sync_dashboard",
+    "expected": "HTTP 200 without UnboundLocalError",
+    "actual": "HTTP 200",
+    "status": "PASS"
+  },
+  {
+    "provider": "uber_eats",
+    "route": "/products/uber_eats/u_rest/p1",
+    "action": "product_detail",
+    "expected": "Render gracefully with None timestamps and prices",
+    "actual": "HTTP 200",
+    "status": "PASS"
+  }
+]

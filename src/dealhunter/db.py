@@ -379,7 +379,7 @@ def migrate(conn, db_path):
         SELECT o.* FROM observations o
         JOIN runs r ON o.run_id = r.run_id
         WHERE o.provider IN ('rappi', 'uber_eats')
-          AND r.status IN ('SUCCESS', 'PARTIAL')
+          AND r.status IN ('SUCCESS', 'PARTIAL', 'COMPLETED', 'COMPLETE')
     ''')
 
     conn.commit()

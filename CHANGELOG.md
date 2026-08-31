@@ -2,8 +2,7 @@
 
 ## [v3.2.0] - Unreleased release candidate
 
-`v3.2.0` is the current development target. It has not been merged to `main`,
-tagged or released.
+`v3.2.0` is the current development target. It is currently in `main`, but has not been tagged or released.
 
 ### Added
 - **Multi-Provider Architecture**: Implemented robust provider registry and decoupled core logic from specific providers.

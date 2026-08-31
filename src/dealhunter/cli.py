@@ -166,7 +166,7 @@ def build_parser():
     watch_p.add_argument("query_or_id", nargs="?")
     uber_p = subparsers.add_parser("uber", help="Uber Eats management")
     uber_p.add_argument("action", choices=["status", "setup"])
-    
+
     sync_p = subparsers.add_parser("sync", help="Sync data from a specific provider", parents=[base_parser])
     sync_p.add_argument("--provider", choices=["rappi", "uber_eats"], default="rappi", help="Provider to sync")
 
@@ -177,17 +177,17 @@ def build_parser():
 
     # Phase 5E settings
     providers_p = subparsers.add_parser("providers", help="List configured providers")
-    
+
     prov_p = subparsers.add_parser("provider", help="Manage a provider")
     prov_p.add_argument("name", choices=["rappi", "uber_eats"])
     prov_p.add_argument("action", choices=["enable", "disable"])
-    
+
     memberships_p = subparsers.add_parser("memberships", help="List configured memberships")
-    
+
     mem_p = subparsers.add_parser("membership", help="Manage a membership")
     mem_p.add_argument("name", choices=["rappi_pro", "uber_one"])
     mem_p.add_argument("action", choices=["active", "inactive", "unknown"])
-    
+
     comp_p = subparsers.add_parser("comparison", help="Manage comparison policies")
     comp_p.add_argument("policy", choices=["membership-policy"])
     comp_p.add_argument("value", choices=["exclude", "show_but_exclude", "include"])
@@ -634,10 +634,10 @@ def main(args_list=None):
         lat, lng = location
         _warn_on_location_change(conn, lat, lng)
         run_source = os.environ.get("DEALHUNTER_SOURCE", "CLI")
-        
+
         c = conn.cursor()
-        c.execute('''INSERT INTO runs (run_id, started_at, lat, lng, radius, vertical, status, source) 
-                     VALUES (?, ?, ?, ?, ?, ?, ?, ?)''', 
+        c.execute('''INSERT INTO runs (run_id, started_at, lat, lng, radius, vertical, status, source)
+                     VALUES (?, ?, ?, ?, ?, ?, ?, ?)''',
                   (run_id, datetime.now().isoformat(), lat, lng, config.get("radius"), str(config.get("vertical", "general")), "RUNNING", run_source))
         conn.commit()
 
@@ -647,13 +647,13 @@ def main(args_list=None):
         from dealhunter.eligibility import EligibilityEngine
         engine = EligibilityEngine(config)
         target_provider = getattr(args, "provider", "rappi")
-        
+
         if not engine.is_provider_enabled(target_provider):
             print(f"SKIPPED: Provider '{target_provider}' is disabled in configuration.", file=sys.stderr)
-            
-            # Still update run to COMPLETED so it doesn't stay RUNNING
+
+            # Still update run to PARTIAL so it doesn't stay RUNNING
             c = conn.cursor()
-            c.execute("UPDATE runs SET status='SKIPPED', finished_at=? WHERE run_id=?", 
+            c.execute("UPDATE runs SET status='PARTIAL', finished_at=? WHERE run_id=?",
                      (datetime.now().isoformat(), run_id))
             conn.commit()
             return 0
@@ -666,41 +666,41 @@ def main(args_list=None):
                 import asyncio
                 from dealhunter.auth import RappiSessionProvider
                 from dealhunter.account import SessionStatus
-    
+
                 provider = RappiSessionProvider()
                 has_token = asyncio.run(provider.is_authenticated())
                 status = SessionStatus().get_current(check_network=False)
                 is_auth = has_token and status.get("status") in ("VALID", "UNVERIFIED", "CONFIGURED")
                 print(f"DEBUG: has_token={has_token}, status={status.get('status')}, is_auth={is_auth}", file=sys.stderr)
-    
+
                 if is_auth and config.get("catalog_sync", {}).get("enabled", True):
                     print(f"SESSION_{status.get('status')}: Using ZONE_INVENTORY mode.", file=sys.stderr)
                     from dealhunter.crawler_zone import run_zone_inventory
                     state, reqs = run_zone_inventory(config, lat, lng, conn, run_id, dry_run=config.get("dry_run"))
                     if state == "SESSION_EXPIRED":
                         print("SESSION_EXPIRED: Using SEARCH_DISCOVERY mode as fallback.", file=sys.stderr)
-                        
+
                         from dealhunter.secret_store import SessionService
                         from datetime import timezone
                         svc = SessionService()
                         if svc.get_mode() == "PERSISTENT":
                             svc.update_validation("EXPIRED", datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ'))
-                            
+
                         c.execute('''UPDATE runs SET crawler_mode = ?, coverage_complete = ?, status = ?, finished_at = CURRENT_TIMESTAMP WHERE run_id = ?''',
                                   ("ZONE_INVENTORY", 0, "PARTIAL", run_id))
                         conn.commit()
-    
+
                         import uuid
                         fallback_run_id = str(uuid.uuid4())
                         c.execute('INSERT INTO runs (run_id, started_at, status) VALUES (?, CURRENT_TIMESTAMP, "RUNNING")', (fallback_run_id,))
                         conn.commit()
-    
+
                         from dealhunter.crawler import run_discover, run_update
                         if mode == "discover":
                             state, reqs = run_discover(config, lat, lng, conn, fallback_run_id, dry_run=config.get("dry_run"))
                         else:
                             state, reqs = run_update(config, lat, lng, conn, fallback_run_id, dry_run=config.get("dry_run"))
-    
+
                         # Update run_id variable so the final block uses the fallback run_id
                         run_id = fallback_run_id
                     else:
@@ -718,7 +718,7 @@ def main(args_list=None):
                         state, reqs = run_discover(config, lat, lng, conn, run_id, dry_run=config.get("dry_run"))
                     else:
                         state, reqs = run_update(config, lat, lng, conn, run_id, dry_run=config.get("dry_run"))
-    
+
         except Exception as exc:
             # Preserve already-committed observations; mark run as PARTIAL
             from .errors import classify_error
@@ -726,7 +726,9 @@ def main(args_list=None):
             state = "PARTIAL"
             print(f"Run interrupted: {err}", file=sys.stderr)
 
-        c.execute('''UPDATE runs SET status = ?, finished_at = CURRENT_TIMESTAMP WHERE run_id = ?''', (state, run_id))
+        from dealhunter.run_status import normalize_run_status
+        canonical_state = normalize_run_status(state)
+        c.execute('''UPDATE runs SET status = ?, finished_at = CURRENT_TIMESTAMP WHERE run_id = ?''', (canonical_state, run_id))
         conn.commit()
 
         if config.get("dry_run"):

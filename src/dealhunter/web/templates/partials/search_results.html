@@ -13,7 +13,7 @@
         {% if results.stores %}
             <div class="list-group-item bg-light text-secondary small fw-bold">TIENDAS Y RESTAURANTES</div>
             {% for s in results.stores %}
-                {% if s.type == 'restaurants' %}
+                {% if s.type|lower in ['restaurant', 'restaurants'] %}
                     <a href="/restaurants/{{ s.provider }}/{{ s.store_id }}" class="list-group-item list-group-item-action d-flex align-items-center gap-2">
                         <span>🍔</span>
                         <div class="flex-grow-1">
@@ -36,7 +36,7 @@
         {% if results.products %}
             <div class="list-group-item bg-light text-secondary small fw-bold">PRODUCTOS Y PLATILLOS</div>
             {% for p in results.products %}
-                {% if p.store_type == 'restaurants' %}
+                {% if p.store_type|lower in ['restaurant', 'restaurants'] %}
                     <a href="/products/{{ p.provider }}/{{ p.store_id }}/{{ p.product_id }}?context=restaurant" class="list-group-item list-group-item-action d-flex align-items-center gap-2">
                         <span>🍽️</span>
                         <div class="flex-grow-1">

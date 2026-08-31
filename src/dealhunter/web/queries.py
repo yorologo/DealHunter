@@ -181,9 +181,9 @@ def enrich_products_with_metrics(db_path, products):
             try:
                 ts = datetime.fromisoformat(r[4].replace("Z", ""))
             except:
-                ts = datetime.now()
+                ts = None
         else:
-            ts = datetime(1970, 1, 1)
+            ts = None
 
         obs_map[key].append({"price": r[3], "timestamp": ts, "original_price": r[5]})
         
@@ -561,7 +561,7 @@ def get_restaurants_home(db_path, filters=None):
         FROM stores s
         LEFT JOIN products p ON s.provider = p.provider AND s.store_id = p.store_id
         LEFT JOIN trusted_observations o ON p.provider = o.provider AND p.product_id = o.product_id AND p.store_id = o.store_id
-        WHERE LOWER(s.type) IN ('restaurant', 'restaurants')
+        WHERE (LOWER(s.type) IN ('restaurant', 'restaurants') OR LOWER(s.vertical) IN ('restaurant', 'restaurants'))
         {provider_sql}
         GROUP BY s.provider, s.store_id
         HAVING COUNT(DISTINCT p.product_id) > 0
@@ -608,7 +608,7 @@ def get_restaurant_detail(db_path, provider, store_id):
     conn = sqlite3.connect(db_path)
     c = conn.cursor()
     
-    c.execute("SELECT name, brand, type FROM stores WHERE provider = ? AND store_id = ? AND LOWER(type) IN ('restaurant', 'restaurants')", (provider, store_id,))
+    c.execute("SELECT name, brand, type FROM stores WHERE provider = ? AND store_id = ? AND (LOWER(type) IN ('restaurant', 'restaurants') OR LOWER(vertical) IN ('restaurant', 'restaurants'))", (provider, store_id,))
     row = c.fetchone()
     if not row:
         return None
@@ -766,7 +766,7 @@ def get_available_stores(db_path, vertical=None, filters=None):
         if vertical == "turbo":
             c.execute("SELECT store_id, name FROM stores WHERE type IN ('chiper_home', 'chiper_extended', 'chiper_express') ORDER BY name")
         elif vertical == "market":
-            c.execute("SELECT store_id, name FROM stores WHERE LOWER(type) NOT IN ('chiper_home', 'chiper_extended', 'chiper_express', 'restaurants', 'restaurant') ORDER BY name")
+            c.execute("SELECT store_id, name FROM stores WHERE (LOWER(type) NOT IN ('chiper_home', 'chiper_extended', 'chiper_express', 'restaurants', 'restaurant')) AND (LOWER(vertical) NOT IN ('restaurants', 'restaurant') OR vertical IS NULL) ORDER BY name")
         else:
             c.execute("SELECT store_id, name FROM stores WHERE type = ? ORDER BY name", (vertical,))
     else:
@@ -782,7 +782,7 @@ def get_available_categories(db_path, vertical=None, store_ids=None, filters=Non
         if vertical == "turbo":
             query += " AND s.type IN ('chiper_home', 'chiper_extended', 'chiper_express')"
         elif vertical == "market":
-            query += " AND LOWER(s.type) NOT IN ('chiper_home', 'chiper_extended', 'chiper_express', 'restaurants', 'restaurant')"
+            query += " AND (LOWER(s.type) NOT IN ('chiper_home', 'chiper_extended', 'chiper_express', 'restaurants', 'restaurant')) AND (LOWER(s.vertical) NOT IN ('restaurants', 'restaurant') OR s.vertical IS NULL)"
         else:
             query += " AND s.type = ?"
             params.append(vertical)

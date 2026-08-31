@@ -40,9 +40,9 @@
         <div class="mt-auto">
             <div class="d-flex justify-content-between align-items-end">
                 <div>
-                    <div class="fs-4 fw-bold text-success lh-1">${{ "%.2f"|format(p.current_price) }}</div>
+                    <div class="fs-4 fw-bold text-success lh-1">{% if p.current_price is not none %}${{ "%.2f"|format(p.current_price) }}{% else %}—{% endif %}</div>
                     {% set op = p.metrics.original_price if p.metrics else None %}
-                    {% if op and op > p.current_price %}
+                    {% if op is not none and p.current_price is not none and op > p.current_price %}
                         <div class="fs-6 text-decoration-line-through text-secondary mt-1">${{ "%.2f"|format(op) }}
                         {% if p.metrics and p.metrics.is_suspicious_reference %}
                             <span class="badge bg-warning text-dark border ms-1" title="Precio original sospechoso">⚠️</span>
@@ -56,7 +56,7 @@
                 
                 
                 <div class="text-end">
-                    {% if p.has_pro_offer == 1 and p.pro_price %}
+                    {% if p.has_pro_offer == 1 and p.pro_price is not none %}
                     <div class="mb-1 text-end">
                         <span class="badge bg-dark text-white border border-dark rounded-pill py-1 px-2" style="font-size: 0.75rem;">
                             Pro ${{ "%.2f"|format(p.pro_price) }}
@@ -67,7 +67,7 @@
                     </div>
                     {% endif %}
 
-                    {% if op and op > p.current_price and (not p.metrics or not p.metrics.is_suspicious_reference) %}
+                    {% if op is not none and p.current_price is not none and op > p.current_price and (not p.metrics or not p.metrics.is_suspicious_reference) %}
                         {% set discount = ((op - p.current_price) / op) * 100 %}
                         {% set savings = op - p.current_price %}
                         <div class="badge bg-danger-subtle text-danger border border-danger-subtle mb-1 d-block">-{{ "%.1f"|format(discount) }}%</div>

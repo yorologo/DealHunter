@@ -52,9 +52,9 @@ def analyze_history(db_path, config, store=None, product=None):
                 "obs": []
             }
         try:
-            ts = datetime.fromisoformat(ts_str.replace("Z", ""))
+            ts = datetime.fromisoformat(ts_str.replace("Z", "")) if ts_str else None
         except:
-            ts = datetime.now()
+            ts = None
         grouped[key]["obs"].append({"price": price, "timestamp": ts, "discount_effective": d_eff, "original_price": orig_price})
         
     results = []
@@ -217,7 +217,7 @@ def compare_stores(db_path, query, exact_only=False, no_fuzzy=False):
             
             res.append({
                 "GRUPO": best_current["product_name"][:20],
-                "TIENDA": item["store_name"][:15],
+                "TIENDA": (item.get("store_name") or item.get("store_id") or "Desconocida")[:15],
                 "PRECIO": f"${item['price']:.2f}",
                 "DIFF": f"+{((item['price'] / best_current['price']) - 1) * 100:.1f}%" if item['price'] > best_current['price'] else "BEST",
                 "UNIT_PRICE": up_str,
@@ -399,7 +399,7 @@ def compare_with_anchor(db_path, provider, store_id, product_id):
             "provider": item["provider"],
             "product_id": item["product_id"],
             "store_id": item["store_id"],
-            "TIENDA": item["store_name"][:15],
+            "TIENDA": (item.get("store_name") or item.get("store_id") or "Desconocida")[:15],
             "PRECIO": f"${item['price']:.2f}",
             "DIFF": f"+{((item['price'] / best_current['price']) - 1) * 100:.1f}%" if item['price'] > best_current['price'] else "BEST",
             "UNIT_PRICE": up_str,

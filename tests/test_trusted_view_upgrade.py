@@ -39,7 +39,7 @@ def test_stale_view_upgrade():
     c.execute("SELECT sql FROM sqlite_master WHERE type='view' AND name='trusted_observations'")
     sql = c.fetchone()[0]
     
-    assert "r.status IN ('SUCCESS', 'PARTIAL')" in sql
+    assert "r.status IN ('SUCCESS', 'PARTIAL', 'COMPLETED', 'COMPLETE')" in sql
     assert "test_run_123" not in sql
     conn.close()
 
