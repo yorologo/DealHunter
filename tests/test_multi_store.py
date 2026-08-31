@@ -23,15 +23,20 @@ def test_compare_stores_grouping():
     c.execute("INSERT INTO products (product_id, store_id, name, brand, normalized_name, quantity, unit, normalized_quantity, normalized_unit, fingerprint, pack_count) VALUES ('p2', 's2', 'Coca-Cola Refresco Original 2000 ml', 'Coca-Cola', 'refresco original', 2000, 'ml', 2, 'L', 'coca cola|refresco original|2|l', 1)")
     c.execute("INSERT INTO products (product_id, store_id, name, brand, normalized_name, quantity, unit, normalized_quantity, normalized_unit, fingerprint, pack_count) VALUES ('p3', 's3', 'Coca Cola Zero 2 L', 'Coca-Cola', 'zero', 2, 'L', 2, 'L', 'coca cola|zero|2|l', 1)")
     
+    c.execute("INSERT OR IGNORE INTO runs (run_id, started_at, status) VALUES ('r1', '2024-01-01', 'SUCCESS')")
     c.execute("INSERT INTO observations (run_id, store_id, product_id, price, original_price, stock, timestamp) VALUES ('r1', 's1', 'p1', 42.0, 42.0, 10, '2026-08-19T00:00:00')")
+    c.execute("INSERT OR IGNORE INTO runs (run_id, started_at, status) VALUES ('r1', '2024-01-01', 'SUCCESS')")
     c.execute("INSERT INTO observations (run_id, store_id, product_id, price, original_price, stock, timestamp) VALUES ('r1', 's2', 'p2', 45.0, 45.0, 10, '2026-08-19T00:00:00')")
+    c.execute("INSERT OR IGNORE INTO runs (run_id, started_at, status) VALUES ('r1', '2024-01-01', 'SUCCESS')")
     c.execute("INSERT INTO observations (run_id, store_id, product_id, price, original_price, stock, timestamp) VALUES ('r1', 's3', 'p3', 49.0, 49.0, 10, '2026-08-19T00:00:00')")
     
     conn.commit()
     c.execute("INSERT INTO products (product_id, store_id, name, brand, normalized_name, quantity, unit, normalized_quantity, normalized_unit, fingerprint, pack_count) VALUES ('p4', 's1', 'Cacahuete 500 g', 'Marcax', 'cacahuete', 500, 'g', 0.5, 'kg', 'marcax|cacahuete|0.5|kg', 1)")
     c.execute("INSERT INTO products (product_id, store_id, name, brand, normalized_name, quantity, unit, normalized_quantity, normalized_unit, fingerprint, pack_count) VALUES ('p5', 's2', 'Cacahuate 500 g', 'Marcax', 'cacahuate', 500, 'g', 0.5, 'kg', 'marcax|cacahuate|0.5|kg', 1)")
     
+    c.execute("INSERT OR IGNORE INTO runs (run_id, started_at, status) VALUES ('r1', '2024-01-01', 'SUCCESS')")
     c.execute("INSERT INTO observations (run_id, store_id, product_id, price, original_price, stock, timestamp) VALUES ('r1', 's1', 'p4', 20.0, 20.0, 10, '2026-08-19T00:00:00')")
+    c.execute("INSERT OR IGNORE INTO runs (run_id, started_at, status) VALUES ('r1', '2024-01-01', 'SUCCESS')")
     c.execute("INSERT INTO observations (run_id, store_id, product_id, price, original_price, stock, timestamp) VALUES ('r1', 's2', 'p5', 22.0, 22.0, 10, '2026-08-19T00:00:00')")
     
     conn.commit()

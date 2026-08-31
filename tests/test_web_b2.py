@@ -23,9 +23,12 @@ def app():
     c.execute("INSERT INTO products (product_id, store_id, name, normalized_quantity, normalized_unit, category) VALUES ('p1', 's1', 'Prod 1', 1, 'L', 'bebidas')")
     c.execute("INSERT INTO products (product_id, store_id, name, normalized_quantity, normalized_unit, category) VALUES ('p2', 's2', 'Prod 2', 1, 'L', 'farmacia')")
     
+    c.execute("INSERT OR IGNORE INTO runs (run_id, started_at, status) VALUES ('r1', '2024-01-01', 'SUCCESS')")
     c.execute("INSERT INTO observations (run_id, store_id, product_id, price, timestamp, query_term) VALUES ('r1', 's1', 'p1', 30.0, '2026-08-01T00:00:00', 'bebidas')")
+    c.execute("INSERT OR IGNORE INTO runs (run_id, started_at, status) VALUES ('r2', '2024-01-01', 'SUCCESS')")
     c.execute("INSERT INTO observations (run_id, store_id, product_id, price, timestamp, query_term) VALUES ('r2', 's1', 'p1', 25.0, '2026-08-02T00:00:00', 'bebidas')")
     
+    c.execute("INSERT OR IGNORE INTO runs (run_id, started_at, status) VALUES ('r1', '2024-01-01', 'SUCCESS')")
     c.execute("INSERT INTO observations (run_id, store_id, product_id, price, timestamp, query_term) VALUES ('r1', 's2', 'p2', 50.0, '2026-08-01T00:00:00', 'farmacia')")
     
     conn.commit()

@@ -15,7 +15,8 @@ def app_client(tmp_path):
     c.execute("INSERT INTO stores (store_id, name, type) VALUES ('popeyes_1', 'Popeyes 1', 'restaurants')")
     c.execute("INSERT INTO stores (store_id, name, type) VALUES ('other_1', 'Other 1', 'market')")
     c.execute("INSERT INTO products (product_id, store_id, name) VALUES ('p1', 'popeyes_1', 'Burger')")
-    c.execute("INSERT INTO observations (product_id, store_id, timestamp, price, original_price) VALUES ('p1', 'popeyes_1', '2026-08-22 12:00:00', 10, 10)")
+    c.execute("INSERT OR IGNORE INTO runs (run_id, started_at, status) VALUES ('r1', '2024-01-01', 'SUCCESS')")
+    c.execute("INSERT INTO observations (run_id, provider, product_id, store_id, timestamp, price, original_price) VALUES ('r1', 'rappi', 'p1', 'popeyes_1', '2026-08-22 12:00:00', 10, 10)")
     conn.commit()
     conn.close()
     

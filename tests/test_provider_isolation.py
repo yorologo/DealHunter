@@ -18,11 +18,13 @@ def test_adversarial_provider_isolation():
     # 2. Insert Rappi store and product
     c.execute("INSERT INTO stores (provider, store_id, name) VALUES ('rappi', 's1', 'Rappi Store')")
     c.execute("INSERT INTO products (provider, product_id, store_id, name) VALUES ('rappi', 'p1', 's1', 'Rappi Product')")
+    c.execute("INSERT OR IGNORE INTO runs (run_id, started_at, status) VALUES ('r_run', '2024-01-01', 'SUCCESS')")
     c.execute("INSERT INTO observations (run_id, provider, store_id, product_id, price) VALUES ('r_run', 'rappi', 's1', 'p1', 100.0)")
     
     # 3. Insert Uber Eats store and product with EXACT SAME IDs
     c.execute("INSERT INTO stores (provider, store_id, name) VALUES ('uber_eats', 's1', 'Uber Store')")
     c.execute("INSERT INTO products (provider, product_id, store_id, name) VALUES ('uber_eats', 'p1', 's1', 'Uber Product')")
+    c.execute("INSERT OR IGNORE INTO runs (run_id, started_at, status) VALUES ('u_run', '2024-01-01', 'SUCCESS')")
     c.execute("INSERT INTO observations (run_id, provider, store_id, product_id, price) VALUES ('u_run', 'uber_eats', 's1', 'p1', 200.0)")
     
     conn.commit()

@@ -27,10 +27,14 @@ def app():
     t2 = (now - timedelta(days=1)).isoformat()
     t3 = now.isoformat()
     
+    c.execute("INSERT OR IGNORE INTO runs (run_id, started_at, status) VALUES ('r1', '2024-01-01', 'SUCCESS')")
     c.execute("INSERT INTO observations (run_id, store_id, product_id, price, timestamp, original_price) VALUES ('r1', 's1', 'p1', 30.0, ?, 35.0)", (t1,))
+    c.execute("INSERT OR IGNORE INTO runs (run_id, started_at, status) VALUES ('r2', '2024-01-01', 'SUCCESS')")
     c.execute("INSERT INTO observations (run_id, store_id, product_id, price, timestamp, original_price) VALUES ('r2', 's1', 'p1', 22.95, ?, 35.0)", (t2,))
+    c.execute("INSERT OR IGNORE INTO runs (run_id, started_at, status) VALUES ('r3', '2024-01-01', 'SUCCESS')")
     c.execute("INSERT INTO observations (run_id, store_id, product_id, price, timestamp, original_price) VALUES ('r3', 's1', 'p1', 22.95, ?, 35.0)", (t3,))
     
+    c.execute("INSERT OR IGNORE INTO runs (run_id, started_at, status) VALUES ('r3', '2024-01-01', 'SUCCESS')")
     c.execute("INSERT INTO observations (run_id, store_id, product_id, price, timestamp) VALUES ('r3', 's2', 'p1', 25.0, ?)", (t3,))
     
     c.execute("INSERT INTO watchlist (query, target_price, enabled) VALUES ('Electrolit Mora Azul 625 ml', 25.0, 1)")
@@ -131,7 +135,9 @@ def test_compare_anchor_strict_rules(client):
     
     # We must insert at least 2 observations to ensure metrics are generated (since we need metrics for them to appear in final valid_matches)
     for p in ['p_anc', 'p_m1', 'p_m2', 'p_nm1', 'p_nm2', 'p_nm3', 'p_milk_anc', 'p_milk_nm', 'p_sham_anc', 'p_sham_nm']:
+        c.execute("INSERT OR IGNORE INTO runs (run_id, started_at, status) VALUES ('r1', '2024-01-01', 'SUCCESS')")
         c.execute("INSERT INTO observations (run_id, store_id, product_id, price, timestamp) VALUES ('r1', ?, ?, 30.0, '2026-08-01T00:00:00')", ('s1' if 'anc' in p else 's2', p,))
+        c.execute("INSERT OR IGNORE INTO runs (run_id, started_at, status) VALUES ('r2', '2024-01-01', 'SUCCESS')")
         c.execute("INSERT INTO observations (run_id, store_id, product_id, price, timestamp) VALUES ('r2', ?, ?, 25.0, '2026-08-02T00:00:00')", ('s1' if 'anc' in p else 's2', p,))
         
     conn.commit()

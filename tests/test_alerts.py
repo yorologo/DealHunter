@@ -33,20 +33,29 @@ def test_alert_engine_types():
     t3 = now.isoformat()
     
     # TARGET_PRICE obs (34 is <= 35)
+    c.execute("INSERT OR IGNORE INTO runs (run_id, started_at, status) VALUES ('r1', '2024-01-01', 'SUCCESS')")
     c.execute("INSERT INTO observations (run_id, store_id, product_id, price, timestamp) VALUES ('r1', 's1', 'p1', 40.0, ?)", (t1,))
+    c.execute("INSERT OR IGNORE INTO runs (run_id, started_at, status) VALUES ('r2', '2024-01-01', 'SUCCESS')")
     c.execute("INSERT INTO observations (run_id, store_id, product_id, price, timestamp) VALUES ('r2', 's1', 'p1', 34.0, ?)", (t3,))
     
     # NEW_LOW obs
+    c.execute("INSERT OR IGNORE INTO runs (run_id, started_at, status) VALUES ('r1', '2024-01-01', 'SUCCESS')")
     c.execute("INSERT INTO observations (run_id, store_id, product_id, price, timestamp) VALUES ('r1', 's1', 'p2', 50.0, ?)", (t1,))
+    c.execute("INSERT OR IGNORE INTO runs (run_id, started_at, status) VALUES ('r2', '2024-01-01', 'SUCCESS')")
     c.execute("INSERT INTO observations (run_id, store_id, product_id, price, timestamp) VALUES ('r2', 's1', 'p2', 45.0, ?)", (t2,))
+    c.execute("INSERT OR IGNORE INTO runs (run_id, started_at, status) VALUES ('r3', '2024-01-01', 'SUCCESS')")
     c.execute("INSERT INTO observations (run_id, store_id, product_id, price, timestamp) VALUES ('r3', 's1', 'p2', 40.0, ?)", (t3,))
     
     # PRICE_DROP obs (100 -> 80 is 20%)
+    c.execute("INSERT OR IGNORE INTO runs (run_id, started_at, status) VALUES ('r1', '2024-01-01', 'SUCCESS')")
     c.execute("INSERT INTO observations (run_id, store_id, product_id, price, timestamp) VALUES ('r1', 's2', 'p3', 100.0, ?)", (t1,))
+    c.execute("INSERT OR IGNORE INTO runs (run_id, started_at, status) VALUES ('r2', '2024-01-01', 'SUCCESS')")
     c.execute("INSERT INTO observations (run_id, store_id, product_id, price, timestamp) VALUES ('r2', 's2', 'p3', 80.0, ?)", (t3,))
     
     # BACK_IN_STOCK obs
+    c.execute("INSERT OR IGNORE INTO runs (run_id, started_at, status) VALUES ('r1', '2024-01-01', 'SUCCESS')")
     c.execute("INSERT INTO observations (run_id, store_id, product_id, price, availability, timestamp) VALUES ('r1', 's2', 'p4', 60.0, 'UNAVAILABLE', ?)", (t1,))
+    c.execute("INSERT OR IGNORE INTO runs (run_id, started_at, status) VALUES ('r2', '2024-01-01', 'SUCCESS')")
     c.execute("INSERT INTO observations (run_id, store_id, product_id, price, availability, timestamp) VALUES ('r2', 's2', 'p4', 60.0, 'AVAILABLE', ?)", (t3,))
     
     conn.commit()
@@ -79,6 +88,7 @@ def test_alert_engine_types():
     conn = setup_db(db_path)
     c = conn.cursor()
     # Coca cola drops to 30
+    c.execute("INSERT OR IGNORE INTO runs (run_id, started_at, status) VALUES ('r4', '2024-01-01', 'SUCCESS')")
     c.execute("INSERT INTO observations (run_id, store_id, product_id, price, timestamp) VALUES ('r4', 's1', 'p1', 30.0, ?)", ((now + timedelta(days=1)).isoformat(),))
     conn.commit()
     conn.close()

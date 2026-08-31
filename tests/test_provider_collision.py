@@ -22,15 +22,19 @@ def collision_db():
     
 
     # Insert runs
-    c.execute("INSERT INTO runs (run_id, started_at) VALUES ('run1', '2026-08-01T09:00:00Z')")
-    c.execute("INSERT INTO runs (run_id, started_at) VALUES ('run2', '2026-08-02T09:00:00Z')")
+    c.execute("INSERT INTO runs (run_id, started_at, status) VALUES ('run1', '2026-08-01T09:00:00Z', 'SUCCESS')")
+    c.execute("INSERT INTO runs (run_id, started_at, status) VALUES ('run2', '2026-08-02T09:00:00Z', 'SUCCESS')")
     
     # Observations Rappi
+    c.execute("INSERT OR IGNORE INTO runs (run_id, started_at, status) VALUES ('run1', '2024-01-01', 'SUCCESS')")
     c.execute("INSERT INTO observations (run_id, provider, store_id, product_id, price, original_price, stock, timestamp, availability) VALUES ('run1', 'rappi', 's1', 'p1', 100.0, 100.0, 10, '2026-08-01T10:00:00Z', 'AVAILABLE')")
+    c.execute("INSERT OR IGNORE INTO runs (run_id, started_at, status) VALUES ('run2', '2024-01-01', 'SUCCESS')")
     c.execute("INSERT INTO observations (run_id, provider, store_id, product_id, price, original_price, stock, timestamp, availability, discount_effective) VALUES ('run2', 'rappi', 's1', 'p1', 50.0, 100.0, 10, '2026-08-02T10:00:00Z', 'AVAILABLE', 50.0)")
     
     # Observations Uber
+    c.execute("INSERT OR IGNORE INTO runs (run_id, started_at, status) VALUES ('run1', '2024-01-01', 'SUCCESS')")
     c.execute("INSERT INTO observations (run_id, provider, store_id, product_id, price, original_price, stock, timestamp, availability) VALUES ('run1', 'uber_eats', 's1', 'p1', 200.0, 200.0, 10, '2026-08-01T11:00:00Z', 'AVAILABLE')")
+    c.execute("INSERT OR IGNORE INTO runs (run_id, started_at, status) VALUES ('run2', '2024-01-01', 'SUCCESS')")
     c.execute("INSERT INTO observations (run_id, provider, store_id, product_id, price, original_price, stock, timestamp, availability, discount_effective) VALUES ('run2', 'uber_eats', 's1', 'p1', 150.0, 200.0, 10, '2026-08-02T11:00:00Z', 'AVAILABLE', 25.0)")
     
     conn.commit()
@@ -83,7 +87,7 @@ def test_alerts_collision(collision_db):
 def test_alert_run_scope_does_not_mark_other_provider_out_of_stock(collision_db):
     conn = sqlite3.connect(collision_db)
     conn.execute(
-        "INSERT INTO runs (run_id, started_at) VALUES ('run3', '2026-08-03T09:00:00Z')"
+        "INSERT INTO runs (run_id, started_at, status) VALUES ('run3', '2026-08-03T09:00:00Z', 'SUCCESS')"
     )
     conn.execute(
         """INSERT INTO observations
