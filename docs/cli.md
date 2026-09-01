@@ -17,14 +17,19 @@ bin/rappi-ofertas sync --provider uber_eats --lat TU_LAT --lng TU_LNG
 ```
 
 ## `rappi-historico`
-Análisis prolongado, motor de alertas, bases de datos y servicio web:
+Análisis histórico, comparación, motor de alertas y servicio web:
 ```bash
-bin/rappi-historico history
-bin/rappi-historico compare
-bin/rappi-historico watchlist list
+bin/rappi-historico compare "Coca Cola"
+bin/rappi-historico deals --top 20
+bin/rappi-historico alerts list
 bin/rappi-historico alerts evaluate
-bin/rappi-historico db status
 bin/rappi-historico web --port 8765
+```
+
+Watchlist y administración de SQLite pertenecen a `rappi-ofertas`:
+```bash
+bin/rappi-ofertas watch list
+bin/rappi-ofertas db status
 ```
 
 Utilice `--help` para consultar los comandos que expone el HEAD instalado. La
