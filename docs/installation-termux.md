@@ -16,7 +16,7 @@ pkg install git python sqlite
 ## 3. Clonar Repositorio
 ```bash
 git clone https://github.com/yorologo/DealHunter.git
-cd rappi-deal-hunter
+cd DealHunter
 pip install -r requirements.txt
 ```
 

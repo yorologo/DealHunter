@@ -1,12 +1,21 @@
 import pytest
+from dealhunter.db import setup_db
 from dealhunter.web.app import create_app
 from flask import session
 
-def test_admin_settings_csrf_protection(tmp_path):
-    app = create_app()
-    app.config['TESTING'] = True
+def test_admin_settings_csrf_protection(tmp_path, monkeypatch):
+    config_home = tmp_path / "xdg-config"
+    db_path = tmp_path / "csrf.db"
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(config_home))
+    monkeypatch.setenv("RAPPI_DB_PATH", str(db_path))
+    setup_db(str(db_path)).close()
+
+    app = create_app({
+        'DATABASE': str(db_path),
+        'TESTING': True,
+        'SECRET_KEY': 'test',
+    })
     app.config['WTF_CSRF_ENABLED'] = False  # we manage CSRF manually
-    app.config['SECRET_KEY'] = 'test'
     
     with app.test_client() as client:
         # 1. GET /admin/settings -> 200
@@ -61,3 +70,4 @@ def test_admin_settings_csrf_protection(tmp_path):
         })
         assert res_comp_invalid.status_code == 400
 
+    assert (config_home / "dealhunter" / "config.toml").is_file()
