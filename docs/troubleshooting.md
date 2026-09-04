@@ -20,8 +20,19 @@
 
 ## Problemas de Base de Datos
 ### `SQLite Database Locked`
-**Causa:** Corriste `rappi-ofertas` o `rappi-historico` simultáneamente en varias terminales hacia el mismo archivo de base de datos.
-**Solución Real:** El script actual usa conectores que confían en writes secuenciales monohilo. Cancela los procesos concurrentes y mantén un solo cron.
+**Causa:** Dos procesos intentan escribir o migrar el mismo archivo a la vez, o
+un proceso conserva una transacción abierta durante demasiado tiempo. Las
+lecturas web normales sobre schema 16 no ejecutan migraciones ni recrean
+`trusted_observations`; un error recurrente indica un writer solapado, una
+transacción atascada o un schema que requiere reparación.
+
+**Solución Real:** No inicies crawlers manuales mientras el scheduler está
+activo y conserva el `flock` compartido para los runs programados. Revisa los
+procesos/runs activos y `Admin → Base de datos` antes de detener únicamente el
+writer solapado. No borres la DB ni la vista. Si el error persiste sin otro
+writer, crea primero un backup SQLite consistente, ejecuta
+`PRAGMA integrity_check;` y revisa `schema_version` y la presencia de
+`trusted_observations` antes de intentar una reparación.
 
 
 ### DealHunter Web se congela en segundo plano (Android)

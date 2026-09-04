@@ -5,7 +5,17 @@ Current `CURRENT_SCHEMA_VERSION = 16`.
 La fuente de verdad es `src/dealhunter/db.py`; este documento resume el
 contrato actual y no reemplaza al DDL/migrations ejecutables.
 
-DealHunter gestiona las migraciones automáticamente en el arranque para preservar idempotentemente el historial de `observations`.
+DealHunter verifica el contrato de schema al abrir la DB. Una DB que ya cumple
+schema 16 se abre sin ejecutar DDL: las operaciones web de lectura no eliminan
+ni recrean tablas o vistas. Una DB nueva, antigua o con
+`trusted_observations` ausente/obsoleta entra al proceso de migración/reparación,
+que toma un write lock y realiza el DDL completo dentro de una sola transacción.
+Así, otras conexiones ven el schema anterior o el nuevo, nunca el intervalo
+entre `DROP VIEW` y `CREATE VIEW`. La migración conserva idempotentemente el
+historial de `observations` y crea un backup previo cuando sube de versión.
+Las conexiones inicializadas por `setup_db()` usan además un `busy_timeout`
+acotado como tolerancia a writers breves; no sustituye la separación entre DDL
+y lecturas normales ni convierte bloqueos prolongados en reintentos ciegos.
 
 ## Migraciones Clave
 

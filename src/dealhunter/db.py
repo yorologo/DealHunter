@@ -6,57 +6,123 @@ import sys
 
 CURRENT_SCHEMA_VERSION = 16
 
+SQLITE_BUSY_TIMEOUT_MS = 30_000
+
+_CORE_TABLES = {
+    "stores",
+    "products",
+    "runs",
+    "observations",
+    "schema_version",
+}
+
+_TRUSTED_VIEW_MARKERS = (
+    "JOIN RUNS R ON O.RUN_ID = R.RUN_ID",
+    "O.PROVIDER IN ('RAPPI', 'UBER_EATS')",
+    "R.STATUS IN ('SUCCESS', 'PARTIAL', 'COMPLETED', 'COMPLETE')",
+)
+
 def get_default_db_path():
     return os.environ.get("RAPPI_DB_PATH", os.path.expanduser("~/rappi-deal-hunter/rappi-deals.db"))
 
-def setup_db(db_path=None):
-    if not db_path:
-        db_path = get_default_db_path()
-    
-    conn = sqlite3.connect(db_path)
-    
-    # Ensure backward compatibility by creating existing tables if they don't exist
-    c = conn.cursor()
-    c.execute('''CREATE TABLE IF NOT EXISTS stores
+
+def _schema_contract_is_current(conn):
+    """Check the current schema contract without executing DDL."""
+    try:
+        row = conn.execute("SELECT version FROM schema_version LIMIT 1").fetchone()
+    except sqlite3.OperationalError:
+        return False
+
+    if row is None or row[0] != CURRENT_SCHEMA_VERSION:
+        return False
+
+    placeholders = ",".join("?" for _ in _CORE_TABLES)
+    rows = conn.execute(
+        f"SELECT name FROM sqlite_master WHERE type = 'table' AND name IN ({placeholders})",
+        tuple(sorted(_CORE_TABLES)),
+    ).fetchall()
+    if {row[0] for row in rows} != _CORE_TABLES:
+        return False
+
+    row = conn.execute(
+        "SELECT sql FROM sqlite_master WHERE type = 'view' AND name = 'trusted_observations'"
+    ).fetchone()
+    if row is None or not row[0]:
+        return False
+
+    normalized_sql = " ".join(row[0].upper().split())
+    return all(marker in normalized_sql for marker in _TRUSTED_VIEW_MARKERS)
+
+
+def _create_base_tables(cursor):
+    cursor.execute('''CREATE TABLE IF NOT EXISTS stores
                  (provider TEXT DEFAULT 'rappi', store_id TEXT, name TEXT, brand TEXT, type TEXT, status TEXT DEFAULT 'UNKNOWN', last_seen_at DATETIME, vertical TEXT, PRIMARY KEY (provider, store_id))''')
-    
-    c.execute('''CREATE TABLE IF NOT EXISTS products
+
+    cursor.execute('''CREATE TABLE IF NOT EXISTS products
                  (provider TEXT DEFAULT 'rappi', product_id TEXT, store_id TEXT, name TEXT, brand TEXT, image TEXT,
-                  normalized_name TEXT, quantity REAL, unit TEXT, 
+                  normalized_name TEXT, quantity REAL, unit TEXT,
                   normalized_quantity REAL, normalized_unit TEXT, fingerprint TEXT,
                   pack_count INTEGER,
                   category TEXT,
                   has_toppings INTEGER,
                   category_source TEXT DEFAULT 'unknown',
                   PRIMARY KEY (provider, store_id, product_id))''')
-                  
-    c.execute('''CREATE TABLE IF NOT EXISTS runs (
-                 run_id TEXT PRIMARY KEY, 
-                 started_at DATETIME, 
-                 finished_at DATETIME, 
-                 lat REAL, 
-                 lng REAL, 
-                 radius REAL, 
-                 vertical TEXT, 
+
+    cursor.execute('''CREATE TABLE IF NOT EXISTS runs (
+                 run_id TEXT PRIMARY KEY,
+                 started_at DATETIME,
+                 finished_at DATETIME,
+                 lat REAL,
+                 lng REAL,
+                 radius REAL,
+                 vertical TEXT,
                  status TEXT)''')
-                 
-    # Base creation logic for v2
-    c.execute('''CREATE TABLE IF NOT EXISTS observations
-                 (id INTEGER PRIMARY KEY AUTOINCREMENT, run_id TEXT, provider TEXT DEFAULT 'rappi', store_id TEXT, product_id TEXT, 
-                  price REAL, original_price REAL, stock INTEGER, timestamp DATETIME, 
+
+    cursor.execute('''CREATE TABLE IF NOT EXISTS observations
+                 (id INTEGER PRIMARY KEY AUTOINCREMENT, run_id TEXT, provider TEXT DEFAULT 'rappi', store_id TEXT, product_id TEXT,
+                  price REAL, original_price REAL, stock INTEGER, timestamp DATETIME,
                   discount_price REAL, discount_promotion REAL, discount_effective REAL,
                   discount_source TEXT, promotion_type TEXT, promotion_label TEXT,
                   query_term TEXT, availability TEXT, has_pro_offer INTEGER DEFAULT NULL, pro_price REAL, pro_discount_effective REAL, limit_info TEXT,
                   UNIQUE(run_id, provider, store_id, product_id))''')
 
-    # Migrations
+
+def setup_db(db_path=None):
+    if not db_path:
+        db_path = get_default_db_path()
+
+    conn = sqlite3.connect(db_path, timeout=SQLITE_BUSY_TIMEOUT_MS / 1000)
+    conn.execute(f"PRAGMA busy_timeout = {SQLITE_BUSY_TIMEOUT_MS}")
+
+    if _schema_contract_is_current(conn):
+        return conn
+
     migrate(conn, db_path)
-    
     return conn
 
+
 def migrate(conn, db_path):
+    """Bring an invalid/old schema current under one atomic write lock."""
+    if _schema_contract_is_current(conn):
+        return
+
+    conn.execute("BEGIN IMMEDIATE")
+    try:
+        # Another initializer may have completed while this connection waited.
+        if _schema_contract_is_current(conn):
+            conn.commit()
+            return
+        _migrate_locked(conn, db_path)
+    except Exception:
+        conn.rollback()
+        raise
+
+
+def _migrate_locked(conn, db_path):
     c = conn.cursor()
-    
+
+    _create_base_tables(c)
+
     # Check current version
     c.execute('''CREATE TABLE IF NOT EXISTS schema_version (version INTEGER PRIMARY KEY)''')
     c.execute('SELECT version FROM schema_version LIMIT 1')
