@@ -18,17 +18,18 @@ DealHunter es un motor local-first de inteligencia de precios y oportunidades pa
 
 ## Estado Actual
 
-### Current development / RC
+### Current development (`develop`)
 
-- **Target**: `v3.2.0` (release candidate; todavía no es una release pública ni un tag).
-- **Schema DB**: `16`.
-- **Validación**: suite offline completa pasando; el conteo exacto se obtiene con `PYTHONPATH=src pytest tests -q` y no se mantiene duplicado aquí.
-- **Fuente runtime de versión**: `dealhunter.metadata.VERSION`.
-- **Fuente runtime de schema**: `dealhunter.db.CURRENT_SCHEMA_VERSION`.
+- **Base pública**: `v3.2.0`. La rama `develop` contiene trabajo posterior a esa release; la próxima versión se determina sólo al cerrar sus gates.
+- **Runtime version actual**: `3.2.0` (`dealhunter.metadata.VERSION`) hasta que exista una promoción/version bump validado.
+- **Schema DB**: `16` (`dealhunter.db.CURRENT_SCHEMA_VERSION`).
+- **Validación**: el conteo exacto se obtiene con `PYTHONPATH=src pytest -q`; no se mantiene duplicado como verdad estática.
 
 ### Última release pública
 
-- **Release publication**: Determinado por Git tag y GitHub Releases.
+- **v3.2.0**, publicada el **2026-09-01**.
+- Tag `v3.2.0` → commit `258b449557b3e55f716eabcf566c9455a7d62960`.
+- La publicación se verifica con Git tag remoto + GitHub Releases; no se infiere del README.
 
 ### Estado de capacidades
 
@@ -142,7 +143,7 @@ Para mantener DealHunter Web activo en Android/Termux, DealHunter adquiere el `t
 DealHunter Phase 4I supports automated background execution and push notifications via `termux-notification`.
 See [docs/SCHEDULER.md](docs/SCHEDULER.md) for instructions on setting up `cron`, configuring the DealWatcher, and managing Termux battery optimizations.
 
-## DealHunter v3.2.0 — Release Target
+## DealHunter v3.2.0 — Public Release Baseline
 
 Esta versión estabiliza la infraestructura de multi-proveedor e introduce el schema v16.
 

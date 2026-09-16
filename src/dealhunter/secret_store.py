@@ -7,7 +7,6 @@ import os
 import stat
 import json
 import base64
-import hashlib
 import platform
 from datetime import datetime, timezone
 import getpass
@@ -15,9 +14,11 @@ import logging
 import time
 from typing import Optional, Dict, Any, List
 
+from .errors import DealHunterError
+
 logger = logging.getLogger(__name__)
 
-# Try to import cryptography, fallback to itsdangerous
+# Secure persistent storage requires authenticated encryption.
 try:
     from cryptography.fernet import Fernet
     from cryptography.hazmat.primitives import hashes
@@ -25,14 +26,8 @@ try:
     CRYPTO_AVAILABLE = True
     ENCRYPTION_METHOD = 'Fernet (AES-128)'
 except ImportError:
-    try:
-        from itsdangerous import URLSafeSerializer
-        CRYPTO_AVAILABLE = False
-        ENCRYPTION_METHOD = 'itsdangerous.URLSafeSerializer (HMAC Sign-only Fallback)'
-    except ImportError:
-        CRYPTO_AVAILABLE = False
-        ENCRYPTION_METHOD = 'Plaintext (UNSAFE FALLBACK)'
-        logger.error("Neither cryptography nor itsdangerous available. Storing secrets insecurely!")
+    CRYPTO_AVAILABLE = False
+    ENCRYPTION_METHOD = 'unavailable'
 
 # Session Modes
 SESSION_NOT_CONFIGURED = 'NOT_CONFIGURED'
@@ -134,6 +129,11 @@ class SecretStore:
         entropy = "|".join(components)
         return entropy.encode('utf-8')
 
+    @staticmethod
+    def _require_crypto():
+        if not CRYPTO_AVAILABLE:
+            raise DealHunterError("SECRET_STORE_UNAVAILABLE")
+
     def _get_or_create_salt(self) -> bytes:
         """Get existing salt or create a new one and store it securely."""
         if os.path.exists(self.salt_file):
@@ -156,24 +156,19 @@ class SecretStore:
 
     def _derive_key(self, salt: bytes) -> bytes:
         """Derive encryption key from device entropy + salt."""
+        self._require_crypto()
         entropy = self._get_device_entropy()
-        
-        if CRYPTO_AVAILABLE:
-            kdf = PBKDF2HMAC(
-                algorithm=hashes.SHA256(),
-                length=32,
-                salt=salt,
-                iterations=100000,
-            )
-            key = base64.urlsafe_b64encode(kdf.derive(entropy))
-            return key
-        else:
-            # Fallback simple derivation for itsdangerous/plaintext
-            dk = hashlib.pbkdf2_hmac('sha256', entropy, salt, 100000)
-            return base64.urlsafe_b64encode(dk)
+        kdf = PBKDF2HMAC(
+            algorithm=hashes.SHA256(),
+            length=32,
+            salt=salt,
+            iterations=100000,
+        )
+        return base64.urlsafe_b64encode(kdf.derive(entropy))
 
     def store(self, token: str, is_expired: bool = False, last_validation_status: str = None, last_validated_at: str = None) -> bool:
         """Encrypt and persist token."""
+        self._require_crypto()
         try:
             self._ensure_dir()
             salt = self._get_or_create_salt()
@@ -189,16 +184,7 @@ class SecretStore:
             }
             raw_data = json.dumps(data).encode('utf-8')
             
-            if CRYPTO_AVAILABLE:
-                f = Fernet(key)
-                encrypted = f.encrypt(raw_data)
-            elif 'itsdangerous' in ENCRYPTION_METHOD:
-                # URLSafeSerializer doesn't encrypt, it just signs.
-                # So we base64 the json, then sign it.
-                s = URLSafeSerializer(key)
-                encrypted = s.dumps(data).encode('utf-8')
-            else:
-                encrypted = base64.b64encode(raw_data)
+            encrypted = Fernet(key).encrypt(raw_data)
                 
             with open(self.session_file, 'wb') as f:
                 f.write(encrypted)
@@ -213,6 +199,7 @@ class SecretStore:
         """Load and decrypt full data dictionary."""
         if not os.path.exists(self.session_file):
             return None
+        self._require_crypto()
             
         try:
             with open(self.session_file, 'rb') as f:
@@ -226,16 +213,8 @@ class SecretStore:
                 
             key = self._derive_key(salt)
             
-            if CRYPTO_AVAILABLE:
-                f = Fernet(key)
-                raw_data = f.decrypt(encrypted)
-                data = json.loads(raw_data.decode('utf-8'))
-            elif 'itsdangerous' in ENCRYPTION_METHOD:
-                s = URLSafeSerializer(key)
-                data = s.loads(encrypted.decode('utf-8'))
-            else:
-                raw_data = base64.b64decode(encrypted)
-                data = json.loads(raw_data.decode('utf-8'))
+            raw_data = Fernet(key).decrypt(encrypted)
+            data = json.loads(raw_data.decode('utf-8'))
                 
             return data
             
@@ -276,6 +255,8 @@ class SecretStore:
         
         if not self.exists():
             return meta
+
+        self._require_crypto()
             
         meta['mode'] = SESSION_PERSISTENT
         
@@ -287,16 +268,8 @@ class SecretStore:
                 
             key = self._derive_key(salt)
             
-            if CRYPTO_AVAILABLE:
-                f = Fernet(key)
-                raw_data = f.decrypt(encrypted)
-                data = json.loads(raw_data.decode('utf-8'))
-            elif 'itsdangerous' in ENCRYPTION_METHOD:
-                s = URLSafeSerializer(key)
-                data = s.loads(encrypted.decode('utf-8'))
-            else:
-                raw_data = base64.b64decode(encrypted)
-                data = json.loads(raw_data.decode('utf-8'))
+            raw_data = Fernet(key).decrypt(encrypted)
+            data = json.loads(raw_data.decode('utf-8'))
                 
             meta['stored_at'] = data.get('stored_at')
         except Exception:

@@ -4,6 +4,8 @@ import datetime
 import shutil
 import sys
 
+from .errors import DealHunterError
+
 CURRENT_SCHEMA_VERSION = 16
 
 SQLITE_BUSY_TIMEOUT_MS = 30_000
@@ -23,7 +25,16 @@ _TRUSTED_VIEW_MARKERS = (
 )
 
 def get_default_db_path():
-    return os.environ.get("RAPPI_DB_PATH", os.path.expanduser("~/rappi-deal-hunter/rappi-deals.db"))
+    override = os.environ.get("RAPPI_DB_PATH")
+    if override:
+        return os.path.expanduser(override)
+
+    legacy = os.path.expanduser("~/rappi-deal-hunter/rappi-deals.db")
+    if os.path.exists(legacy):
+        return legacy
+
+    data_home = os.environ.get("XDG_DATA_HOME") or os.path.expanduser("~/.local/share")
+    return os.path.join(data_home, "dealhunter", "rappi-deals.db")
 
 
 def _schema_contract_is_current(conn):
@@ -90,6 +101,11 @@ def _create_base_tables(cursor):
 def setup_db(db_path=None):
     if not db_path:
         db_path = get_default_db_path()
+
+    if db_path != ":memory:":
+        parent = os.path.dirname(os.path.abspath(db_path))
+        if parent:
+            os.makedirs(parent, mode=0o700, exist_ok=True)
 
     conn = sqlite3.connect(db_path, timeout=SQLITE_BUSY_TIMEOUT_MS / 1000)
     conn.execute(f"PRAGMA busy_timeout = {SQLITE_BUSY_TIMEOUT_MS}")
@@ -450,20 +466,45 @@ def _migrate_locked(conn, db_path):
 
     conn.commit()
 
+def _backup_is_valid(backup_path, source_schema_version):
+    try:
+        with sqlite3.connect(backup_path) as conn:
+            integrity = conn.execute("PRAGMA integrity_check").fetchone()
+            try:
+                row = conn.execute("SELECT version FROM schema_version LIMIT 1").fetchone()
+                version = row[0] if row else None
+            except sqlite3.OperationalError:
+                version = None
+        return integrity == ("ok",) and version == source_schema_version
+    except sqlite3.Error:
+        return False
+
+
 def backup_db(db_path, tag="backup"):
-    if os.path.exists(db_path):
-        ts = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-        backup_path = f"{db_path}.{ts}.{tag}.bak"
-        
-        source = sqlite3.connect(db_path)
-        dest = sqlite3.connect(backup_path)
-        with source:
-            source.backup(dest)
-        dest.close()
-        source.close()
-        
+    if not os.path.exists(db_path):
+        return None
+
+    ts = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+    backup_path = f"{db_path}.{ts}.{tag}.bak"
+    try:
+        with sqlite3.connect(db_path) as source:
+            try:
+                row = source.execute("SELECT version FROM schema_version LIMIT 1").fetchone()
+                source_schema_version = row[0] if row else None
+            except sqlite3.OperationalError:
+                source_schema_version = None
+            with sqlite3.connect(backup_path) as dest:
+                source.backup(dest)
+
+        if not _backup_is_valid(backup_path, source_schema_version):
+            raise sqlite3.DatabaseError("backup integrity or schema version verification failed")
         return backup_path
-    return None
+    except (sqlite3.Error, OSError) as exc:
+        try:
+            os.remove(backup_path)
+        except FileNotFoundError:
+            pass
+        raise DealHunterError("DB_CORRUPT", message=f"Database backup rejected: {exc}") from exc
 
 def db_status(db_path):
     if not os.path.exists(db_path):

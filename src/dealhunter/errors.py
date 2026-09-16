@@ -52,6 +52,11 @@ ERROR_CATALOG = {
         "recoverable": True,
         "recommended_action": "Check config with: rappi-ofertas config show",
     },
+    "SECRET_STORE_UNAVAILABLE": {
+        "message": "Secure credential storage is unavailable",
+        "recoverable": False,
+        "recommended_action": "Install the cryptography package before storing a session",
+    },
     "PARTIAL_RUN": {
         "message": "Run completed partially with some data collected",
         "recoverable": True,

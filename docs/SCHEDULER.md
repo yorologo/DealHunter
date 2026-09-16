@@ -1,59 +1,68 @@
 # DealHunter Scheduler Operations
 
-The automated execution of DealHunter is managed natively through `cron` (or `crond` in Termux). This allows the multi-provider crawlers and Alerts Engine (Deal Watcher) to run autonomously in the background.
+DealHunter usa `cron`/`crond` en Termux y un único `flock` compartido para evitar crawls concurrentes. El scheduler gestionado por la aplicación detecta el checkout real en tiempo de ejecución; no depende de una ruta fija como `~/rappi-deal-hunter`.
 
-## Standard Cadence
-The recommended live rollout cadence executes 4 times a day to capture intraday price adjustments and flash deals. Providers are intentionally staggered by 30 minutes to distribute load and prevent resource contention:
+## Cadencia gestionada
 
-**Rappi:**
-- **07:00** (Morning updates)
-- **10:00** (Mid-morning sweeps)
-- **13:00** (Lunchtime promotions)
-- **19:00** (Evening deals)
+Los providers se escalonan para repartir carga:
 
-**Uber Eats:**
-- **07:30** (Morning updates)
-- **10:30** (Mid-morning sweeps)
-- **13:30** (Lunchtime promotions)
-- **19:30** (Evening deals)
+- Rappi: `07:00`, `10:00`, `13:00`, `19:00`.
+- Uber Eats: `07:30`, `10:30`, `13:30`, `19:30`.
 
-Timezone defaults to your device's local Termux environment timezone.
+La zona horaria es la zona local efectiva de Termux.
 
-## How to Enable / Disable
-To enable or modify the scheduler, edit the crontab:
+Cada job ejecuta `bin/rappi-ofertas sync --provider <provider>` y, sólo si el sync termina correctamente, `bin/dealwatcher`. Ambos providers comparten `${TMPDIR}/dealhunter.lock` mediante el `flock` encontrado en el entorno.
+
+## Prerrequisitos obligatorios
+
+Antes de habilitar el scheduler:
+
+1. configura `lat` y `lng` en `~/.config/dealhunter/config.toml` mediante `bin/rappi-ofertas config set lat ...` y `config set lng ...`;
+2. verifica `bin/rappi-ofertas doctor`;
+3. confirma que los providers deseados estén habilitados;
+4. inicia `crond` y, si necesitas ejecución puntual con pantalla apagada, adquiere `termux-wake-lock`.
+
+DealHunter falla cerrado si la ubicación no está configurada. No existe fallback de ciudad o coordenadas hardcodeadas.
+
+## Habilitar / deshabilitar
+
+La interfaz Admin de Catalog Sync usa `dealhunter.scheduler.enable_scheduler()` / `disable_scheduler()`. El gestor:
+
+- conserva líneas de cron ajenas a DealHunter;
+- elimina entradas legacy gestionadas por DealHunter;
+- instala exactamente las líneas Rappi/Uber actuales;
+- verifica el `crontab` mediante lectura posterior exacta;
+- crea el directorio local de logs si hace falta.
+
+Para auditar el resultado efectivo:
+
 ```bash
-crontab -e
+crontab -l
 ```
 
-**Enable (Example Entry):**
-```bash
-# Rappi Sync
-0 7,10,13,19 * * * cd /data/data/com.termux/files/home/rappi-deal-hunter && DEALHUNTER_SOURCE=SCHEDULED /data/data/com.termux/files/usr/bin/flock -n ${TMPDIR:-/tmp}/dealhunter.lock bash -c "PYTHONPATH=src python3 -m dealhunter.cli sync --provider rappi && ./bin/dealwatcher" >> logs/crawler-cron.log 2>&1
+No copies rutas absolutas de otro checkout. Si mueves el repositorio, vuelve a habilitar el scheduler para regenerar los comandos desde la ruta real.
 
-# Uber Eats Sync
-30 7,10,13,19 * * * cd /data/data/com.termux/files/home/rappi-deal-hunter && DEALHUNTER_SOURCE=SCHEDULED /data/data/com.termux/files/usr/bin/flock -n ${TMPDIR:-/tmp}/dealhunter.lock bash -c "PYTHONPATH=src python3 -m dealhunter.cli sync --provider uber_eats && ./bin/dealwatcher" >> logs/crawler-cron.log 2>&1
+## Wake-lock / Doze
+
+Android puede suspender Termux cuando la pantalla está apagada. En un dispositivo dedicado, ejecuta manualmente:
+
+```bash
+termux-wake-lock
 ```
 
-**Disable:**
-Run `crontab -e` and comment out (`#`) the DealHunter lines.
+El wake-lock es global para Termux; no debe liberarse automáticamente por un proceso individual. Cuando ya no necesites servicios Termux en segundo plano:
 
-## Termux Doze / Wake Policy
-Android enforces strict power management (Deep Sleep / Doze mode) when the screen is off. We support two operating paradigms:
+```bash
+termux-wake-unlock
+```
 
-1. **RELIABLE (Recommended for dedicated devices)**:
-   You must acquire a persistent global wake lock (`termux-wake-lock` executed once manually). This guarantees the `crond` scheduler will fire on the exact scheduled minute, but increases battery consumption.
-   *Note: Using a script that acquires the wake-lock only when the job starts is insufficient, as the device may be asleep and miss the cron trigger entirely.*
+## Estado y logs
 
-2. **BATTERY_FRIENDLY (Accepts missed/delayed executions)**:
-   Do not use a persistent wake-lock. Android will aggressively suspend Termux. Scheduled jobs may fire late (e.g., when you next turn on the screen) or be completely skipped. DealHunter handles this gracefully without data corruption, but you may miss flash deals.
+- Jobs efectivos: `crontab -l`.
+- Lock: `${TMPDIR}/dealhunter.lock` (resuelto por Python con `tempfile.gettempdir()`).
+- Log: `<checkout>/logs/crawler-cron.log`.
+- DB: `RAPPI_DB_PATH` si está definido; en instalaciones legacy se conserva una DB existente en `~/rappi-deal-hunter/rappi-deals.db`; de lo contrario se usa `${XDG_DATA_HOME:-~/.local/share}/dealhunter/rappi-deals.db`.
 
-## Check Status & Logs
-- **Pending Jobs**: `crontab -l`
-- **Crawler & Alert Logs**: `tail -f ~/rappi-deal-hunter/logs/crawler-cron.log`
-- **Database Tracking**: `sqlite3 rappi-deals.db "SELECT run_id, started_at, status FROM runs ORDER BY started_at DESC LIMIT 5;"`
+## Fallos
 
-## Singleton Lock (Concurrency Protection)
-We use `flock -n ${TMPDIR:-/tmp}/dealhunter.lock` to guarantee that only one crawler can run at a time. If a crawl takes longer than the interval or is triggered manually while the cron is running, the secondary execution is safely rejected to avoid database locking issues or duplicate observations.
-
-## Delivery Failures
-Failures in the Termux notification delivery (e.g. API crash) will mark the event's `delivery_status` as `failed` inside `alert_events`, but will *not* crash the crawler or corrupt historical observations. DealHunter does not implement aggressive infinite retries to avoid delayed spam floods.
+Un job que no puede adquirir `flock` no inicia un segundo crawler. Un fallo del sync impide ejecutar `dealwatcher` en ese job. Los fallos de entrega de notificaciones se registran sin convertir datos parciales en éxito ni corromper observaciones históricas.

@@ -1,5 +1,11 @@
+import json
+import math
 import os
+import tempfile
 import tomllib
+
+from .errors import DealHunterError
+
 
 def get_config_dir():
     xdg_config = os.environ.get("XDG_CONFIG_HOME")
@@ -7,54 +13,109 @@ def get_config_dir():
         return os.path.join(xdg_config, "dealhunter")
     return os.path.expanduser("~/.config/dealhunter")
 
+
 def get_config_path():
     return os.path.join(get_config_dir(), "config.toml")
+
 
 def load_config():
     path = get_config_path()
     if not os.path.exists(path):
         return {}
-    with open(path, "rb") as f:
-        try:
+    try:
+        with open(path, "rb") as f:
             return tomllib.load(f)
-        except Exception:
-            return {}
+    except (tomllib.TOMLDecodeError, OSError) as exc:
+        raise DealHunterError("CONFIG_ERROR", message=f"Could not read {path}: {exc}") from exc
+
 
 def save_config(config_dict):
     path = get_config_path()
-    os.makedirs(os.path.dirname(path), exist_ok=True)
-    with open(path, "w") as f:
-        f.write(_dump_toml(config_dict))
+    directory = os.path.dirname(path)
+    temp_path = None
+    try:
+        content = _dump_toml(config_dict) + "\n"
+        os.makedirs(directory, mode=0o700, exist_ok=True)
+        os.chmod(directory, 0o700)
+        with tempfile.NamedTemporaryFile(
+            "w",
+            encoding="utf-8",
+            dir=directory,
+            prefix=".config.toml.",
+            suffix=".tmp",
+            delete=False,
+        ) as f:
+            temp_path = f.name
+            os.chmod(temp_path, 0o600)
+            f.write(content)
+            f.flush()
+            os.fsync(f.fileno())
+        os.replace(temp_path, path)
+        temp_path = None
+        os.chmod(path, 0o600)
+        directory_fd = os.open(directory, os.O_RDONLY)
+        try:
+            os.fsync(directory_fd)
+        finally:
+            os.close(directory_fd)
+    except (OSError, TypeError, ValueError) as exc:
+        if temp_path:
+            try:
+                os.unlink(temp_path)
+            except FileNotFoundError:
+                pass
+        raise DealHunterError("CONFIG_ERROR", message=f"Could not save {path}: {exc}") from exc
+
 
 def _dump_toml(d, prefix=""):
+    if not isinstance(d, dict):
+        raise TypeError("TOML root must be a table")
     lines = []
-    # Dump simple types first
+
     for k, v in d.items():
         if not isinstance(v, dict):
-            lines.append(f"{k} = {_dump_value(v)}")
-            
-    # Dump nested dicts
+            lines.append(f"{_dump_key(k)} = {_dump_value(v)}")
+
     for k, v in d.items():
         if isinstance(v, dict):
             if lines:
                 lines.append("")
-            section = f"{prefix}.{k}" if prefix else k
+            key = _dump_key(k)
+            section = f"{prefix}.{key}" if prefix else key
             lines.append(f"[{section}]")
-            lines.append(_dump_toml(v, section))
-            
+            nested = _dump_toml(v, section)
+            if nested:
+                lines.append(nested)
+
     return "\n".join(lines).strip()
+
 
 def _dump_value(v):
     if isinstance(v, bool):
         return "true" if v else "false"
-    elif isinstance(v, (int, float)):
+    if isinstance(v, int):
         return str(v)
-    elif isinstance(v, str):
-        return f'"{v}"'
-    elif isinstance(v, list):
-        items = ", ".join(_dump_value(i) for i in v)
-        return f"[{items}]"
-    return '""'
+    if isinstance(v, float):
+        if not math.isfinite(v):
+            raise ValueError("non-finite floats are not supported")
+        return repr(v)
+    if isinstance(v, str):
+        return json.dumps(v, ensure_ascii=False)
+    if isinstance(v, list):
+        if any(isinstance(item, (dict, list)) for item in v):
+            raise TypeError("nested arrays and inline tables are not supported")
+        types = {type(item) for item in v}
+        if len(types) > 1:
+            raise TypeError("TOML arrays must contain one value type")
+        return "[" + ", ".join(_dump_value(item) for item in v) + "]"
+    raise TypeError(f"unsupported TOML value: {type(v).__name__}")
+
+
+def _dump_key(value):
+    if not isinstance(value, str) or not value:
+        raise TypeError("TOML keys must be non-empty strings")
+    return json.dumps(value, ensure_ascii=False)
+
 
 def _deep_update(d, u):
     for k, v in u.items():
@@ -64,8 +125,8 @@ def _deep_update(d, u):
             d[k] = v
     return d
 
+
 def get_merged_config(cli_args, profile_name=None):
-    # defaults
     config = {
         "lat": None,
         "lng": None,
@@ -84,22 +145,19 @@ def get_merged_config(cli_args, profile_name=None):
         "max_runtime": 3600,
         "compact": False,
         "dry_run": False,
-        
-        # Phase 5E Settings
         "providers": {
             "rappi": {"enabled": True},
-            "uber_eats": {"enabled": True}
+            "uber_eats": {"enabled": True},
         },
         "memberships": {
             "rappi_pro": {"status": "unknown"},
-            "uber_one": {"status": "unknown"}
+            "uber_one": {"status": "unknown"},
         },
         "comparison": {
-            "inactive_membership_offers": "show_but_exclude"
-        }
+            "inactive_membership_offers": "show_but_exclude",
+        },
     }
-    
-    # global config
+
     global_cfg = load_config()
     for k in config.keys():
         if k in global_cfg:
@@ -107,8 +165,7 @@ def get_merged_config(cli_args, profile_name=None):
                 _deep_update(config[k], global_cfg[k])
             else:
                 config[k] = global_cfg[k]
-            
-    # profile
+
     if profile_name and "profiles" in global_cfg and profile_name in global_cfg["profiles"]:
         profile_cfg = global_cfg["profiles"][profile_name]
         for k in config.keys():
@@ -117,15 +174,14 @@ def get_merged_config(cli_args, profile_name=None):
                     _deep_update(config[k], profile_cfg[k])
                 else:
                     config[k] = profile_cfg[k]
-                
-    # cli override
+
     if cli_args:
         for k, v in vars(cli_args).items():
             if v is not None and k in config:
                 if isinstance(v, list) and len(v) == 0:
-                    continue # empty lists from CLI shouldn't override config lists
+                    continue
                 if isinstance(v, bool) and not v:
-                    continue # False flags might be default, let's be careful. Actually, argparse defaults might overwrite.
+                    continue
                 config[k] = v
-                
+
     return config

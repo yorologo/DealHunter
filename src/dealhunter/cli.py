@@ -4,7 +4,7 @@ import sys
 import os
 import logging
 from .config import get_merged_config, save_config, load_config
-from .db import setup_db, db_status, db_integrity, db_vacuum, backup_db
+from .db import setup_db, db_status, db_integrity, db_vacuum, backup_db, get_default_db_path
 from .crawler import run_discover, run_update
 from .historico import analyze_history, compare_stores
 from .output import print_results
@@ -240,7 +240,7 @@ def main(args_list=None):
 
     if args.command == "doctor":
         import os
-        db_path = os.environ.get("RAPPI_DB_PATH", os.path.expanduser("~/rappi-deal-hunter/rappi-deals.db"))
+        db_path = get_default_db_path()
         checks = run_doctor(db_path=db_path, check_network=getattr(args, "network", False))
         print(format_doctor_output(checks))
         return
@@ -565,7 +565,7 @@ def main(args_list=None):
     if args.command == "db":
 
         import os
-        db_path = os.environ.get("RAPPI_DB_PATH", os.path.expanduser("~/rappi-deal-hunter/rappi-deals.db"))
+        db_path = get_default_db_path()
 
         if args.action == "status":
             import json
@@ -599,7 +599,7 @@ def main(args_list=None):
     elif args.command == "stats":
         import json
         import os
-        db_path = os.environ.get("RAPPI_DB_PATH", os.path.expanduser("~/rappi-deal-hunter/rappi-deals.db"))
+        db_path = get_default_db_path()
         print(json.dumps(db_status(db_path), indent=2))
         return
 

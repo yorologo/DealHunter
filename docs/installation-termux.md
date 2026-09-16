@@ -1,49 +1,85 @@
 # Instalación y Setup en Termux (Android)
 
-Esta guía explica la instalación de producción/usuario-final del entorno offline/CLI, excluyendo herramientas pesadas como Blutter requeridas únicamente para la fase de investigación.
+Esta guía cubre el entorno operativo de DealHunter en Termux. Herramientas de investigación pesada no forman parte del runtime normal.
 
-## 1. Requisitos Iniciales
-- Dispositivo Android con `Termux` (instalado preferiblemente vía F-Droid, NO Play Store).
-- Conexión a internet estable.
+## 1. Requisitos
 
-## 2. Instalar Dependencias del Entorno
-Ejecutar dentro de la terminal Termux:
+- Android con Termux actualizado.
+- Conectividad para instalar dependencias y para los providers que se habiliten.
+
+## 2. Dependencias del entorno
+
 ```bash
 pkg update && pkg upgrade
-pkg install git python sqlite
+pkg install git python sqlite python-cryptography
 ```
 
-## 3. Clonar Repositorio
+`python-cryptography` es el backend seguro recomendado en Termux. DealHunter no degrada SecretStore a plaintext/base64/firma si `cryptography` no puede cargarse.
+
+## 3. Clonar e instalar dependencias Python
+
 ```bash
 git clone https://github.com/yorologo/DealHunter.git
 cd DealHunter
 pip install -r requirements.txt
 ```
 
-## 4. Configurar Permisos
-Dar permisos de ejecución a los binarios:
+En Termux, si `cryptography` ya proviene de `python-cryptography`, conserva el paquete nativo funcional. Verifica:
+
 ```bash
-chmod +x bin/rappi-ofertas
-chmod +x bin/rappi-historico
+python -c "from cryptography.fernet import Fernet; print('cryptography OK')"
 ```
 
-*(Opcional)* Si usarás rutas del almacenamiento local, es probable que requieras `termux-setup-storage`. Actualmente, todo se guarda por defecto en la misma carpeta raíz del repositorio en formato `rappi-deals.db`.
+No uses un `LD_PRELOAD` global como solución permanente de DealHunter.
 
-## 5. Pruebas de Arranque (Test Run)
-Haz una minería microscópica controlada que no te hará chocar con un rate limit:
+## 4. Permisos de los binarios
+
+```bash
+chmod +x bin/rappi-ofertas bin/rappi-historico bin/dealwatcher
+```
+
+## 5. Configuración local
+
+Configura la ubicación una sola vez; el archivo queda fuera de Git:
+
+```bash
+./bin/rappi-ofertas config set lat TU_LATITUD
+./bin/rappi-ofertas config set lng TU_LONGITUD
+```
+
+La configuración vive en `~/.config/dealhunter/config.toml` o bajo `XDG_CONFIG_HOME`. Un TOML malformado produce `CONFIG_ERROR`; no se sustituye silenciosamente por defaults.
+
+La DB respeta este orden:
+
+1. `RAPPI_DB_PATH`, si se define explícitamente.
+2. Una DB legacy existente en `~/rappi-deal-hunter/rappi-deals.db`.
+3. `${XDG_DATA_HOME:-~/.local/share}/dealhunter/rappi-deals.db` para instalaciones nuevas.
+
+No es necesario `termux-setup-storage` para esos paths privados de Termux.
+
+## 6. Smoke local
+
 ```bash
 ./bin/rappi-ofertas doctor
-```
-Verifica que la base de datos se haya creado.
-
-## 6. Primer Run Real
-Escanea tu área. Alimenta tus coordenadas reales usando `--lat` y `--lng`. Si prefieres testear la funcionalidad `general` que recorre todos los verticales:
-```bash
-./bin/rappi-ofertas discover --vertical general --lat TU_LATITUD --lng TU_LONGITUD
+./bin/rappi-ofertas providers
 ```
 
-## 7. Ejecución de Históricos (Day 2 onwards)
-Al día siguiente, corre el comando anterior de nuevo. Al finalizar, audita los resultados reales:
+## 7. Primer run real
+
 ```bash
-./bin/rappi-historico deals
+./bin/rappi-ofertas discover --vertical general
 ```
+
+El crawler exige ubicación efectiva y conserva `lat/lng` como provenance del run. Puedes usar `--lat/--lng` sólo para un override deliberado de una ejecución.
+
+## 8. Web local
+
+```bash
+./bin/rappi-historico web --port 8765
+```
+
+Por defecto escucha en `127.0.0.1:8765`.
+
+## 9. Scheduler
+
+Configura ubicación y providers antes de habilitarlo. Consulta [SCHEDULER.md](SCHEDULER.md) para la cadencia, `flock`, `crond` y wake-lock.

@@ -1,8 +1,15 @@
 # Changelog
 
-## [v3.2.0] - 2026-08-31
+## [Unreleased]
 
-`v3.2.0` is the current development target. It is currently in `main`, but has not been tagged or released.
+Development after the public `v3.2.0` baseline. Release version, tag and publication are intentionally deferred until the full promotion gates pass.
+
+### Changed
+- Security/operations hardening keeps SecretStore fail-closed, validates SQLite backups, uses strict atomic TOML writes, removes name-based category authority, and aligns the managed scheduler with the real checkout.
+
+## [v3.2.0] - 2026-09-01
+
+Public release. Annotated tag `v3.2.0` resolves to `258b449557b3e55f716eabcf566c9455a7d62960`; GitHub Release `DealHunter v3.2.0` was published on 2026-09-01.
 
 ### Added
 - **Multi-Provider Architecture**: Implemented robust provider registry and decoupled core logic from specific providers.

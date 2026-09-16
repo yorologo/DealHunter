@@ -1,18 +1,29 @@
 # Security & Privacy
 
-DealHunter asume y respeta los límites del modelo local garantizando un marco robusto contra vulnerabilidades habituales de la web.
+DealHunter mantiene un modelo local-first y aplica fallos cerrados en los límites sensibles.
 
-- **Host Seguro**: Default bind a `127.0.0.1`.
-- **Read-Only Nav**: Rutas web GET no mutan base de datos ni ejecutan rutinas remotas no deseadas.
-- **Explicit POSTs & CSRF**: Toda acción mutable requiere POST validado contra un token CSRF (generado dinámicamente) de forma imperativa.
-- **Templating**: Autoescape activo de Jinja2 (`XSS` prevention).
-- **Secrets Isolation**: Credenciales viajan puramente vía environment, nunca son cacheadas en SQLite, renderizadas en logs o en atributos ocultos HTML.
-- **File System**: Archivos `.db`, `.bak` e historial personal no son nunca servidos desde directorios estáticos públicos. No se expone *path traversal* (ej. el backup se autoasigna su nombre).
-- **No Arbitrary Execution**: Se deniega rotundamente ejecución SQL por la web o shell injection.
+- **Host seguro**: la web se vincula por defecto a `127.0.0.1`.
+- **GET sin mutación**: las rutas de navegación no deben modificar estado ni ejecutar adquisición remota.
+- **POST + CSRF**: toda acción mutable requiere POST y token CSRF válido.
+- **Jinja autoescape**: las plantillas conservan escape HTML por defecto.
+- **SecretStore**: las sesiones persistentes usan exclusivamente cifrado autenticado Fernet provisto por `cryptography`. Si el backend seguro no puede cargarse, DealHunter devuelve `SECRET_STORE_UNAVAILABLE` y no persiste el secreto.
+- **Sin fallback débil**: no se permite plaintext, base64, firma sin cifrado ni criptografía casera como sustituto del SecretStore.
+- **Flask session key**: `SECRET_KEY` de entorno tiene prioridad. Sin override, DealHunter crea una clave aleatoria persistente en `~/.config/dealhunter/flask_secret.key` (o `XDG_CONFIG_HOME`) y fuerza permisos `0600`; no existe fallback `dev`.
+- **Aislamiento**: tokens de sesión no entran en SQLite, `config.toml`, templates, logs ni backups generales.
+- **Filesystem**: `.db`, `.bak` e historial personal no se sirven desde estáticos públicos.
+- **Backups SQLite**: un backup sólo se acepta después de reabrirlo, ejecutar `PRAGMA integrity_check` y comprobar que su versión de schema coincide con la fuente. Un resultado inválido se elimina y se reporta como error.
+- **Sin ejecución arbitraria**: la web no expone SQL arbitrario ni construcción de shell desde input del usuario.
+
+## Termux y `cryptography`
+
+En Termux usa preferentemente el paquete nativo cuando esté disponible:
+
+```bash
+pkg install python-cryptography
+```
+
+En el entorno validado con Python 3.14.6, `python-cryptography 50.0.1` carga Fernet sin `LD_PRELOAD`. No configures `LD_PRELOAD` global como requisito de DealHunter. Si `cryptography` no carga, corrige el runtime/paquete; no debilites SecretStore.
 
 ## Privacy Philosophy
-DealHunter solo extrae catálogos comerciales. NO persigue persistir ni rastrear:
-- Cookies.
-- Pagos.
-- Direcciones.
-- Historiales ajenos.
+
+DealHunter extrae catálogos comerciales y evita persistir datos personales que no sean necesarios para la función local. En particular, no debe almacenar deliberadamente cookies completas, datos de pago, direcciones personales ni historiales ajenos.

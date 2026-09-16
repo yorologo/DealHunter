@@ -44,52 +44,8 @@ def process_and_insert_product(p, run_id, s_id, s_name, config, q, conn, seen_in
         return False
     seen_in_run.add(uid)
 
-    cat = p.get("category", "")
-    cat_source = "provider"
-    name_lower = pname.lower()
-    
-    # Existing fallback logic
-    if not cat:
-        if "super" in s_name.lower() or "market" in s_name.lower():
-            cat = "Supermercado"
-            cat_source = "inferred"
-        elif "farmacia" in s_name.lower():
-            cat = "Farmacia"
-            cat_source = "inferred"
-        else:
-            if "hamburguesa" in name_lower or "burger" in name_lower:
-                cat = "Hamburguesas"
-                cat_source = "inferred"
-            elif "pizza" in name_lower:
-                cat = "Pizza"
-                cat_source = "inferred"
-            elif "sushi" in name_lower or "roll" in name_lower:
-                cat = "Sushi"
-                cat_source = "inferred"
-            elif "taco" in name_lower:
-                cat = "Tacos"
-                cat_source = "inferred"
-            elif "pollo" in name_lower or "wings" in name_lower or "alitas" in name_lower:
-                cat = "Pollo"
-                cat_source = "inferred"
-            elif "helado" in name_lower or "postre" in name_lower or "frappuccino" in name_lower or "pastel" in name_lower or "pay" in name_lower:
-                cat = "Postres"
-                cat_source = "inferred"
-            elif "bebida" in name_lower or "refresco" in name_lower or "coca" in name_lower or "pepsi" in name_lower or "agua" in name_lower or "jugo" in name_lower:
-                cat = "Bebidas"
-                cat_source = "inferred"
-            elif "ensalada" in name_lower or "bowl" in name_lower:
-                cat = "Saludable"
-                cat_source = "inferred"
-            elif "sándwich" in name_lower or "sandwich" in name_lower or "baguette" in name_lower or "sub" in name_lower:
-                cat = "Sándwiches"
-                cat_source = "inferred"
-            elif "café" in name_lower or "cafe" in name_lower or "latte" in name_lower or "espresso" in name_lower:
-                cat = "Café"
-                cat_source = "inferred"
-            elif "papas" in name_lower or "fries" in name_lower:
-                cat = "Snacks"
-                cat_source = "inferred"
+    cat = p.get("category") or None
+    cat_source = (p.get("category_source") or "provider") if cat else "unknown"
 
     raw_toppings = p.get("has_toppings")
     has_toppings = 1 if raw_toppings else 0 if raw_toppings is not None else None
@@ -104,7 +60,7 @@ def process_and_insert_product(p, run_id, s_id, s_name, config, q, conn, seen_in
         
     d_price, d_promo, d_eff, d_src, p_type, p_label, eff_price, eff_real, comm_extra = calculate_discount(p)
     
-    if not matches_filters(pname, brand, s_name, cat, config, d_eff, p_type, eff_price):
+    if not matches_filters(pname, brand, s_name, cat or "", config, d_eff, p_type, eff_price):
         return False
         
     img = p.get("image", "")
