@@ -75,3 +75,18 @@ def test_cli_help():
     assert "web" in res.stdout
     assert "--port" in res.stdout
 
+def test_run_server_initializes_fresh_database(tmp_path, monkeypatch):
+    import dealhunter.web.app as webapp
+
+    db_path = tmp_path / "fresh-web.db"
+    monkeypatch.setattr(webapp, "get_default_db_path", lambda: str(db_path))
+    monkeypatch.setattr(webapp, "_production_secret_key", lambda: "test-only-secret")
+    monkeypatch.setattr(webapp, "is_termux", lambda: False)
+    monkeypatch.setattr(webapp.Flask, "run", lambda self, **kwargs: None)
+
+    webapp.run_server(port=18765)
+
+    with sqlite3.connect(db_path) as conn:
+        assert conn.execute("SELECT version FROM schema_version").fetchone()[0] == 17
+        assert conn.execute("SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='alerts'").fetchone()[0] == 1
+

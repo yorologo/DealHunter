@@ -2,7 +2,7 @@ from flask import render_template
 import os
 import secrets
 from flask import Flask, session, request, abort, g, current_app
-from dealhunter.db import get_default_db_path
+from dealhunter.db import get_default_db_path, setup_db
 from dealhunter.config import get_config_dir
 from dealhunter.metadata import VERSION
 from dealhunter.web.routes import register_routes
@@ -85,6 +85,10 @@ def create_app(test_config=None):
 
 
 def run_server(port=8765, debug=False):
+    # The documented Web command must be safe on a first run. Initialize or
+    # migrate the default database before Flask routes start reading from it.
+    conn = setup_db(get_default_db_path())
+    conn.close()
     app = create_app()
 
     if is_termux():
