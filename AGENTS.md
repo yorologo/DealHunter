@@ -28,8 +28,9 @@ The project must prioritize demonstrable value, not the largest advertised disco
 
 ## CURRENT DEVELOPMENT / RC
 
-- **Current development version**: v3.3.0
-- **Public baseline**: v3.2.0
+- **Runtime version**: v3.3.1 until the next release decision is validated.
+- **Public baseline**: v3.3.1 (`9f5f3c3c12f084190d0aea8f28e4950afb51bca8`).
+- **Integration branch**: `develop`, currently carrying post-v3.3.1 A01–A32 audit work.
 - **Schema**: 17
 - **Release status**: Publication determined by Git tag and GitHub Releases.
 - **Version source of truth**: `src/dealhunter/metadata.py`.
@@ -41,7 +42,8 @@ The project must prioritize demonstrable value, not the largest advertised disco
 - Uber Eats acquisition: production, phone-only Termux Chromium headless.
 - Provider configuration: production.
 - Rappi Pro / Uber One configuration and eligibility: production and separate from product identity.
-- Canonical schema infrastructure: implemented in schema v16.
+- Product canonical infrastructure: introduced in schema v16; matcher remains shadow/experimental.
+- Commercial identity and browse taxonomy: schema v17, with explicit reviewed mappings only; unresolved/unclassified evidence remains explicit.
 - Canonical matcher: shadow / experimental.
 - Automatic canonicalization: OFF; there is no automatic canonical membership write path.
 - Human ground truth: insufficient.
@@ -155,11 +157,11 @@ instead of guessing.
 
 ## Release terminology
 
-- **CURRENT DEVELOPMENT / RC** means the checked-out candidate: target v3.2.0, schema 16.
+- **CURRENT DEVELOPMENT** means the checked-out `develop` state. Do not invent a target version before release gates determine whether the accumulated changes justify patch/minor/major. Current schema is 17.
 - **PUBLIC RELEASE** means a published Git tag/release.
 - **LAST PUBLIC RELEASE** is derived from Git/GitHub metadata, not inferred from README text.
 
-Capabilities of the v3.2.0 foundation include:
+Capabilities inherited from the stable v3.x foundation include:
 
 - persistent TOML configuration;
 - profiles;
@@ -740,14 +742,14 @@ Priority direction:
 - suspicious reference price detection;
 - availability history.
 
-### v3.2 RC — Multi-provider foundation
+### Historical v3.2 foundation — Multi-provider baseline
 
 Current status:
 
 - Rappi and Uber Eats acquisition are production-capable;
 - provider and membership configuration are implemented;
 - raw identity is provider-aware;
-- schema v16 canonical infrastructure is implemented;
+- schema v16 introduced product-canonical infrastructure; schema v17 adds commercial identity and browse taxonomy;
 - cross-provider canonical matching remains shadow/experimental;
 - automatic canonicalization remains OFF until human and statistical gates pass.
 

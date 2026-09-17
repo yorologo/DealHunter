@@ -11,7 +11,8 @@
 - **v2.8**: Background runtime, Wake Lock management.
 - **v2.9**: Catalog Sync con sesión segura, Zone Inventory vs Search Discovery, UI/UX de Sesiones.
 - **KISS Iterations**: Deal Score V1, Taxonomy, Price Integrity, Multiselect Filters, safe zone realignment.
-- **Develop post-v3.2.0**: Schema v17 commercial identity/browse taxonomy, keyset pagination y Watchlist Web de solo lectura.
+- **v3.3.x**: Schema v17, keyset pagination, Watchlist Web de solo lectura y hardening de primer arranque/packaging Termux.
+- **Develop post-v3.3.1 / A01–A10**: workflows explícitos de merchant/location y browse mapping, sorts/recency autoritativos, SecretStore atómico fail-closed y validación Admin/redirects locales.
 
 ## Próximo (Follow Experience)
 - Panel visual de Alertas web

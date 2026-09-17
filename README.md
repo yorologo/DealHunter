@@ -20,16 +20,16 @@ DealHunter es un motor local-first de inteligencia de precios y oportunidades pa
 
 ### Current development (`develop`)
 
-- **Base pública**: `v3.3.0`. La rama `develop` contiene el hotfix posterior a esa release.
-- **Candidato de versión**: `v3.3.1` (patch), corrige el primer arranque Web sobre una DB aún inexistente; schema permanece v17.
-- **Runtime version actual**: `3.3.1` (`dealhunter.metadata.VERSION`).
+- **Última release pública**: `v3.3.1` (`9f5f3c3c12f084190d0aea8f28e4950afb51bca8`).
+- **Rama de integración**: `develop`, actualmente con trabajo post-`v3.3.1` del backlog A01–A32; aún no se ha decidido la siguiente versión.
+- **Runtime version actual**: `3.3.1` (`dealhunter.metadata.VERSION`) hasta que exista una decisión de release validada.
 - **Schema DB**: `17` (`dealhunter.db.CURRENT_SCHEMA_VERSION`).
 - **Validación**: el conteo exacto se obtiene con `PYTHONPATH=src pytest -q`; no se mantiene duplicado como verdad estática.
 
-### Base pública del hotfix
+### Última release pública
 
-- **v3.3.0**, publicada el **2026-09-16**; `v3.3.1` corrige exclusivamente el primer arranque Web sobre una DB inexistente.
-- Tag `v3.3.0` → commit `1c2e5ff6ed338df192cf0a4e00b974d9273bb147`.
+- **v3.3.1**, publicada como patch sobre v3.3.0.
+- Tag `v3.3.1` → commit `9f5f3c3c12f084190d0aea8f28e4950afb51bca8`.
 - La publicación se verifica con Git tag remoto + GitHub Releases; no se infiere del README.
 
 ### Estado de capacidades
@@ -40,9 +40,9 @@ DealHunter es un motor local-first de inteligencia de precios y oportunidades pa
 | Uber Eats acquisition | Production, phone-only |
 | Provider configuration | Production |
 | Membership configuration | Production |
-| Canonical infrastructure | Implemented in schema v16 |
-| Commercial identity (`merchant/location`) | Implemented in schema v17; explicit/reviewed mappings only |
-| Browse taxonomy | Implemented in schema v17; reviewed mappings + `UNCLASSIFIED` |
+| Product canonical infrastructure | Introduced in schema v16; matcher remains shadow/experimental |
+| Commercial identity (`merchant/location`) | Schema v17 + explicit reviewed mapping workflow; unresolved listings remain `UNRESOLVED` |
+| Browse taxonomy | Schema v17 + explicit reviewed mapping workflow; unmapped evidence remains `UNCLASSIFIED` |
 | Large catalog pagination | Keyset/cursor in Web; legacy `page=N` links remain compatible |
 | Canonical matcher | Shadow / experimental |
 | Automatic canonicalization | OFF; no automatic membership write path |
@@ -56,7 +56,7 @@ DealHunter es un motor local-first de inteligencia de precios y oportunidades pa
 - Rappi Pro y Uber One se configuran como estados de membresía independientes con `membership <name> active|inactive|unknown`; no participan en identidad de producto.
 - Uber Eats corre normalmente en el propio teléfono mediante Chromium headless nativo de Termux y CDP. No requiere PC ni servidor X durante los runs normales.
 - Carbonyl se reserva para setup o renovación de la sesión/perfil. El bridge de PC es una alternativa opcional de setup, no una dependencia operativa.
-- Las tablas canónicas de schema v16 existen como infraestructura. El matcher sólo evalúa en shadow y no escribe membresías canónicas automáticamente.
+- La infraestructura de producto canónico introducida en schema v16 sigue en modo shadow; no escribe membresías canónicas automáticamente.
 - Schema v17 separa `merchant`, `location`, tipo de comercio y dominio de catálogo de la identidad raw del provider; no infiere estas relaciones desde nombres visibles.
 - La taxonomía de navegación de DealHunter se mantiene separada de la evidencia raw del provider: sólo mappings revisados clasifican productos; lo demás permanece `UNCLASSIFIED`.
 
@@ -81,7 +81,7 @@ DealHunter incluye una Interfaz Web responsiva (UI/UX) para navegar ofertas sin 
 - Búsqueda global
 
 #### SEGUIR
-- *Watchlist core/CLI existente, vista UI web Parcial (Placeholder).*
+- Watchlist core/CLI + vista Web de solo lectura operativa.
 - *Alerts Engine existente, vista UI web Parcial (Placeholder).*
 
 #### ADMINISTRAR
@@ -149,7 +149,7 @@ Para mantener DealHunter Web activo en Android/Termux, DealHunter adquiere el `t
 DealHunter Phase 4I supports automated background execution and push notifications via `termux-notification`.
 See [docs/SCHEDULER.md](docs/SCHEDULER.md) for instructions on setting up `cron`, configuring the DealWatcher, and managing Termux battery optimizations.
 
-## DealHunter v3.2.0 — Public Release Baseline
+## Histórico: DealHunter v3.2.0 — Public Release Baseline
 
 Esta versión estabiliza la infraestructura de multi-proveedor e introduce el schema v16.
 

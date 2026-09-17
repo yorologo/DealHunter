@@ -2,7 +2,19 @@
 
 ## [Unreleased]
 
-No unreleased changes.
+Post-v3.3.1 work on `develop`; no next release version has been selected yet.
+
+### Added
+- Explicit reviewed CLI workflows for `Provider Listing → Merchant → Location` and raw taxonomy/path → DealHunter browse node. Unknown/ambiguous evidence remains `UNRESOLVED` / `UNCLASSIFIED`; no name-based automatic merge was introduced.
+
+### Fixed
+- Catalog `savings` and `recent` ordering now use persisted price/timestamp evidence and keyset/OFFSET share the same order; unsupported catalog `opportunity` is no longer advertised.
+- Deal recency now propagates the actual latest observation timestamp; restaurant latest rows use `timestamp DESC, id DESC`.
+- SecretStore salt/ciphertext persistence is atomic and fail-closed, preserving an existing secret on partial writes and distinguishing corruption from storage I/O.
+- Admin provider/membership/comparison/boolean settings reuse canonical validators, and mutable redirects reject external/scheme-relative targets.
+
+### Documentation
+- The old #1–#74 closure ledger moved under `docs/audit/` as historical v3.3.1 evidence. A01–A32 is now the stable current audit vocabulary.
 
 ## [v3.3.1] - 2026-09-16
 

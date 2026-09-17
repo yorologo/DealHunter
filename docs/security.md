@@ -6,13 +6,14 @@ DealHunter mantiene un modelo local-first y aplica fallos cerrados en los límit
 - **GET sin mutación**: las rutas de navegación no deben modificar estado ni ejecutar adquisición remota.
 - **POST + CSRF**: toda acción mutable requiere POST y token CSRF válido.
 - **Jinja autoescape**: las plantillas conservan escape HTML por defecto.
-- **SecretStore**: las sesiones persistentes usan exclusivamente cifrado autenticado Fernet provisto por `cryptography`. Si el backend seguro no puede cargarse, DealHunter devuelve `SECRET_STORE_UNAVAILABLE` y no persiste el secreto.
+- **SecretStore**: las sesiones persistentes usan exclusivamente cifrado autenticado Fernet provisto por `cryptography`. `.session_salt` y `session.enc` se escriben como archivo temporal privado → `fsync` → `0600` → reemplazo atómico. Un fallo parcial conserva el secreto anterior y se reporta explícitamente; NOT_CONFIGURED, CORRUPTED y STORAGE_ERROR no se colapsan entre sí.
 - **Sin fallback débil**: no se permite plaintext, base64, firma sin cifrado ni criptografía casera como sustituto del SecretStore.
 - **Flask session key**: `SECRET_KEY` de entorno tiene prioridad. Sin override, DealHunter crea una clave aleatoria persistente en `~/.config/dealhunter/flask_secret.key` (o `XDG_CONFIG_HOME`) y fuerza permisos `0600`; no existe fallback `dev`.
 - **Aislamiento**: tokens de sesión no entran en SQLite, `config.toml`, templates, logs ni backups generales.
 - **Filesystem**: `.db`, `.bak` e historial personal no se sirven desde estáticos públicos.
 - **Backups SQLite**: un backup sólo se acepta después de reabrirlo, ejecutar `PRAGMA integrity_check` y comprobar que su versión de schema coincide con la fuente. Un resultado inválido se elimina y se reporta como error.
 - **Sin ejecución arbitraria**: la web no expone SQL arbitrario ni construcción de shell desde input del usuario.
+- **Redirects locales**: destinos controlados por formularios/Referer sólo pueden volver a rutas internas o same-origin; URLs externas y `//host` nunca son destinos de redirección.
 
 ## Termux y `cryptography`
 

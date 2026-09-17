@@ -1,8 +1,8 @@
 # Documentation Index
 
-Este es el índice oficial de documentación para el desarrollo posterior a la release pública `v3.3.0` (schema v17). La rama de integración es `develop`; el candidato actual es `v3.3.1` (schema v17) y sólo se publica tras cerrar los gates de promoción.
+Este es el índice oficial para el desarrollo posterior a la release pública `v3.3.1` (schema v17). La rama de integración es `develop`; el trabajo A01–A32 todavía no tiene una versión candidata asignada.
 
-La base pública verificada de este hotfix es `v3.3.0` (2026-09-16), tag remoto y GitHub Release sobre `1c2e5ff6ed338df192cf0a4e00b974d9273bb147`; `v3.3.1` mantiene schema v17 y corrige el primer arranque Web.
+La última release pública verificada es `v3.3.1`, tag/GitHub Release sobre `9f5f3c3c12f084190d0aea8f28e4950afb51bca8`.
 
 ## Getting Started
 - [⚡ Very Very Easy Quick Start](VERY_EASY_QUICK_START.md) (Recomendado)
@@ -11,6 +11,10 @@ La base pública verificada de este hotfix es `v3.3.0` (2026-09-16), tag remoto 
 - [Configuration](configuration.md)
 - [CLI Reference](cli.md)
 - [Architecture](architecture.md)
+
+## Current audit
+- [A01–A32 canonical audit backlog](A01-A32-AUDIT.md)
+- Historical audit/closure evidence lives under [`audit/`](audit/).
 
 ## Core Engine
 - [Price Intelligence](price-intelligence.md)
