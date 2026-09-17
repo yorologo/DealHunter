@@ -194,6 +194,26 @@ def build_parser():
     comp_p.add_argument("policy", choices=["membership-policy"])
     comp_p.add_argument("value", choices=["exclude", "show_but_exclude", "include"])
 
+    commerce_map = subparsers.add_parser("commerce-map", help="Review provider listing -> merchant/location mappings")
+    commerce_map.add_argument("action", choices=["list", "confirm", "clear"])
+    commerce_map.add_argument("--provider", choices=["rappi", "uber_eats"])
+    commerce_map.add_argument("--store-id")
+    commerce_map.add_argument("--merchant-id")
+    commerce_map.add_argument("--merchant-name")
+    commerce_map.add_argument("--location-id")
+    commerce_map.add_argument("--location-name")
+
+    browse_map = subparsers.add_parser("browse-map", help="Review provider taxonomy -> DealHunter browse mappings")
+    browse_map.add_argument("action", choices=["list", "add-node", "confirm", "clear"])
+    browse_map.add_argument("--provider", choices=["rappi", "uber_eats"])
+    browse_map.add_argument("--raw-type")
+    browse_map.add_argument("--raw-name")
+    browse_map.add_argument("--raw-path", default="")
+    browse_map.add_argument("--browse-node-id")
+    browse_map.add_argument("--node-name")
+    browse_map.add_argument("--level", choices=["DEPARTMENT", "SECTION", "CATEGORY", "SUBCATEGORY"])
+    browse_map.add_argument("--parent-id")
+
     return parser
 
 def handle_config_command(args):
@@ -562,6 +582,83 @@ def main(args_list=None):
             cfg["comparison"]["inactive_membership_offers"] = args.value
         save_config(cfg)
         print(f"Comparison policy updated.")
+        return
+
+    if args.command == "commerce-map":
+        import json
+        from .reviewed_mappings import (
+            clear_merchant_location_mapping, confirm_merchant_location,
+            list_unresolved_listings,
+        )
+        if args.action == "list":
+            print(json.dumps(list_unresolved_listings(conn, provider=args.provider), indent=2, ensure_ascii=False))
+            conn.close()
+            return
+        required = ["provider", "store_id"]
+        if args.action == "confirm":
+            required += ["merchant_id", "merchant_name", "location_id", "location_name"]
+        missing = [name for name in required if not getattr(args, name)]
+        if missing:
+            conn.close()
+            parser.error("commerce-map %s requires: %s" % (args.action, ", ".join("--" + x.replace("_", "-") for x in missing)))
+        try:
+            if args.action == "confirm":
+                confirm_merchant_location(
+                    conn, provider=args.provider, store_id=args.store_id,
+                    merchant_id=args.merchant_id, merchant_name=args.merchant_name,
+                    location_id=args.location_id, location_name=args.location_name,
+                )
+                print("Reviewed commercial mapping saved.")
+            else:
+                clear_merchant_location_mapping(conn, provider=args.provider, store_id=args.store_id)
+                print("Commercial mapping cleared; listing is UNRESOLVED.")
+        finally:
+            conn.close()
+        return
+
+    if args.command == "browse-map":
+        import json
+        from .reviewed_mappings import (
+            add_browse_node, clear_browse_mapping, confirm_browse_mapping,
+            list_unclassified_memberships,
+        )
+        if args.action == "list":
+            print(json.dumps(list_unclassified_memberships(conn, provider=args.provider), indent=2, ensure_ascii=False))
+            conn.close()
+            return
+        if args.action == "add-node":
+            missing = [name for name in ("browse_node_id", "node_name", "level") if not getattr(args, name)]
+            if missing:
+                conn.close()
+                parser.error("browse-map add-node requires: %s" % ", ".join("--" + x.replace("_", "-") for x in missing))
+            try:
+                add_browse_node(
+                    conn, args.browse_node_id, name=args.node_name, level=args.level, parent_id=args.parent_id,
+                )
+                print("Reviewed browse node saved.")
+            finally:
+                conn.close()
+            return
+        required = ["provider", "raw_type", "raw_name", "browse_node_id"]
+        missing = [name for name in required if not getattr(args, name)]
+        if missing:
+            conn.close()
+            parser.error("browse-map %s requires: %s" % (args.action, ", ".join("--" + x.replace("_", "-") for x in missing)))
+        try:
+            if args.action == "confirm":
+                confirm_browse_mapping(
+                    conn, provider=args.provider, raw_type=args.raw_type, raw_name=args.raw_name,
+                    raw_path=args.raw_path, browse_node_id=args.browse_node_id,
+                )
+                print("Reviewed browse mapping saved.")
+            else:
+                clear_browse_mapping(
+                    conn, provider=args.provider, raw_type=args.raw_type, raw_name=args.raw_name,
+                    raw_path=args.raw_path, browse_node_id=args.browse_node_id,
+                )
+                print("Browse mapping cleared; taxonomy is UNCLASSIFIED.")
+        finally:
+            conn.close()
         return
 
     if args.command == "db":
