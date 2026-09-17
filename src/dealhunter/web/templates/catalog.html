@@ -82,6 +82,67 @@
                     </div>
                     {% endif %}
                     
+                    {% if av_merchants %}
+                    <div class="col-md-3">
+                        <label class="form-label small text-secondary fw-bold">Comercios</label>
+                        {{ multiselect('merchant', 'Comercios', av_merchants, filters.merchant, 'Buscar comercio...', None, None) }}
+                    </div>
+                    {% endif %}
+
+                    {% if av_locations %}
+                    <div class="col-md-3">
+                        <label class="form-label small text-secondary fw-bold">Sucursales incluidas</label>
+                        {{ multiselect('location', 'Incluir sucursales', av_locations, filters.location, 'Buscar sucursal...', None, None) }}
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label small text-secondary fw-bold">Sucursales excluidas</label>
+                        {{ multiselect('exclude_location', 'Excluir sucursales', av_locations, filters.exclude_location, 'Buscar sucursal...', None, None) }}
+                    </div>
+                    {% endif %}
+
+                    {% if av_commerce_types %}
+                    {% set commerce_options = [] %}
+                    {% for c in av_commerce_types %}{% set _ = commerce_options.append({'id': c, 'name': c|replace('_', ' ')|title}) %}{% endfor %}
+                    <div class="col-md-3">
+                        <label class="form-label small text-secondary fw-bold">Tipo de comercio</label>
+                        {{ multiselect('commerce_type', 'Tipo de comercio', commerce_options, filters.commerce_type, 'Buscar tipo...', None, None) }}
+                    </div>
+                    {% endif %}
+
+                    {% if av_catalog_domains %}
+                    {% set domain_options = [] %}
+                    {% for c in av_catalog_domains %}{% set _ = domain_options.append({'id': c, 'name': c|title}) %}{% endfor %}
+                    <div class="col-md-3">
+                        <label class="form-label small text-secondary fw-bold">Dominio</label>
+                        {{ multiselect('catalog_domain', 'Dominio', domain_options, filters.catalog_domain, 'Buscar dominio...', None, None) }}
+                    </div>
+                    {% endif %}
+
+                    {% if av_browse_nodes %}
+                    <div class="col-md-3">
+                        <label class="form-label small text-secondary fw-bold">Taxonomía DealHunter</label>
+                        {{ multiselect('browse_node', 'Categoría browse', av_browse_nodes, filters.browse_node, 'Buscar categoría...', None, None) }}
+                    </div>
+                    {% endif %}
+
+                    {% if av_brands %}
+                    {% set brand_options = [] %}
+                    {% for c in av_brands %}{% set _ = brand_options.append({'id': c, 'name': c}) %}{% endfor %}
+                    <div class="col-md-3">
+                        <label class="form-label small text-secondary fw-bold">Marca</label>
+                        {{ multiselect('brand', 'Marcas', brand_options, filters.brand, 'Buscar marca...', None, None) }}
+                    </div>
+                    {% endif %}
+
+                    <div class="col-md-2">
+                        <label class="form-label small text-secondary fw-bold">Descuento mínimo %</label>
+                        <input type="number" name="min_discount" class="form-control form-control-sm" min="0" max="100" step="0.1" value="{{ filters.min_discount if filters.min_discount is defined else '' }}">
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label small text-secondary fw-bold">Precio máximo</label>
+                        <input type="number" name="max_price" class="form-control form-control-sm" min="0" step="0.01" value="{{ filters.max_price if filters.max_price is defined else '' }}">
+                    </div>
+
                     <div class="col-md-3">
                         <label class="form-label small text-secondary fw-bold">Tipo de Oferta</label>
                         <select name="channel" class="form-select form-select-sm" onchange="document.getElementById('filter-form').dispatchEvent(new Event('submit'))">

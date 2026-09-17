@@ -64,6 +64,8 @@
             <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>
         </div>
         <div class="offcanvas-body">
+            {% set provider_selector_id = 'mobile' %}
+            <div class="mb-3">{% include 'partials/provider_selector.html' %}</div>
             {% include 'partials/nav_links.html' %}
         </div>
     </div>
@@ -77,7 +79,10 @@
                        name="q" hx-get="/search" hx-target="#searchResultsDropdown" hx-trigger="keyup changed delay:500ms">
                 <div id="searchResultsDropdown" class="position-absolute w-100 bg-body shadow rounded mt-1 z-3"></div>
             </div>
-            <div class="dropdown">
+            <div class="d-flex align-items-center gap-3">
+                {% set provider_selector_id = 'desktop' %}
+                {% include 'partials/provider_selector.html' %}
+                <div class="dropdown">
                 <button class="btn btn-light dropdown-toggle" type="button" data-bs-toggle="dropdown">
                     ⚙ Preferencias
                 </button>
@@ -91,6 +96,7 @@
                     <li><a class="dropdown-item" href="#" onclick="setDensity('comfortable')">Confortable</a></li>
                     <li><a class="dropdown-item" href="#" onclick="setDensity('compact')">Compacto</a></li>
                 </ul>
+                </div>
             </div>
         </div>
 

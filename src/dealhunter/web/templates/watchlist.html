@@ -1,0 +1,34 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="container-fluid p-0">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <div>
+            <h2 class="mb-1">👁 Watchlist</h2>
+            <p class="text-secondary mb-0">Seguimientos activos configurados desde DealHunter CLI.</p>
+        </div>
+    </div>
+
+    {% if items %}
+    <div class="list-group shadow-sm">
+        {% for item in items %}
+        <div class="list-group-item d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-2">
+            <div>
+                <div class="fw-bold">{{ item.query }}</div>
+                <div class="small text-secondary">
+                    {% if item.store %}Tienda: {{ item.store }}{% else %}Todas las tiendas{% endif %}
+                    {% if item.target_price is not none %} · Objetivo: ${{ '%.2f'|format(item.target_price) }}{% endif %}
+                </div>
+            </div>
+            <a class="btn btn-sm btn-outline-primary" href="/search?q={{ item.query|urlencode }}">Buscar ahora</a>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="alert alert-secondary text-center py-5">
+        <div class="fs-1 mb-3">👁</div>
+        <h4>No hay seguimientos activos.</h4>
+        <p class="mb-0 text-secondary">Añade uno con <code>rappi-ofertas watch add "producto" --below PRECIO</code>.</p>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

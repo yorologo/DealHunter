@@ -3,21 +3,67 @@
 <nav aria-label="breadcrumb" class="mb-3">
   <ol class="breadcrumb small">
     <li class="breadcrumb-item"><a href="/" class="text-decoration-none">Home</a></li>
-    <li class="breadcrumb-item active" aria-current="page">Tiendas</li>
+    <li class="breadcrumb-item active" aria-current="page">Comercios y sucursales</li>
   </ol>
 </nav>
 
 <div class="d-flex justify-content-between align-items-center mb-4">
-    <h3 class="fw-bold m-0">🏪 Tiendas</h3>
+    <div>
+        <h3 class="fw-bold m-0">🏪 Comercios y sucursales</h3>
+        <div class="small text-secondary mt-1">Sólo se agrupan sucursales con mapping confirmado. Los listings raw permanecen separados.</div>
+    </div>
     <div>
         {% if show_all %}
-            <a href="/stores" class="btn btn-sm btn-primary">Ocultar tiendas vacías</a>
+            <a href="/stores" class="btn btn-sm btn-primary">Ocultar listings vacíos</a>
         {% else %}
-            <a href="/stores?all=1" class="btn btn-sm btn-outline-secondary">Mostrar todas ({{ stores|length }} activas)</a>
+            <a href="/stores?all=1" class="btn btn-sm btn-outline-secondary">Mostrar listings vacíos</a>
         {% endif %}
     </div>
 </div>
 
+{% if merchants %}
+<h5 class="fw-bold mb-3">Comercios identificados</h5>
+<div class="row row-cols-1 row-cols-lg-2 g-4 mb-5">
+    {% for merchant in merchants %}
+    <div class="col">
+        <div class="card h-100 shadow-sm border-0">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-start mb-3">
+                    <div>
+                        <h5 class="fw-bold mb-1">{{ merchant.name }}</h5>
+                        <div class="small text-secondary">{{ merchant.locations|length }} sucursal(es) confirmadas · {{ merchant.listing_count }} listing(s)</div>
+                    </div>
+                    <a class="btn btn-sm btn-outline-primary" href="/market?merchant={{ merchant.id | urlencode }}">Ver catálogo</a>
+                </div>
+                <div class="list-group list-group-flush">
+                    {% for location in merchant.locations %}
+                    <div class="list-group-item px-0">
+                        <div class="d-flex justify-content-between gap-2">
+                            <div>
+                                <div class="fw-semibold">{{ location.name }}</div>
+                                <div class="small text-secondary">Sucursal confirmada · {{ location.products }} productos registrados</div>
+                            </div>
+                            <a class="btn btn-sm btn-outline-secondary align-self-start" href="/market?merchant={{ merchant.id | urlencode }}&location={{ location.id | urlencode }}">Filtrar</a>
+                        </div>
+                        <div class="mt-2 d-flex flex-wrap gap-2">
+                            {% for listing in location.listings %}
+                            <a href="/stores/{{ listing.provider }}/{{ listing.store_id }}" class="badge text-bg-light border text-decoration-none text-body">
+                                {{ 'Uber Eats' if listing.provider == 'uber_eats' else 'Rappi' if listing.provider == 'rappi' else listing.provider }} · {{ listing.name }}
+                            </a>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% endif %}
+
+<h5 class="fw-bold mb-1">Provider listings sin mapping confirmado</h5>
+<p class="small text-secondary mb-3">Estos registros conservan la identidad <code>(provider, store_id)</code>. No se presentan como sucursales hasta existir evidencia de mapping.</p>
 <div class="row row-cols-1 row-cols-sm-2 row-cols-md-3 row-cols-lg-4 g-4">
     {% for store in stores %}
     <div class="col">
@@ -25,6 +71,7 @@
             <div class="card h-100 shadow-sm hover-shadow transition-all border-0">
                 <div class="card-body">
                     <div class="d-flex justify-content-between align-items-start mb-3">
+                        <span class="badge text-bg-warning">Provider listing</span>
                         <span class="badge text-bg-light border text-uppercase">{{ store.type }}</span>
                     </div>
                     <h5 class="fw-bold text-body mb-1">{{ store.name }}</h5>
@@ -38,7 +85,7 @@
     </div>
     {% endfor %}
 </div>
-{% if not stores %}
-    <div class="alert alert-secondary text-center">No hay tiendas disponibles.</div>
+{% if not merchants and not stores %}
+    <div class="alert alert-secondary text-center">No hay comercios/listings disponibles.</div>
 {% endif %}
 {% endblock %}

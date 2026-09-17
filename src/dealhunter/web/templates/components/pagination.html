@@ -1,23 +1,44 @@
-{% macro render_pagination(data, current_url) %}
+{% macro render_pagination(data) %}
 {% if data.pages > 1 %}
 <nav aria-label="Page navigation" class="mt-4">
-    <ul class="pagination justify-content-center">
-        <li class="page-item {{ 'disabled' if data.page == 1 else '' }}">
-            <a class="page-link" href="#" 
-               hx-get="{{ current_url }}&page={{ data.page - 1 }}" hx-target="#catalog-grid"
-               {% if data.page == 1 %}tabindex="-1" aria-disabled="true"{% endif %}>Anterior</a>
-        </li>
-        
-        <li class="page-item active" aria-current="page">
-            <span class="page-link">{{ data.page }} de {{ data.pages }}</span>
-        </li>
-        
-        <li class="page-item {{ 'disabled' if data.page == data.pages else '' }}">
-            <a class="page-link" href="#" 
-               hx-get="{{ current_url }}&page={{ data.page + 1 }}" hx-target="#catalog-grid"
-               {% if data.page == data.pages %}tabindex="-1" aria-disabled="true"{% endif %}>Siguiente</a>
-        </li>
-    </ul>
+    <div class="d-flex justify-content-center align-items-center gap-2 flex-wrap">
+        <form method="get" action="{{ request.path }}"
+              hx-get="{{ request.path }}" hx-target="#catalog-grid" hx-push-url="true">
+            {% for key, values in request.args.lists() %}
+                {% if key not in ('page', 'cursor') %}
+                    {% for value in values %}
+                    <input type="hidden" name="{{ key }}" value="{{ value }}">
+                    {% endfor %}
+                {% endif %}
+            {% endfor %}
+            <input type="hidden" name="page" value="{{ data.page - 1 }}">
+            <button type="submit" class="btn btn-outline-secondary btn-sm"
+                    {% if data.page == 1 %}disabled aria-disabled="true"{% endif %}>
+                Anterior
+            </button>
+        </form>
+
+        <span class="small text-secondary px-2">{{ data.page }} de {{ data.pages }}</span>
+
+        <form method="get" action="{{ request.path }}"
+              hx-get="{{ request.path }}" hx-target="#catalog-grid" hx-push-url="true">
+            {% for key, values in request.args.lists() %}
+                {% if key not in ('page', 'cursor') %}
+                    {% for value in values %}
+                    <input type="hidden" name="{{ key }}" value="{{ value }}">
+                    {% endfor %}
+                {% endif %}
+            {% endfor %}
+            <input type="hidden" name="page" value="{{ data.page + 1 }}">
+            {% if data.next_cursor %}
+            <input type="hidden" name="cursor" value="{{ data.next_cursor }}">
+            {% endif %}
+            <button type="submit" class="btn btn-outline-primary btn-sm"
+                    {% if data.page >= data.pages %}disabled aria-disabled="true"{% endif %}>
+                Siguiente
+            </button>
+        </form>
+    </div>
 </nav>
 {% endif %}
 {% endmacro %}

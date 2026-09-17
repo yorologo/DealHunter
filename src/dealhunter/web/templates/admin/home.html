@@ -69,7 +69,7 @@
                     <div class="d-flex flex-wrap gap-2">
                         {% for status, count in summary.items() %}
                         <a href="/admin/runs?status={{ status }}" class="text-decoration-none">
-                            <span class="badge {% if status == 'COMPLETED' %}bg-success{% elif status in ('FAILED',) %}bg-danger{% elif status in ('PARTIAL', 'PARTIAL_RUN') %}bg-warning text-dark{% else %}bg-secondary{% endif %} fs-6 px-3 py-2">
+                            <span class="badge {% if status in ('SUCCESS', 'COMPLETED') %}bg-success{% elif status in ('FAILED',) %}bg-danger{% elif status in ('PARTIAL', 'PARTIAL_RUN') %}bg-warning text-dark{% else %}bg-secondary{% endif %} fs-6 px-3 py-2">
                                 {{ status }}: {{ count }}
                             </span>
                         </a>

@@ -17,7 +17,7 @@ def get_runs_paginated(db_path, page=1, per_page=20, status_filter=None):
     # Build WHERE clause
     where = ""
     params = []
-    if status_filter and status_filter in ('COMPLETED', 'PARTIAL', 'PARTIAL_RUN', 'FAILED', 'RUNNING'):
+    if status_filter and status_filter in ('SUCCESS', 'COMPLETED', 'PARTIAL', 'PARTIAL_RUN', 'FAILED', 'RUNNING'):
         where = "WHERE status = ?"
         params.append(status_filter)
 

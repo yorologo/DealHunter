@@ -6,7 +6,7 @@ from flask import Blueprint, render_template, request, current_app, redirect, ur
 from markupsafe import escape
 from dealhunter.doctor import run_doctor
 from dealhunter.account import get_account_status, get_account_token
-from dealhunter.config import load_config, get_config_path, get_merged_config, save_config
+from dealhunter.config import load_config, get_config_path, get_default_config, get_merged_config, save_config
 from dealhunter.db import db_status, db_integrity, backup_db, db_vacuum, CURRENT_SCHEMA_VERSION
 from dealhunter.web.admin_queries import (
     get_runs_paginated, get_run_detail, get_events,
@@ -20,31 +20,12 @@ SAFE_EDITABLE = {
     'min_discount', 'max_discount', 'radius', 'top', 'sort',
     'output_format', 'vertical', 'store', 'exclude_store',
     'query', 'exclude', 'compact', 'dry_run',
-    'max_requests', 'max_runtime',
+    'max_requests', 'max_runtime', 'lat', 'lng',
 }
 
 SECRET_FORBIDDEN = {
     'RAPPI_BEARER_TOKEN', 'bearer_token', 'token', 'secret',
     'password', 'cookie', 'session', 'api_key', 'secret_key',
-}
-
-# Default config values for reference
-DEFAULTS = {
-    'min_discount': 0,
-    'max_discount': 100,
-    'radius': 5.0,
-    'top': 50,
-    'sort': 'discount',
-    'output_format': 'table',
-    'vertical': [],
-    'store': [],
-    'exclude_store': [],
-    'query': [],
-    'exclude': [],
-    'max_requests': 1000,
-    'max_runtime': 3600,
-    'compact': False,
-    'dry_run': False,
 }
 
 
@@ -172,31 +153,34 @@ def runs_start():
 
     try:
         db_path = current_app.config['DATABASE']
-        project_root = os.path.dirname(os.path.abspath(db_path))
+        from pathlib import Path
+        project_root = str(Path(__file__).resolve().parents[3])
 
-        # 6. SERVER-SIDE DOUBLE SUBMIT & 7. ACTIVE RUN POLICY
-        conn = sqlite3.connect(db_path)
-        c = conn.cursor()
-        c.execute("SELECT run_id FROM runs WHERE status = 'RUNNING' AND datetime(started_at) >= datetime('now', '-2 hours')")
-        if c.fetchone():
-            conn.close()
-            return "Ya hay un crawler activo recientemente.", 400
-
+        conn = sqlite3.connect(db_path, timeout=30)
         run_id = f"run_{uuid.uuid4().hex[:12]}"
 
-        cfg = load_config()
-        loc = cfg.get("location", {})
-        if not isinstance(loc, dict) or "lat" not in loc or "lng" not in loc:
+        cfg = get_merged_config(None)
+        lat = cfg.get("lat")
+        lng = cfg.get("lng")
+        try:
+            lat = float(lat)
+            lng = float(lng)
+        except (TypeError, ValueError):
             conn.close()
-            return "Ubicación (lat/lng) no configurada. Edite su configuración (config.toml) local primero.", 400
-            
-        lat = loc["lat"]
-        lng = loc["lng"]
+            return "Ubicación (lat/lng) no configurada. Configúrala en Administración → Configuración.", 400
+        if not (-90 <= lat <= 90 and -180 <= lng <= 180):
+            conn.close()
+            return "Ubicación fuera de rango válido.", 400
 
-        c.execute('''INSERT INTO runs (run_id, started_at, lat, lng, radius, status)
-                     VALUES (?, CURRENT_TIMESTAMP, ?, ?, ?, 'RUNNING')''',
-                  (run_id, lat, lng, cfg.get("radius", 5.0)))
-        conn.commit()
+        from dealhunter.run_lifecycle import ActiveRunError, reserve_run
+        try:
+            reserve_run(
+                conn, run_id, lat=lat, lng=lng, radius=cfg.get("radius", 5.0),
+                vertical="general", source="WEB",
+            )
+        except ActiveRunError:
+            conn.close()
+            return "Ya hay un crawler activo recientemente.", 400
         conn.close()
 
         env = os.environ.copy()
@@ -332,25 +316,36 @@ def settings():
     config_path = get_config_path()
     config_exists = os.path.exists(config_path)
 
-    # Build settings display with source and classification
-    settings_list = []
+    profiles = list(global_cfg.get('profiles', {}).keys())
+    requested_profile = request.args.get('profile')
+    selected_profile = requested_profile if requested_profile in profiles else None
+    defaults = get_default_config()
+    effective_cfg = get_merged_config(None, profile_name=selected_profile)
+    profile_cfg = global_cfg.get('profiles', {}).get(selected_profile, {}) if selected_profile else {}
 
-    for key, default_val in sorted(DEFAULTS.items()):
-        effective = global_cfg.get(key, default_val)
-        source = "config.toml" if key in global_cfg else "default"
-        classification = "SAFE_EDITABLE"
+    # Build the editable runtime view from the same merge authority as CLI/runtime.
+    settings_list = []
+    for key in sorted(SAFE_EDITABLE):
+        default_val = defaults.get(key)
+        effective = effective_cfg.get(key)
+        if key in profile_cfg:
+            source = f"profile:{selected_profile}"
+        elif key in global_cfg:
+            source = "config.toml"
+        else:
+            source = "default"
         settings_list.append({
             'key': key,
             'value': effective,
             'default': default_val,
             'source': source,
-            'classification': classification,
-            'type': type(default_val).__name__,
+            'classification': "SAFE_EDITABLE",
+            'type': ("float" if key in ("lat", "lng") else type(default_val).__name__),
         })
 
     # Add any extra keys from config that aren't in defaults
     for key in sorted(global_cfg.keys()):
-        if key in DEFAULTS:
+        if key in defaults:
             continue
         if key == 'profiles':
             continue
@@ -379,16 +374,15 @@ def settings():
                 'editable': False,
             })
 
-    # Profiles info
-    profiles = list(global_cfg.get('profiles', {}).keys())
-
     return render_template('admin/settings.html',
                            current_path='/admin/settings',
                            settings=settings_list,
                            profiles=profiles,
                            config_path=config_path,
                            config_exists=config_exists,
-                           raw_config=global_cfg)
+                           raw_config=global_cfg,
+                           effective_config=effective_cfg,
+                           selected_profile=selected_profile)
 
 
 
@@ -449,9 +443,11 @@ def settings_update():
                                message="No se permiten secretos en la configuración web.")
 
     # Parse value to correct type
-    default_val = DEFAULTS.get(key)
+    default_val = get_default_config().get(key)
     try:
-        if isinstance(default_val, bool):
+        if key in ("lat", "lng"):
+            parsed = float(value)
+        elif isinstance(default_val, bool):
             parsed = value.lower() in ('true', '1', 'yes', 'on')
         elif isinstance(default_val, int):
             parsed = int(value)
@@ -466,6 +462,15 @@ def settings_update():
         return render_template('admin/partials/settings_result.html',
                                success=False,
                                message=f"Valor inválido para '{key}'.")
+
+    if key == "lat" and not -90 <= parsed <= 90:
+        return render_template('admin/partials/settings_result.html', success=False, message="lat debe estar entre -90 y 90.")
+    if key == "lng" and not -180 <= parsed <= 180:
+        return render_template('admin/partials/settings_result.html', success=False, message="lng debe estar entre -180 y 180.")
+    if key in ("min_discount", "max_discount") and not 0 <= parsed <= 100:
+        return render_template('admin/partials/settings_result.html', success=False, message=f"{key} debe estar entre 0 y 100.")
+    if key in ("radius", "top", "max_requests", "max_runtime") and parsed <= 0:
+        return render_template('admin/partials/settings_result.html', success=False, message=f"{key} debe ser mayor que 0.")
 
     # Use config layer to save
     try:
@@ -571,7 +576,7 @@ def catalog_sync():
         last_zone_status = row[1] if row else None
         last_zone_coverage = row[2] if row else 0
 
-        cur.execute("SELECT started_at FROM runs WHERE crawler_mode='ZONE_INVENTORY' AND status='COMPLETED' AND coverage_complete=1 ORDER BY started_at DESC LIMIT 1")
+        cur.execute("SELECT started_at FROM runs WHERE crawler_mode='ZONE_INVENTORY' AND status='SUCCESS' AND coverage_complete=1 ORDER BY started_at DESC LIMIT 1")
         row2 = cur.fetchone()
         last_zone_complete = row2[0] if row2 else None
 
@@ -604,6 +609,30 @@ def catalog_sync():
                            scheduler_enabled=scheduler_enabled,
                            next_run=next_run)
 
+
+
+def _session_status_response(*, flash_message=None, flash_success=None, valid=None):
+    """Render the compatibility session partial without exposing the token."""
+    from datetime import datetime
+    from dealhunter.secret_store import SessionService
+
+    svc = SessionService()
+    status = svc.get_status()
+    stored_at_str = None
+    if status.get('stored_at'):
+        stored_at_str = datetime.fromtimestamp(status['stored_at']).strftime('%d %b %Y %H:%M')
+    if valid is not None:
+        status['valid'] = valid
+    return render_template(
+        'admin/partials/session_status.html',
+        mode=status['mode'],
+        stored_at=stored_at_str,
+        encryption_method=status.get('encryption_method'),
+        valid=status.get('valid'),
+        warnings=status.get('warnings', []),
+        flash_message=flash_message,
+        flash_success=flash_success,
+    )
 
 
 @admin_bp.route('/catalog-sync/session/store', methods=['POST'])
@@ -664,74 +693,31 @@ def session_delete():
 
 @admin_bp.route('/catalog-sync/session/check', methods=['POST'])
 def session_check():
-    """Validate the current session against Rappi API."""
-    from dealhunter.secret_store import SessionService
-    svc = SessionService()
-    token = svc.get_token()
-
-    if not token:
+    """Validate the current Rappi session through the canonical account resolver."""
+    acc = get_account_status(load_config(), check_network=True)
+    status = acc.get('status', 'UNVERIFIED')
+    if status == 'VALID':
         return _session_status_response(
-            flash_message="No hay sesión configurada para comprobar.",
-            flash_success=False
+            flash_message='Sesión válida ✓', flash_success=True, valid=True
         )
-
-    # Try a lightweight API call to validate
-    try:
-        from dealhunter.api import fetch_unified_search
-        result = fetch_unified_search("test", 19.4326, -99.1332, auth_token=token)
-        if result == "RATE_LIMIT":
-            return _session_status_response(
-                flash_message="Rate limit alcanzado. Intenta más tarde.",
-                flash_success=False
-            )
+    if status == 'EXPIRED':
         return _session_status_response(
-            flash_message="Sesión válida ✓",
-            flash_success=True,
-            valid=True
+            flash_message='La sesión expiró o fue rechazada por autenticación.',
+            flash_success=False,
+            valid=False,
         )
-    except Exception as e:
-        err = str(e)
-        if '401' in err or '403' in err:
-            svc.mark_expired()
-            return _session_status_response(
-                flash_message="La sesión no es válida o ha expirado.",
-                flash_success=False
-            )
-        if '429' in err:
-            return _session_status_response(
-                flash_message="Rate limit (HTTP 429). Intenta más tarde.",
-                flash_success=False
-            )
+    if status == 'NOT_CONFIGURED':
         return _session_status_response(
-            flash_message=f"Error de conexión: {err}",
-            flash_success=False
+            flash_message='No hay sesión configurada para comprobar.',
+            flash_success=False,
+            valid=False,
         )
+    return _session_status_response(
+        flash_message='No fue posible verificar la sesión de forma concluyente; se conserva sin invalidarla.',
+        flash_success=False,
+        valid=None,
+    )
 
-
-    """Helper to render session status partial with flash message."""
-    from dealhunter.secret_store import SessionService
-    import datetime
-
-    svc = SessionService()
-    status = svc.get_status()
-
-    stored_at_str = None
-    if status.get('stored_at'):
-        stored_at_str = datetime.datetime.fromtimestamp(
-            status['stored_at']
-        ).strftime('%d %b %Y %H:%M')
-
-    if valid is not None:
-        status['valid'] = valid
-
-    return render_template('admin/partials/session_status.html',
-                           mode=status['mode'],
-                           stored_at=stored_at_str,
-                           encryption_method=status.get('encryption_method'),
-                           valid=status.get('valid'),
-                           warnings=status.get('warnings', []),
-                           flash_message=flash_message,
-                           flash_success=flash_success)
 
 @admin_bp.route('/catalog-sync/scheduler', methods=['POST'])
 def catalog_sync_scheduler():
@@ -739,11 +725,14 @@ def catalog_sync_scheduler():
     from dealhunter.scheduler import enable_scheduler, disable_scheduler
     
     enabled = request.form.get('enabled') == '1'
-    if enabled:
-        enable_scheduler()
-        flash("Scheduler activado exitosamente (10:00 a.m. diariamente).", "success")
-    else:
-        disable_scheduler()
-        flash("Scheduler desactivado.", "info")
-        
+    try:
+        if enabled:
+            enable_scheduler()
+            flash("Scheduler activado: Rappi 07:00/10:00/13:00/19:00 y Uber Eats a :30.", "success")
+        else:
+            disable_scheduler()
+            flash("Scheduler desactivado.", "info")
+    except RuntimeError as exc:
+        flash(str(exc), "warning")
+
     return redirect('/admin/catalog-sync')

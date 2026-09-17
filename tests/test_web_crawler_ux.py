@@ -27,9 +27,9 @@ def test_web_start_creates_exactly_one_run(client, app_and_db, monkeypatch):
     app, db_path = app_and_db
     
     import subprocess
-    monkeypatch.setattr("dealhunter.config.load_config", lambda: {"location": {"lat": 19.4326, "lng": -99.1332}})
+    monkeypatch.setattr("dealhunter.web.admin.get_merged_config", lambda *_args, **_kwargs: {"lat": 19.4326, "lng": -99.1332, "radius": 5.0})
     popen_calls = []
-    monkeypatch.setattr("dealhunter.config.load_config", lambda: {"location": {"lat": 19.4326, "lng": -99.1332}})
+    monkeypatch.setattr("dealhunter.web.admin.get_merged_config", lambda *_args, **_kwargs: {"lat": 19.4326, "lng": -99.1332, "radius": 5.0})
     class MockPopen:
         def __init__(self, *args, **kwargs):
             popen_calls.append((args, kwargs))
@@ -59,7 +59,7 @@ def test_run_start_normal_post_redirect(client, app_and_db, monkeypatch):
     app, db_path = app_and_db
     
     import subprocess
-    monkeypatch.setattr("dealhunter.config.load_config", lambda: {"location": {"lat": 19.4326, "lng": -99.1332}})
+    monkeypatch.setattr("dealhunter.web.admin.get_merged_config", lambda *_args, **_kwargs: {"lat": 19.4326, "lng": -99.1332, "radius": 5.0})
     monkeypatch.setattr(subprocess, "Popen", lambda *args, **kwargs: None)
     
     with app.test_client() as c:
@@ -110,7 +110,7 @@ def test_run_start_valid_location(client, app_and_db, monkeypatch):
     app, db_path = app_and_db
     import subprocess
     monkeypatch.setattr(subprocess, "Popen", lambda *args, **kwargs: None)
-    monkeypatch.setattr("dealhunter.config.load_config", lambda: {"location": {"lat": 19.43, "lng": -99.13}})
+    monkeypatch.setattr("dealhunter.web.admin.get_merged_config", lambda *_args, **_kwargs: {"lat": 19.43, "lng": -99.13, "radius": 5.0})
     with app.test_client() as c:
         with c.session_transaction() as sess:
             sess['csrf_token'] = 'token'

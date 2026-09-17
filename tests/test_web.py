@@ -49,12 +49,20 @@ def test_search_hx(client):
     assert rv.status_code == 200
     assert b'list-group-item' in rv.data
 
-def test_placeholders(client):
-    routes = ['/watchlist', '/alerts']
-    for r in routes:
-        rv = client.get(r)
-        assert rv.status_code == 200
-        assert b'Pr\xc3\xb3ximamente' in rv.data or b'read-only' in rv.data
+def test_watchlist_page(client, app):
+    with sqlite3.connect(app.config['DATABASE']) as conn:
+        conn.execute("INSERT INTO watchlist (query, target_price, enabled) VALUES ('Coca Cola', 35.0, 1)")
+        conn.commit()
+    rv = client.get('/watchlist')
+    assert rv.status_code == 200
+    assert b'Coca Cola' in rv.data
+    assert b'$35.00' in rv.data
+    assert b'/search?q=Coca+Cola' in rv.data or b'/search?q=Coca%20Cola' in rv.data
+
+def test_alerts_placeholder(client):
+    rv = client.get('/alerts')
+    assert rv.status_code == 200
+    assert b'Pr\xc3\xb3ximamente' in rv.data or b'read-only' in rv.data
 
 def test_404(client):
     rv = client.get('/not-exists')

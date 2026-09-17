@@ -28,7 +28,7 @@
                 </td>
                 <td class="small">
                     {% if run.crawler_mode == 'ZONE_INVENTORY' %}
-                        {% if run.status == 'COMPLETED' and run.coverage_complete == 1 %}
+                        {% if run.status in ('SUCCESS', 'COMPLETED') and run.coverage_complete == 1 %}
                         <span class="badge bg-success">Completa</span>
                         {% else %}
                         <span class="badge bg-warning text-dark">Parcial</span>
@@ -42,7 +42,7 @@
                 <td class="small">{{ run.duration or '-' }}</td>
                 <td class="d-none d-md-table-cell small">{{ run.vertical_name or '-' }}</td>
                 <td>
-                    <span class="badge {% if run.status == 'COMPLETED' %}bg-success{% elif run.status == 'FAILED' %}bg-danger{% elif run.status in ('PARTIAL', 'PARTIAL_RUN') %}bg-warning text-dark{% elif run.status == 'RUNNING' %}bg-info{% else %}bg-secondary{% endif %}">
+                    <span class="badge {% if run.status in ('SUCCESS', 'COMPLETED') %}bg-success{% elif run.status == 'FAILED' %}bg-danger{% elif run.status in ('PARTIAL', 'PARTIAL_RUN') %}bg-warning text-dark{% elif run.status == 'RUNNING' %}bg-info{% else %}bg-secondary{% endif %}">
                         {{ run.status }}
                     </span>
                 </td>

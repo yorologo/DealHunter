@@ -11,9 +11,13 @@ def get_home_metrics(db_path):
     # - newest REAL_DEAL (top 5)
     # - biggest price drops (PRICE_DROP)
     
-    c = sqlite3.connect(db_path).cursor()
-    c.execute("SELECT COUNT(*) FROM alerts WHERE seen = 0")
-    new_alerts = c.fetchone()[0]
+    conn = sqlite3.connect(db_path)
+    try:
+        c = conn.cursor()
+        c.execute("SELECT COUNT(*) FROM alerts WHERE seen = 0")
+        new_alerts = c.fetchone()[0]
+    finally:
+        conn.close()
     
     return {
         "stats": stats,
@@ -35,19 +39,23 @@ def get_home_deals(db_path, filters=None):
     }
 
 def get_watchlist(db_path, filters=None):
-    c = sqlite3.connect(db_path).cursor()
+    conn = sqlite3.connect(db_path)
     try:
-        c.execute("SELECT query, store_filter, target_price FROM watchlist WHERE enabled = 1")
+        c = conn.cursor()
+        c.execute("SELECT query, store_filter, target_price FROM watchlist WHERE enabled = 1 ORDER BY id ASC")
         return [{"query": r[0], "store": r[1], "target_price": r[2]} for r in c.fetchall()]
     except sqlite3.OperationalError:
         return []
+    finally:
+        conn.close()
 
 from dealhunter.historico import compute_price_metrics, compare_stores, compare_with_anchor
 from dealhunter.normalization import format_unit_price
 from datetime import datetime
 
 def get_product_detail(db_path, provider, store_id, product_id):
-    c = sqlite3.connect(db_path).cursor()
+    conn = sqlite3.connect(db_path)
+    c = conn.cursor()
     c.execute('''
         SELECT p.provider, p.product_id, p.store_id, p.name, s.name, s.type as store_type, p.brand, 
                p.category, p.quantity, p.unit, p.normalized_quantity, p.normalized_unit, p.pack_count
@@ -57,6 +65,7 @@ def get_product_detail(db_path, provider, store_id, product_id):
     ''', (provider, store_id, product_id))
     row = c.fetchone()
     if not row:
+        conn.close()
         return None
         
     p = {
@@ -138,7 +147,8 @@ def get_product_detail(db_path, provider, store_id, product_id):
     c.execute("SELECT target_price FROM watchlist WHERE query = ? AND enabled = 1", (p["product_name"],))
     w = c.fetchone()
     p["target_price"] = w[0] if w else None
-    
+
+    conn.close()
     return p
 
 def get_product_compare(db_path, product_name):
@@ -385,34 +395,54 @@ def get_deals(db_path, filters, sort, page, per_page=25):
     }
 
 
-def get_catalog(db_path, filters, sort, page, per_page=25):
+def get_catalog(db_path, filters, sort, page, per_page=25, cursor=None):
     import sqlite3
-    from dealhunter.query_layer import build_faceted_query
+    from dealhunter.query_layer import build_faceted_query, build_faceted_cursor_query
     from dealhunter.config import get_merged_config
     from dealhunter.eligibility import EligibilityEngine
-    from dealhunter.config import get_merged_config
-    from dealhunter.eligibility import EligibilityEngine
+    from dealhunter.web.params import encode_cursor
+
     conn = sqlite3.connect(db_path)
     c = conn.cursor()
-    
     facets = _translate_filters(filters, sort, page, per_page)
     config = get_merged_config(None)
     engine = EligibilityEngine(config)
-    q, count_q, params = build_faceted_query(facets, config)
-    
-    c.execute(count_q, params)
-    total = c.fetchone()[0]
-    
-    c.execute(q, params)
-    rows = c.fetchall()
-    
+
+    # Page 1 and all cursor-followups use keyset pagination. Explicit legacy
+    # page=N URLs without a cursor remain valid and use OFFSET as a fallback.
+    use_keyset = cursor is not None or page == 1
+    next_cursor = None
+    if use_keyset:
+        facets["limit"] = per_page + 1
+        facets.pop("offset", None)
+        q, count_q, query_params, count_params = build_faceted_cursor_query(
+            facets, cursor_values=cursor, config=config
+        )
+        c.execute(count_q, count_params)
+        total = c.fetchone()[0]
+        c.execute(q, query_params)
+        rows = c.fetchall()
+        has_more = len(rows) > per_page
+        rows = rows[:per_page]
+        if has_more and rows:
+            last = rows[-1]
+            next_cursor = encode_cursor([
+                last[24], last[25], last[26], last[27],
+                last[23], last[1], last[0],
+            ])
+    else:
+        q, count_q, params = build_faceted_query(facets, config)
+        c.execute(count_q, params)
+        total = c.fetchone()[0]
+        c.execute(q, params)
+        rows = c.fetchall()
+
     products = []
     for r in rows:
         provider = r[23] if len(r) > 23 else 'rappi'
         has_pro = bool(r[13])
         elig = engine.evaluate(provider, has_pro)
         req_mem = engine.map_offer_to_membership(provider, has_pro)
-        
         products.append({
             "product_id": r[0],
             "store_id": r[1],
@@ -441,18 +471,119 @@ def get_catalog(db_path, filters, sort, page, per_page=25):
             "ranking_eligible": elig["ranking_eligible"],
             "requires_membership": req_mem,
         })
-        
+
     conn.close()
-    
     items = enrich_products_with_metrics(db_path, products)
-    
     return {
         "items": items,
         "total": total,
         "page": page,
-        "pages": (total + per_page - 1) // per_page
+        "pages": (total + per_page - 1) // per_page,
+        "next_cursor": next_cursor,
+        "keyset": use_keyset,
     }
 
+
+
+def get_browse_categories(db_path, filters=None):
+    """Return reviewed DealHunter browse nodes plus explicit UNCLASSIFIED.
+
+    Raw provider categories remain available separately through ``get_categories``.
+    """
+    conn = sqlite3.connect(db_path)
+    c = conn.cursor()
+    providers = (filters or {}).get("providers") or []
+    provider_sql = ""
+    params = []
+    if providers:
+        provider_sql = f" AND p.provider IN ({','.join('?' for _ in providers)})"
+        params.extend(providers)
+
+    c.execute(f"""
+        WITH RECURSIVE ancestry(descendant_id, ancestor_id) AS (
+            SELECT browse_node_id, browse_node_id
+            FROM browse_nodes
+            WHERE active = 1
+            UNION ALL
+            SELECT a.descendant_id, parent.parent_id
+            FROM ancestry a
+            JOIN browse_nodes current ON current.browse_node_id = a.ancestor_id
+            JOIN browse_nodes parent ON parent.browse_node_id = current.parent_id
+            WHERE current.parent_id IS NOT NULL AND parent.active = 1
+        ),
+        mapped AS (
+            SELECT DISTINCT p.provider, p.store_id, p.product_id, bm.browse_node_id
+            FROM products p
+            JOIN product_memberships pm
+              ON pm.provider=p.provider AND pm.store_id=p.store_id AND pm.product_id=p.product_id
+            JOIN browse_mappings bm
+              ON bm.provider=pm.provider
+             AND bm.raw_type=COALESCE(pm.raw_type, '')
+             AND bm.raw_name=pm.raw_name
+             AND bm.raw_path=COALESCE(pm.path, '')
+            WHERE EXISTS (
+                SELECT 1 FROM trusted_observations o
+                WHERE o.provider=p.provider AND o.store_id=p.store_id AND o.product_id=p.product_id
+            )
+            {provider_sql}
+        )
+        SELECT bn.browse_node_id, bn.parent_id, bn.level, bn.name,
+               COUNT(DISTINCT m.provider || char(31) || m.store_id || char(31) || m.product_id) AS products,
+               COUNT(DISTINCT m.provider || char(31) || m.store_id) AS stores
+        FROM mapped m
+        JOIN ancestry a ON a.descendant_id = m.browse_node_id
+        JOIN browse_nodes bn ON bn.browse_node_id = a.ancestor_id
+        GROUP BY bn.browse_node_id, bn.parent_id, bn.level, bn.name, bn.sort_order
+        ORDER BY CASE bn.level WHEN 'DEPARTMENT' THEN 1 WHEN 'SECTION' THEN 2 WHEN 'CATEGORY' THEN 3 ELSE 4 END,
+                 bn.sort_order, bn.name
+    """, params)
+    rows = [
+        {"id": r[0], "parent_id": r[1], "level": r[2], "name": r[3], "products": r[4], "stores": r[5]}
+        for r in c.fetchall()
+    ]
+
+    unclassified_sql = f"""
+        SELECT COUNT(DISTINCT p.provider || char(31) || p.store_id || char(31) || p.product_id),
+               COUNT(DISTINCT p.provider || char(31) || p.store_id)
+        FROM products p
+        WHERE EXISTS (
+            SELECT 1 FROM trusted_observations o
+            WHERE o.provider=p.provider AND o.store_id=p.store_id AND o.product_id=p.product_id
+        )
+        AND NOT EXISTS (
+            SELECT 1
+            FROM product_memberships pm
+            JOIN browse_mappings bm
+              ON bm.provider=pm.provider
+             AND bm.raw_type=COALESCE(pm.raw_type, '')
+             AND bm.raw_name=pm.raw_name
+             AND bm.raw_path=COALESCE(pm.path, '')
+            WHERE pm.provider=p.provider AND pm.store_id=p.store_id AND pm.product_id=p.product_id
+        )
+        {provider_sql}
+    """
+    c.execute(unclassified_sql, params)
+    unclassified = c.fetchone()
+    if unclassified and unclassified[0]:
+        rows.append({
+            "id": "UNCLASSIFIED", "parent_id": None, "level": "UNCLASSIFIED",
+            "name": "Sin clasificar", "products": unclassified[0], "stores": unclassified[1],
+        })
+    conn.close()
+    return rows
+
+
+def get_browse_node(db_path, node_id):
+    if node_id == "UNCLASSIFIED":
+        return {"id": node_id, "name": "Sin clasificar", "level": "UNCLASSIFIED", "parent_id": None}
+    with sqlite3.connect(db_path) as conn:
+        row = conn.execute(
+            "SELECT browse_node_id, name, level, parent_id FROM browse_nodes WHERE browse_node_id=? AND active=1",
+            (node_id,),
+        ).fetchone()
+    if not row:
+        return None
+    return {"id": row[0], "name": row[1], "level": row[2], "parent_id": row[3]}
 
 
 def get_categories(db_path, filters=None):
@@ -482,7 +613,57 @@ def get_categories(db_path, filters=None):
     conn.close()
     return cats
     
-def get_stores(db_path, hide_empty=True, filters=None):
+def get_merchants_directory(db_path, filters=None):
+    """Return only evidence-backed merchant/location groupings.
+
+    Provider store listings without a reviewed merchant/location mapping are
+    intentionally excluded and are displayed separately by ``get_stores``.
+    """
+    conn = sqlite3.connect(db_path)
+    c = conn.cursor()
+    providers = (filters or {}).get("providers") or []
+    where = "WHERE s.merchant_id IS NOT NULL AND s.location_id IS NOT NULL"
+    params = []
+    if providers:
+        where += f" AND s.provider IN ({','.join('?' for _ in providers)})"
+        params.extend(providers)
+    c.execute(f"""
+        SELECT m.merchant_id, m.name, ml.location_id, ml.name,
+               s.provider, s.store_id, s.name, s.type,
+               COUNT(DISTINCT p.product_id) AS products
+        FROM stores s
+        JOIN merchants m ON m.merchant_id = s.merchant_id
+        JOIN merchant_locations ml ON ml.location_id = s.location_id AND ml.merchant_id = m.merchant_id
+        LEFT JOIN products p ON p.provider=s.provider AND p.store_id=s.store_id
+        {where}
+        GROUP BY m.merchant_id, m.name, ml.location_id, ml.name,
+                 s.provider, s.store_id, s.name, s.type
+        ORDER BY m.name, ml.name, s.provider, s.name
+    """, params)
+    merchants = {}
+    for row in c.fetchall():
+        merchant = merchants.setdefault(row[0], {"id": row[0], "name": row[1], "locations": {}})
+        location = merchant["locations"].setdefault(
+            row[2], {"id": row[2], "name": row[3], "listings": [], "products": 0}
+        )
+        listing = {
+            "provider": row[4], "store_id": row[5], "name": row[6],
+            "type": row[7], "products": row[8],
+        }
+        location["listings"].append(listing)
+        location["products"] += row[8]
+    result = []
+    for merchant in merchants.values():
+        locations = list(merchant["locations"].values())
+        merchant["locations"] = locations
+        merchant["products"] = sum(item["products"] for item in locations)
+        merchant["listing_count"] = sum(len(item["listings"]) for item in locations)
+        result.append(merchant)
+    conn.close()
+    return result
+
+
+def get_stores(db_path, hide_empty=True, filters=None, unmapped_only=False):
     import sqlite3
     conn = sqlite3.connect(db_path)
     c = conn.cursor()
@@ -493,9 +674,14 @@ def get_stores(db_path, hide_empty=True, filters=None):
         LEFT JOIN products p ON s.provider = p.provider AND s.store_id = p.store_id
     '''
     params = []
+    clauses = []
     if providers:
-        query += f" WHERE s.provider IN ({','.join('?' for _ in providers)})"
+        clauses.append(f"s.provider IN ({','.join('?' for _ in providers)})")
         params.extend(providers)
+    if unmapped_only:
+        clauses.append("(s.merchant_id IS NULL OR s.location_id IS NULL)")
+    if clauses:
+        query += " WHERE " + " AND ".join(clauses)
     query += ' GROUP BY s.provider, s.store_id'
     if hide_empty:
         query += ' HAVING prod_count > 0'
@@ -509,7 +695,11 @@ def get_stores(db_path, hide_empty=True, filters=None):
 def get_store_detail(db_path, provider, store_id):
     conn = sqlite3.connect(db_path)
     c = conn.cursor()
-    c.execute("SELECT name, type FROM stores WHERE provider = ? AND store_id = ?", (provider, store_id))
+    c.execute("""SELECT s.name, s.type, s.merchant_id, m.name, s.location_id, ml.name, s.commerce_type, s.catalog_domain
+                 FROM stores s
+                 LEFT JOIN merchants m ON m.merchant_id=s.merchant_id
+                 LEFT JOIN merchant_locations ml ON ml.location_id=s.location_id
+                 WHERE s.provider=? AND s.store_id=?""", (provider, store_id))
     row = c.fetchone()
     if not row:
         return None
@@ -537,6 +727,12 @@ def get_store_detail(db_path, provider, store_id):
         "store_id": store_id,
         "name": row[0],
         "type": row[1],
+        "merchant_id": row[2],
+        "merchant_name": row[3],
+        "location_id": row[4],
+        "location_name": row[5],
+        "commerce_type": row[6],
+        "catalog_domain": row[7],
         "products": p_count,
         "last_obs": last_obs,
         "categories": cats
@@ -828,12 +1024,32 @@ def _translate_filters(filters, sort=None, page=None, per_page=None):
         providers = [filters["provider"]]
     if providers:
         facets["providers"] = providers if isinstance(providers, list) else [providers]
+
+    def _as_list(key):
+        value = filters.get(key)
+        if not value:
+            return []
+        return value if isinstance(value, list) else [value]
+
+    mapping = {
+        "merchant": "merchant_ids",
+        "location": "location_ids",
+        "exclude_location": "exclude_location_ids",
+        "commerce_type": "commerce_types",
+        "catalog_domain": "catalog_domains",
+        "brand": "brands",
+        "browse_node": "browse_node_ids",
+    }
+    for source_key, target_key in mapping.items():
+        values = _as_list(source_key)
+        if values:
+            facets[target_key] = values
     if filters.get("vertical"):
         v = filters["vertical"]
         if v == "turbo":
             facets["verticals"] = ["turbo", "chiper_home", "chiper_extended", "chiper_express"]
         elif v == "market":
-            facets["verticals"] = ["market", "Supermercado", "Express", "Farmacias", "Mascotas", "Hogar"]
+            facets["verticals"] = ["market", "grocery", "Supermercado", "Express", "Farmacias", "Mascotas", "Hogar"]
         else:
             facets["verticals"] = [v]
     if filters.get("category"):
@@ -843,11 +1059,10 @@ def _translate_filters(filters, sort=None, page=None, per_page=None):
             facets["categories"] = cats
     if filters.get("only_deals"):
         facets["min_discount"] = 1.0
-    if filters.get("min_discount"):
-        try:
-            facets["min_discount"] = float(filters["min_discount"])
-        except:
-            pass
+    if filters.get("min_discount") is not None:
+        facets["min_discount"] = float(filters["min_discount"])
+    if filters.get("max_price") is not None:
+        facets["max_price"] = float(filters["max_price"])
     if filters.get("channel"):
         facets["channel"] = filters["channel"]
     if filters.get("collections"):
@@ -859,7 +1074,6 @@ def _translate_filters(filters, sort=None, page=None, per_page=None):
 def get_ui_facets(db_path, filters):
     import sqlite3
     from dealhunter.query_layer import get_facet_counts
-    from dealhunter.config import get_merged_config
     from dealhunter.config import get_merged_config
     conn = sqlite3.connect(db_path)
     facets = _translate_filters(filters)

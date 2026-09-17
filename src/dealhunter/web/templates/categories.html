@@ -7,24 +7,20 @@
   </ol>
 </nav>
 
-<h3 class="fw-bold mb-4">📦 Categorías</h3>
+<h3 class="fw-bold mb-2">📦 Taxonomía DealHunter</h3>
+<p class="text-secondary small mb-4">Nodos Browse revisados. La evidencia RAW del proveedor se muestra aparte y nunca se promueve automáticamente.</p>
 
 <div class="row row-cols-1 row-cols-sm-2 row-cols-md-3 row-cols-lg-4 g-4">
     {% for cat in cats %}
     <div class="col">
-        <a href="/categories/{{ cat.name | urlencode }}" class="text-decoration-none">
+        <a href="/categories/browse/{{ cat.id | urlencode }}" class="text-decoration-none">
             <div class="card h-100 shadow-sm hover-shadow transition-all border-0 bg-body-tertiary">
                 <div class="card-body text-center py-4">
-                    <h5 class="fw-bold text-body text-uppercase mb-3">{{ cat.name }}</h5>
+                    <div class="small text-secondary text-uppercase mb-1">{{ cat.level | replace('_', ' ') }}</div>
+                    <h5 class="fw-bold text-body mb-3">{{ cat.name }}</h5>
                     <div class="d-flex justify-content-center gap-3 text-secondary small">
-                        <div>
-                            <span class="fw-bold fs-5 d-block text-body">{{ cat.products }}</span>
-                            Productos
-                        </div>
-                        <div>
-                            <span class="fw-bold fs-5 d-block text-body">{{ cat.stores }}</span>
-                            Tiendas
-                        </div>
+                        <div><span class="fw-bold fs-5 d-block text-body">{{ cat.products }}</span>Productos</div>
+                        <div><span class="fw-bold fs-5 d-block text-body">{{ cat.stores }}</span>Tiendas</div>
                     </div>
                 </div>
             </div>
@@ -33,6 +29,27 @@
     {% endfor %}
 </div>
 {% if not cats %}
-    <div class="alert alert-secondary text-center">No hay categorías disponibles.</div>
+    <div class="alert alert-secondary text-center">No hay nodos Browse revisados ni productos sin clasificar.</div>
+{% endif %}
+
+<hr class="my-5">
+<h4 class="fw-bold mb-2">Evidencia RAW del proveedor</h4>
+<p class="text-secondary small">Etiquetas recibidas de proveedores. Se conservan para trazabilidad y compatibilidad; no son la taxonomía autoritativa de DealHunter.</p>
+<div class="row row-cols-1 row-cols-sm-2 row-cols-md-3 row-cols-lg-4 g-3">
+    {% for cat in raw_cats %}
+    <div class="col">
+        <a href="/categories/{{ cat.name | urlencode }}" class="text-decoration-none">
+            <div class="card h-100 border">
+                <div class="card-body py-3">
+                    <div class="fw-semibold text-body">{{ cat.name }}</div>
+                    <div class="small text-secondary">{{ cat.products }} productos · {{ cat.stores }} tiendas</div>
+                </div>
+            </div>
+        </a>
+    </div>
+    {% endfor %}
+</div>
+{% if not raw_cats %}
+    <div class="text-secondary small">Sin categorías RAW disponibles.</div>
 {% endif %}
 {% endblock %}

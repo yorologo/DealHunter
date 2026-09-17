@@ -79,4 +79,4 @@ def test_clear_restaurant_filters(app_client):
     res = client.get('/restaurants?store=popeyes_1&category=test&only_deals=1', headers={'HX-Request': 'true'})
     html = res.data.decode('utf-8')
     assert 'Limpiar filtros' in html
-    assert 'href="/restaurants?sort=discount&vertical=restaurants"' in html.replace('amp;', '')
+    assert 'href="/restaurants?sort=discount"' in html.replace('amp;', '')

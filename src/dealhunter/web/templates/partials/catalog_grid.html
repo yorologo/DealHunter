@@ -31,15 +31,9 @@
         </div>
     {% endif %}
     
-    {% from 'components/pagination.html' import render_pagination %}
+    {% from 'components/pagination.html' import render_pagination with context %}
     
-    <!-- We need a way to pass the current URL parameters to pagination. We can reconstruct it or use JS. -->
-    <!-- htmx hx-include can be used, but since the pagination is just GET params, we can build it. -->
-    {% set query_params = request.query_string.decode('utf-8') %}
-    {% set clean_query = query_params|replace('page=' ~ data.page, '')|replace('&&', '&') %}
-    {% set base_url = request.path ~ '?' ~ clean_query %}
-    
-    {{ render_pagination(data, base_url) }}
+    {{ render_pagination(data) }}
     
 {% else %}
     <div class="alert alert-secondary text-center py-5">

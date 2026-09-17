@@ -1,0 +1,12 @@
+<form method="post" action="/preferences/provider" class="d-flex align-items-center gap-2 provider-selector">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <label for="provider-select-{{ provider_selector_id|default('main') }}" class="small text-secondary mb-0">Proveedor</label>
+    <select id="provider-select-{{ provider_selector_id|default('main') }}" name="provider" class="form-select form-select-sm" onchange="this.form.submit()" aria-label="Filtrar por proveedor">
+        <option value="all" {% if selected_provider == 'all' %}selected{% endif %}>Todos</option>
+        {% for provider in shopping_providers %}
+        <option value="{{ provider }}" {% if selected_provider == provider %}selected{% endif %}>
+            {{ 'Uber Eats' if provider == 'uber_eats' else 'Rappi' if provider == 'rappi' else provider|replace('_', ' ')|title }}
+        </option>
+        {% endfor %}
+    </select>
+</form>

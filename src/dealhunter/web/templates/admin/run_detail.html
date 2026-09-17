@@ -16,9 +16,9 @@
     <p class="text-muted"><code>{{ run.run_id }}</code></p>
 
     <!-- Status Banner -->
-    <div class="alert {% if run.status == 'COMPLETED' %}alert-success{% elif run.status == 'FAILED' %}alert-danger{% elif run.status in ('PARTIAL', 'PARTIAL_RUN') %}alert-warning{% else %}alert-info{% endif %} d-flex align-items-center" role="alert">
+    <div class="alert {% if run.status in ('SUCCESS', 'COMPLETED') %}alert-success{% elif run.status == 'FAILED' %}alert-danger{% elif run.status in ('PARTIAL', 'PARTIAL_RUN') %}alert-warning{% else %}alert-info{% endif %} d-flex align-items-center" role="alert">
         <span class="fs-4 me-2">
-            {% if run.status == 'COMPLETED' %}✅{% elif run.status == 'FAILED' %}❌{% elif run.status in ('PARTIAL', 'PARTIAL_RUN') %}⚠️{% else %}🔄{% endif %}
+            {% if run.status in ('SUCCESS', 'COMPLETED') %}✅{% elif run.status == 'FAILED' %}❌{% elif run.status in ('PARTIAL', 'PARTIAL_RUN') %}⚠️{% else %}🔄{% endif %}
         </span>
         <div>
             <strong>{{ run.status }}</strong>
