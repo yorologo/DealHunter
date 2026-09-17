@@ -1,8 +1,8 @@
-from urllib.parse import urlsplit
 from flask import render_template, request, current_app, redirect, url_for, flash, jsonify, abort
 from dealhunter.config import get_merged_config
 from dealhunter.providers.registry import KNOWN_PROVIDERS
 from dealhunter.web.params import QueryParamError, parse_cursor, parse_enum, parse_float, parse_page
+from dealhunter.web.security import local_redirect_target
 from dealhunter.web.queries import (
     get_home_metrics, get_home_deals, get_watchlist, search_local, 
     get_product_detail, get_product_compare, get_anchor_compare,
@@ -105,11 +105,9 @@ def register_routes(app):
         selected = request.form.get('provider', 'all')
         if selected != 'all' and selected not in _enabled_providers():
             abort(400, 'provider has an unsupported or disabled value')
-        target = url_for('home')
-        if request.referrer:
-            ref = urlsplit(request.referrer)
-            if ref.scheme in ('http', 'https') and ref.netloc == request.host:
-                target = request.referrer
+        target = local_redirect_target(
+            request.referrer, host=request.host, default=url_for('home')
+        )
         response = redirect(target)
         response.set_cookie('dh_provider', selected, max_age=365 * 24 * 3600, samesite='Lax')
         return response
@@ -368,13 +366,13 @@ def register_routes(app):
             if is_ajax:
                 return jsonify({"ok": False, "error": msg}), code
             flash(msg, "danger")
-            return redirect(request.referrer or url_for('home'))
+            return redirect(local_redirect_target(request.referrer, host=request.host, default=url_for('home')))
 
         def _success(msg):
             if is_ajax:
                 return jsonify({"ok": True, "message": msg})
             flash(msg, "success")
-            return redirect(request.referrer or url_for('home'))
+            return redirect(local_redirect_target(request.referrer, host=request.host, default=url_for('home')))
 
         if not store_id or not store_id.isdigit():
             return _error("Falta ID de tienda válido.")

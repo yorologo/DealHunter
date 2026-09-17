@@ -4,7 +4,10 @@ import math
 import sys
 import os
 import logging
-from .config import get_merged_config, save_config, load_config
+from .config import (
+    get_merged_config, save_config, load_config, KNOWN_MEMBERSHIPS,
+    MEMBERSHIP_STATUSES, COMPARISON_POLICIES,
+)
 from .db import setup_db, db_status, db_integrity, db_vacuum, backup_db, get_default_db_path
 from .crawler import run_discover, run_update
 from .historico import analyze_history, compare_stores
@@ -181,18 +184,18 @@ def build_parser():
     providers_p = subparsers.add_parser("providers", help="List configured providers")
 
     prov_p = subparsers.add_parser("provider", help="Manage a provider")
-    prov_p.add_argument("name", choices=["rappi", "uber_eats"])
+    prov_p.add_argument("name", choices=sorted(__import__("dealhunter.providers.registry", fromlist=["KNOWN_PROVIDERS"]).KNOWN_PROVIDERS))
     prov_p.add_argument("action", choices=["enable", "disable"])
 
     memberships_p = subparsers.add_parser("memberships", help="List configured memberships")
 
     mem_p = subparsers.add_parser("membership", help="Manage a membership")
-    mem_p.add_argument("name", choices=["rappi_pro", "uber_one"])
-    mem_p.add_argument("action", choices=["active", "inactive", "unknown"])
+    mem_p.add_argument("name", choices=KNOWN_MEMBERSHIPS)
+    mem_p.add_argument("action", choices=MEMBERSHIP_STATUSES)
 
     comp_p = subparsers.add_parser("comparison", help="Manage comparison policies")
     comp_p.add_argument("policy", choices=["membership-policy"])
-    comp_p.add_argument("value", choices=["exclude", "show_but_exclude", "include"])
+    comp_p.add_argument("value", choices=COMPARISON_POLICIES)
 
     commerce_map = subparsers.add_parser("commerce-map", help="Review provider listing -> merchant/location mappings")
     commerce_map.add_argument("action", choices=["list", "confirm", "clear"])

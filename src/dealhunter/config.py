@@ -5,6 +5,43 @@ import tempfile
 import tomllib
 
 from .errors import DealHunterError
+from .providers.registry import KNOWN_PROVIDERS, validate_provider
+
+KNOWN_MEMBERSHIPS = ("rappi_pro", "uber_one")
+MEMBERSHIP_STATUSES = ("active", "inactive", "unknown")
+COMPARISON_POLICIES = ("exclude", "show_but_exclude", "include")
+TRUE_VALUES = {"true", "1", "yes", "on"}
+FALSE_VALUES = {"false", "0", "no", "off"}
+
+
+def parse_strict_bool(value):
+    if isinstance(value, bool):
+        return value
+    normalized = str(value or "").strip().lower()
+    if normalized in TRUE_VALUES:
+        return True
+    if normalized in FALSE_VALUES:
+        return False
+    raise ValueError("boolean must be one of true/false, 1/0, yes/no, on/off")
+
+
+def validate_membership(name):
+    if name not in KNOWN_MEMBERSHIPS:
+        raise ValueError(f"unsupported membership: {name}")
+    return name
+
+
+def validate_membership_status(status):
+    if status not in MEMBERSHIP_STATUSES:
+        raise ValueError(f"unsupported membership status: {status}")
+    return status
+
+
+def validate_comparison_policy(policy):
+    if policy not in COMPARISON_POLICIES:
+        raise ValueError(f"unsupported comparison policy: {policy}")
+    return policy
+
 
 
 def get_config_dir():

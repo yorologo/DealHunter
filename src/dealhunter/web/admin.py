@@ -2,11 +2,17 @@
 
 import os
 import sqlite3
-from flask import Blueprint, render_template, request, current_app, redirect, url_for
+from flask import Blueprint, render_template, request, current_app, redirect, url_for, abort
 from markupsafe import escape
 from dealhunter.doctor import run_doctor
 from dealhunter.account import get_account_status, get_account_token
-from dealhunter.config import load_config, get_config_path, get_default_config, get_merged_config, save_config
+from dealhunter.config import (
+    load_config, get_config_path, get_default_config, get_merged_config, save_config,
+    parse_strict_bool, validate_membership, validate_membership_status,
+    validate_comparison_policy,
+)
+from dealhunter.providers.registry import validate_provider
+from dealhunter.web.security import local_redirect_target
 from dealhunter.db import db_status, db_integrity, backup_db, db_vacuum, CURRENT_SCHEMA_VERSION
 from dealhunter.web.admin_queries import (
     get_runs_paginated, get_run_detail, get_events,
@@ -388,8 +394,11 @@ def settings():
 
 @admin_bp.route('/settings/provider', methods=['POST'])
 def settings_provider():
-    provider = request.form.get('provider')
-    enabled = request.form.get('enabled') == 'true'
+    try:
+        provider = validate_provider(request.form.get('provider'))
+        enabled = parse_strict_bool(request.form.get('enabled'))
+    except ValueError as exc:
+        abort(400, str(exc))
     cfg = load_config()
     if 'providers' not in cfg:
         cfg['providers'] = {}
@@ -401,8 +410,11 @@ def settings_provider():
 
 @admin_bp.route('/settings/membership', methods=['POST'])
 def settings_membership():
-    membership = request.form.get('membership')
-    status = request.form.get('status')
+    try:
+        membership = validate_membership(request.form.get('membership'))
+        status = validate_membership_status(request.form.get('status'))
+    except ValueError as exc:
+        abort(400, str(exc))
     cfg = load_config()
     if 'memberships' not in cfg:
         cfg['memberships'] = {}
@@ -414,7 +426,10 @@ def settings_membership():
 
 @admin_bp.route('/settings/comparison', methods=['POST'])
 def settings_comparison():
-    policy = request.form.get('policy')
+    try:
+        policy = validate_comparison_policy(request.form.get('policy'))
+    except ValueError as exc:
+        abort(400, str(exc))
     cfg = load_config()
     if 'comparison' not in cfg:
         cfg['comparison'] = {}
@@ -448,7 +463,7 @@ def settings_update():
         if key in ("lat", "lng"):
             parsed = float(value)
         elif isinstance(default_val, bool):
-            parsed = value.lower() in ('true', '1', 'yes', 'on')
+            parsed = parse_strict_bool(value)
         elif isinstance(default_val, int):
             parsed = int(value)
         elif isinstance(default_val, float):
@@ -461,7 +476,7 @@ def settings_update():
     except (ValueError, TypeError):
         return render_template('admin/partials/settings_result.html',
                                success=False,
-                               message=f"Valor inválido para '{key}'.")
+                               message=f"Valor inválido para '{key}'."), 400
 
     if key == "lat" and not -90 <= parsed <= 90:
         return render_template('admin/partials/settings_result.html', success=False, message="lat debe estar entre -90 y 90.")
@@ -513,7 +528,12 @@ def catalog_sync_wizard_store():
 
     token = request.form.get('token', '').strip()
     mode = request.form.get('session_mode', 'persistent')
-    return_path = request.form.get('return_path', '/admin/account')
+    return_path = local_redirect_target(
+        request.form.get('return_path', '/admin/account'),
+        host=request.host, default=None,
+    )
+    if return_path is None:
+        abort(400, "return_path must be an internal or same-origin URL")
 
     if not token:
         flash("No se proporcionó un token.", "error")
