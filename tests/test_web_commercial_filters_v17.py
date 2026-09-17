@@ -117,7 +117,7 @@ def test_categories_separate_browse_from_raw_provider_evidence(client):
     rv = client.get('/categories')
     assert rv.status_code == 200
     assert b'Taxonom' in rv.data
-    assert b'Evidencia RAW del proveedor' in rv.data
+    assert b'Compatibilidad: evidencia RAW del proveedor' in rv.data
     assert b'Teclados' in rv.data
     assert b'Sin clasificar' in rv.data
 

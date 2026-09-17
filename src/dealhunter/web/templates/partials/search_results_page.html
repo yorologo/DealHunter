@@ -1,5 +1,23 @@
-{% if results.categories or results.stores or results.products %}
+{% if results.merchants or results.locations or results.browse_nodes or results.categories or results.stores or results.products %}
     <div class="list-group list-group-flush">
+        {% if results.merchants %}
+            <div class="list-group-item bg-light text-secondary small fw-bold">COMERCIOS</div>
+            {% for m in results.merchants %}
+                <a href="/market?merchant={{ m.id | urlencode }}" class="list-group-item list-group-item-action"><span class="me-2">🏬</span><span class="fw-medium">{{ m.name }}</span></a>
+            {% endfor %}
+        {% endif %}
+        {% if results.locations %}
+            <div class="list-group-item bg-light text-secondary small fw-bold">SUCURSALES</div>
+            {% for l in results.locations %}
+                <a href="/market?merchant={{ l.merchant_id | urlencode }}&location={{ l.id | urlencode }}" class="list-group-item list-group-item-action"><span class="me-2">📍</span><span class="fw-medium">{{ l.merchant_name }} · {{ l.name }}</span></a>
+            {% endfor %}
+        {% endif %}
+        {% if results.browse_nodes %}
+            <div class="list-group-item bg-light text-secondary small fw-bold">CATEGORÍAS DEALHUNTER</div>
+            {% for b in results.browse_nodes %}
+                <a href="/categories/browse/{{ b.id | urlencode }}" class="list-group-item list-group-item-action"><span class="me-2">🗂</span><span class="fw-medium">{{ b.name }}</span><span class="badge text-bg-light border ms-2">{{ b.level }}</span></a>
+            {% endfor %}
+        {% endif %}
         {% if results.categories %}
             <div class="list-group-item bg-light text-secondary small fw-bold">CATEGORÍAS</div>
             {% for c in results.categories %}

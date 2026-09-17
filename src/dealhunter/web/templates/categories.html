@@ -33,8 +33,9 @@
 {% endif %}
 
 <hr class="my-5">
-<h4 class="fw-bold mb-2">Evidencia RAW del proveedor</h4>
-<p class="text-secondary small">Etiquetas recibidas de proveedores. Se conservan para trazabilidad y compatibilidad; no son la taxonomía autoritativa de DealHunter.</p>
+<details class="mb-4">
+<summary class="fw-bold">Compatibilidad: evidencia RAW del proveedor</summary>
+<p class="text-secondary small mt-2">Etiquetas recibidas de proveedores. Se conservan para trazabilidad y compatibilidad; no son la taxonomía autoritativa de DealHunter.</p>
 <div class="row row-cols-1 row-cols-sm-2 row-cols-md-3 row-cols-lg-4 g-3">
     {% for cat in raw_cats %}
     <div class="col">
@@ -52,4 +53,5 @@
 {% if not raw_cats %}
     <div class="text-secondary small">Sin categorías RAW disponibles.</div>
 {% endif %}
+</details>
 {% endblock %}

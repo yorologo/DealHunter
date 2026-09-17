@@ -1,0 +1,3 @@
+{% include 'partials/catalog_items.html' %}
+<div id="catalog-count-header" hx-swap-oob="true" class="text-secondary small">{{ data.total }} productos</div>
+<div id="catalog-pagination" hx-swap-oob="outerHTML">{% from 'components/pagination.html' import render_pagination with context %}{{ render_pagination(data) }}</div>

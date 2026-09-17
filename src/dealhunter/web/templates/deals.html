@@ -15,10 +15,11 @@
 
 <ul class="nav nav-tabs mb-4 flex-nowrap overflow-x-auto overflow-y-hidden" style="white-space: nowrap; -webkit-overflow-scrolling: touch;" id="dealsTabs" role="tablist">
     {% set tabs = ['Todo', 'NEW_LOW', 'REAL_DEAL', 'GOOD_PRICE', 'PRICE_DROP', 'TARGET_PRICE', 'BACK_IN_STOCK'] %}
+    {% set tab_labels = {'Todo':'Todo','NEW_LOW':'Nuevo mínimo','REAL_DEAL':'Oferta verificada','GOOD_PRICE':'Buen precio','PRICE_DROP':'Bajó de precio','TARGET_PRICE':'Precio objetivo','BACK_IN_STOCK':'Volvió a estar disponible'} %}
     {% for t in tabs %}
     <li class="nav-item" role="presentation">
         <a class="nav-link {{ 'active fw-bold' if tab == t else 'text-secondary' }}" 
-           href="/deals?tab={{ t }}&sort={{ sort }}">{{ t }}</a>
+           href="/deals?tab={{ t }}&sort={{ sort }}">{{ tab_labels.get(t, t) }}</a>
     </li>
     {% endfor %}
 </ul>

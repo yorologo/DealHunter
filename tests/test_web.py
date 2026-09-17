@@ -59,10 +59,12 @@ def test_watchlist_page(client, app):
     assert b'$35.00' in rv.data
     assert b'/search?q=Coca+Cola' in rv.data or b'/search?q=Coca%20Cola' in rv.data
 
-def test_alerts_placeholder(client):
+def test_alerts_read_only_view(client):
     rv = client.get('/alerts')
     assert rv.status_code == 200
-    assert b'Pr\xc3\xb3ximamente' in rv.data or b'read-only' in rv.data
+    assert b'Alertas' in rv.data
+    assert b'solo lectura' in rv.data
+    assert b'Pr\xc3\xb3ximamente' not in rv.data
 
 def test_404(client):
     rv = client.get('/not-exists')

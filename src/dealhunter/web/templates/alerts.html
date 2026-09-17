@@ -1,0 +1,34 @@
+{% extends 'base.html' %}
+{% from 'components/status_badge.html' import render_status %}
+{% block content %}
+<div class="d-flex flex-column flex-md-row justify-content-between gap-3 align-items-md-center mb-4">
+  <div><h3 class="fw-bold mb-1">🔔 Alertas</h3><div class="text-secondary small">Eventos generados por el AlertEngine local existente. Esta vista es de solo lectura.</div></div>
+  <form method="get" class="d-flex gap-2 align-items-center">
+    <label class="small text-secondary" for="alert-type">Tipo</label>
+    <select id="alert-type" name="type" class="form-select form-select-sm" onchange="this.form.submit()">
+      <option value="">Todos</option>
+      {% set alert_labels = {'NEW_LOW':'Nuevo mínimo','REAL_DEAL':'Oferta verificada','PRICE_DROP':'Bajó de precio','TARGET_PRICE':'Precio objetivo','BACK_IN_STOCK':'Volvió a estar disponible'} %}
+      {% for t in alert_types %}<option value="{{ t }}" {% if selected_type == t %}selected{% endif %}>{{ alert_labels.get(t, t) }}</option>{% endfor %}
+    </select>
+  </form>
+</div>
+{% if alerts %}
+<div class="list-group shadow-sm">
+  {% for a in alerts %}
+  <a href="/products/{{ a.provider }}/{{ a.store_id }}/{{ a.product_id }}" class="list-group-item list-group-item-action">
+    <div class="d-flex justify-content-between gap-3 align-items-start">
+      <div>
+        <div class="mb-1">{{ render_status(a.alert_type) }}</div>
+        <div class="fw-semibold">{{ a.product_name }}</div>
+        <div class="small text-secondary">{{ a.store_name }} · {{ a.provider }}</div>
+        {% if a.reason %}<div class="small mt-1">{{ a.reason }}</div>{% endif %}
+      </div>
+      <div class="text-end text-nowrap"><div class="fw-bold">${{ '%.2f'|format(a.current_price) if a.current_price is not none else '-' }}</div><div class="small text-secondary">{{ a.triggered_at }}</div></div>
+    </div>
+  </a>
+  {% endfor %}
+</div>
+{% else %}
+<div class="alert alert-secondary">No hay alertas que coincidan con este filtro.</div>
+{% endif %}
+{% endblock %}

@@ -1,40 +1,11 @@
 <div id="catalog-count-header" hx-swap-oob="true" class="text-secondary small">
     {{ data.total }} {% if filters and (filters.get('store') or filters.get('category') or filters.get('only_deals')) %}resultados{% else %}productos{% endif %}
 </div>
-
 {% if data['items'] %}
-    {% if view_mode == 'rows' %}
-        <div class="list-group shadow-sm">
-            {% for p in data['items'] %}
-                {% if p.type == 'alert' or p.type == 'pi' %}
-                    {% set item = p.data %}
-                {% else %}
-                    {% set item = p %}
-                {% endif %}
-                {% include 'components/product_row.html' with context %}
-            {% endfor %}
-        </div>
-    {% else %}
-        <div class="row row-cols-1 row-cols-sm-2 row-cols-md-3 row-cols-lg-4 g-4">
-            {% for p in data['items'] %}
-                {% if p.type == 'alert' or p.type == 'pi' %}
-                    {% set item = p.data %}
-                {% else %}
-                    {% set item = p %}
-                {% endif %}
-                <div class="col">
-                    {% with p=item %}
-                        {% include 'components/product_card.html' %}
-                    {% endwith %}
-                </div>
-            {% endfor %}
-        </div>
-    {% endif %}
-    
-    {% from 'components/pagination.html' import render_pagination with context %}
-    
-    {{ render_pagination(data) }}
-    
+    {% if view_mode == 'rows' %}<div id="catalog-items" class="list-group shadow-sm">{% else %}<div id="catalog-items" class="row row-cols-1 row-cols-sm-2 row-cols-md-3 row-cols-lg-4 g-4">{% endif %}
+        {% include 'partials/catalog_items.html' %}
+    </div>
+    <div id="catalog-pagination">{% from 'components/pagination.html' import render_pagination with context %}{{ render_pagination(data) }}</div>
 {% else %}
     <div class="alert alert-secondary text-center py-5">
         <div class="fs-1 mb-3">🤷</div>
@@ -42,10 +13,8 @@
         {% if has_user_filters %}
             <h4>No hay productos que coincidan con los filtros seleccionados.</h4>
             <p class="text-secondary mb-4">Tus filtros no encontraron resultados. Intenta ajustarlos o limpiarlos.</p>
-            {% set clear_url = current_path|default(request.path) ~ '?sort=' ~ (sort|default('opportunity')) %}
-            {% if filters and filters.get('vertical') %}
-                {% set clear_url = clear_url ~ '&vertical=' ~ filters.get('vertical') %}
-            {% endif %}
+            {% set clear_url = current_path|default(request.path) ~ '?sort=' ~ (sort|default('discount')) %}
+            {% if filters and filters.get('vertical') %}{% set clear_url = clear_url ~ '&vertical=' ~ filters.get('vertical') %}{% endif %}
             <a href="{{ clear_url }}" class="btn btn-outline-primary">Limpiar filtros</a>
         {% else %}
             <h4>Aún no hay productos capturados.</h4>

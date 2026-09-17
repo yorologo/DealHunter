@@ -1,3 +1,4 @@
+{% from 'components/status_badge.html' import render_status %}
 <div class="card h-100 shadow-sm border-0 hover-shadow transition-all">
     <div class="card-body d-flex flex-column">
         <!-- DECISIÓN -->
@@ -8,15 +9,7 @@
                 </a>
             </h6>
             <div style="z-index: 2;" class="position-relative">
-            {% if deal.deal_status == 'NEW_LOW' %}
-                <span class="badge bg-primary text-white text-nowrap">🔥 NEW_LOW</span>
-            {% elif deal.deal_status == 'REAL_DEAL' %}
-                <span class="badge bg-success text-white text-nowrap">💰 REAL_DEAL</span>
-            {% elif deal.deal_status == 'GOOD_PRICE' %}
-                <span class="badge bg-info text-dark text-nowrap">🟢 GOOD_PRICE</span>
-            {% else %}
-                <span class="badge bg-secondary text-nowrap">○ NORMAL</span>
-            {% endif %}
+            {{ render_status(deal.deal_status) }}
             </div>
         </div>
         

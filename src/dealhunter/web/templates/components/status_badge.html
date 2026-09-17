@@ -1,19 +1,19 @@
 {% macro render_status(status) %}
     {% if status == 'NEW_LOW' %}
-        <span class="badge bg-primary">🔥 NEW_LOW</span>
+        <span class="badge bg-primary">🔥 Nuevo mínimo</span>
     {% elif status == 'REAL_DEAL' %}
-        <span class="badge bg-success">💰 REAL_DEAL</span>
+        <span class="badge bg-success">💰 Oferta verificada</span>
     {% elif status == 'GOOD_PRICE' %}
-        <span class="badge bg-info text-dark">🟢 GOOD_PRICE</span>
+        <span class="badge bg-info text-dark">🟢 Buen precio</span>
     {% elif status == 'INSUFFICIENT_HISTORY' %}
-        <span class="badge bg-warning text-dark">🕒 INSUFFICIENT_HISTORY</span>
+        <span class="badge bg-warning text-dark">🕒 Historial insuficiente</span>
     {% elif status == 'PRICE_DROP' %}
-        <span class="badge bg-danger">📉 PRICE_DROP</span>
+        <span class="badge bg-danger">📉 Bajó de precio</span>
     {% elif status == 'TARGET_PRICE' %}
-        <span class="badge bg-primary">🎯 TARGET_PRICE</span>
+        <span class="badge bg-primary">🎯 Precio objetivo</span>
     {% elif status == 'BACK_IN_STOCK' %}
-        <span class="badge bg-success">✅ BACK_IN_STOCK</span>
+        <span class="badge bg-success">✅ Volvió a estar disponible</span>
     {% else %}
-        <span class="badge bg-secondary">○ NORMAL</span>
+        <span class="badge bg-secondary">○ Normal</span>
     {% endif %}
 {% endmacro %}

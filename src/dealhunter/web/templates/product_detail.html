@@ -90,13 +90,13 @@
                 <div class="d-flex flex-wrap align-items-center gap-3 mb-3">
                     {% if p.metrics %}
                         {% if p.metrics.status == 'NEW_LOW' %}
-                            <span class="badge bg-primary text-white fs-6 py-2 px-3">🔥 NEW_LOW</span>
+                            <span class="badge bg-primary text-white fs-6 py-2 px-3">🔥 Nuevo mínimo</span>
                         {% elif p.metrics.status == 'REAL_DEAL' %}
-                            <span class="badge bg-success text-white fs-6 py-2 px-3">💰 REAL_DEAL</span>
+                            <span class="badge bg-success text-white fs-6 py-2 px-3">💰 Oferta verificada</span>
                         {% elif p.metrics.status == 'GOOD_PRICE' %}
-                            <span class="badge bg-info text-dark fs-6 py-2 px-3">🟢 GOOD_PRICE</span>
+                            <span class="badge bg-info text-dark fs-6 py-2 px-3">🟢 Buen precio</span>
                         {% elif p.metrics.status == 'INSUFFICIENT_HISTORY' %}
-                            <span class="badge bg-warning text-dark fs-6 py-2 px-3">🕒 INSUFFICIENT_HISTORY</span>
+                            <span class="badge bg-warning text-dark fs-6 py-2 px-3">🕒 Historial insuficiente</span>
                         {% else %}
                             <span class="badge bg-secondary fs-6 py-2 px-3">○ NORMAL</span>
                         {% endif %}
@@ -105,7 +105,7 @@
                             <span class="badge bg-danger text-white fs-6 py-2 px-3">⚠ Precio de referencia atípico</span>
                         {% endif %}
                     {% else %}
-                        <span class="badge bg-warning text-dark fs-6 py-2 px-3">🕒 INSUFFICIENT_HISTORY</span>
+                        <span class="badge bg-warning text-dark fs-6 py-2 px-3">🕒 Historial insuficiente</span>
                     {% endif %}
                 </div>
 

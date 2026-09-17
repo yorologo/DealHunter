@@ -1,23 +1,13 @@
 import sqlite3
-from dealhunter.db import get_default_db_path, db_status, read_connection
+from dealhunter.db import get_default_db_path, read_connection
 from dealhunter.historico import analyze_history
 from dealhunter.alerts import AlertEngine
 
 def get_home_metrics(db_path):
-    stats = db_status(db_path)
-    
-    # We use analyze_history lightly if possible, but actually we need to show
-    # - newest NEW_LOW (top 5)
-    # - newest REAL_DEAL (top 5)
-    # - biggest price drops (PRICE_DROP)
-    
+    """Home keeps only user-facing alert count; technical DB metrics live in System/Admin."""
     with read_connection(db_path) as conn:
         new_alerts = conn.execute("SELECT COUNT(*) FROM alerts WHERE seen = 0").fetchone()[0]
-    
-    return {
-        "stats": stats,
-        "new_alerts": new_alerts
-    }
+    return {"new_alerts": new_alerts}
 
 def get_home_deals(db_path, filters=None):
     """Return Home deal buckets from one historical-analysis pass."""
@@ -846,86 +836,68 @@ def get_restaurant_detail(db_path, provider, store_id):
 
 
 def search_local(db_path, query, filters=None):
+    """Search products plus reviewed merchant/location/browse entities locally."""
     limit = 50
-    conn = sqlite3.connect(db_path)
-    c = conn.cursor()
-    
     providers = (filters or {}).get("providers") or []
-
-    # 1. Search Categories (using query_term or category field if it exists)
-    c_results = []
-    if query:
+    like = f"%{query}%"
+    with read_connection(db_path) as conn:
+        c = conn.cursor()
+        c_results, merchant_results, location_results, browse_results = [], [], [], []
+        if query:
+            provider_sql = ""
+            provider_params = []
+            if providers:
+                provider_sql = f" AND p.provider IN ({','.join('?' for _ in providers)})"
+                provider_params = list(providers)
+            c.execute(f'''SELECT DISTINCT COALESCE(NULLIF(TRIM(p.category), ''), 'Uncategorized')
+                          FROM products p WHERE p.category LIKE ? {provider_sql} LIMIT 5''', [like, *provider_params])
+            c_results = [{"name": r[0]} for r in c.fetchall()]
+            store_provider_sql, store_provider_params = "", []
+            if providers:
+                store_provider_sql = f" AND s.provider IN ({','.join('?' for _ in providers)})"
+                store_provider_params = list(providers)
+            c.execute(f'''SELECT DISTINCT m.merchant_id, m.name
+                          FROM merchants m JOIN stores s ON s.merchant_id=m.merchant_id
+                          WHERE m.name LIKE ? {store_provider_sql}
+                          ORDER BY m.name LIMIT 10''', [like, *store_provider_params])
+            merchant_results = [{"id": r[0], "name": r[1]} for r in c.fetchall()]
+            c.execute(f'''SELECT DISTINCT ml.location_id, ml.merchant_id, ml.name, m.name
+                          FROM merchant_locations ml
+                          JOIN merchants m ON m.merchant_id=ml.merchant_id
+                          JOIN stores s ON s.location_id=ml.location_id
+                          WHERE (ml.name LIKE ? OR m.name LIKE ?) {store_provider_sql}
+                          ORDER BY m.name, ml.name LIMIT 10''', [like, like, *store_provider_params])
+            location_results = [{"id":r[0],"merchant_id":r[1],"name":r[2],"merchant_name":r[3]} for r in c.fetchall()]
+            mapping_provider_sql, mapping_params = "", []
+            if providers:
+                mapping_provider_sql = f" AND bm.provider IN ({','.join('?' for _ in providers)})"
+                mapping_params = list(providers)
+            c.execute(f'''SELECT DISTINCT bn.browse_node_id, bn.name, bn.level
+                          FROM browse_nodes bn JOIN browse_mappings bm ON bm.browse_node_id=bn.browse_node_id
+                          WHERE bn.active=1 AND bn.name LIKE ? {mapping_provider_sql}
+                          ORDER BY bn.sort_order, bn.name LIMIT 10''', [like, *mapping_params])
+            browse_results = [{"id":r[0],"name":r[1],"level":r[2]} for r in c.fetchall()]
         provider_sql = ""
-        params = [f"%{query}%"]
+        params = [like, like]
         if providers:
             provider_sql = f" AND provider IN ({','.join('?' for _ in providers)})"
             params.extend(providers)
-        c.execute(f'''
-            SELECT DISTINCT COALESCE(NULLIF(TRIM(category), ''), 'Uncategorized') as cat
-            FROM products 
-            WHERE cat LIKE ?
-            {provider_sql}
-            LIMIT 5
-        ''', params)
-        for r in c.fetchall():
-            c_results.append({"name": r[0]})
-            
-    # 2. Search Stores
-    s_results = []
-    provider_sql = ""
-    params = [f"%{query}%", f"%{query}%"]
-    if providers:
-        provider_sql = f" AND provider IN ({','.join('?' for _ in providers)})"
-        params.extend(providers)
-    c.execute(f'''
-        SELECT provider, store_id, name, type, brand
-        FROM stores
-        WHERE (name LIKE ? OR brand LIKE ?)
-        {provider_sql}
-        LIMIT 10
-    ''', params)
-    for r in c.fetchall():
-        s_results.append({
-            "provider": r[0],
-            "store_id": r[1],
-            "name": r[2],
-            "type": r[3],
-            "brand": r[4]
-        })
-        
-    # 3. Search Products (includes dishes)
-    p_results = []
-    query_str = f"SELECT p.provider, p.product_id, p.store_id, p.name, s.name, p.brand, s.type FROM products p JOIN stores s ON p.provider = s.provider AND p.store_id = s.store_id "
-    params = []
-    conditions = []
-    if query:
-        conditions.append("(p.name LIKE ? OR p.brand LIKE ?)")
-        params.extend([f"%{query}%", f"%{query}%"])
-    if providers:
-        conditions.append(f"p.provider IN ({','.join('?' for _ in providers)})")
-        params.extend(providers)
-    if conditions:
-        query_str += "WHERE " + " AND ".join(conditions) + " "
-    query_str += f"LIMIT {limit}"
-    
-    c.execute(query_str, params)
-    for r in c.fetchall():
-        p_results.append({
-            "provider": r[0],
-            "product_id": r[1],
-            "store_id": r[2],
-            "name": r[3],
-            "store_name": r[4],
-            "brand": r[5],
-            "store_type": r[6]
-        })
-        
-    conn.close()
-    return {
-        "categories": c_results,
-        "stores": s_results,
-        "products": p_results
-    }
+        c.execute(f'''SELECT provider, store_id, name, type, brand FROM stores
+                      WHERE (name LIKE ? OR brand LIKE ?) {provider_sql} LIMIT 10''', params)
+        s_results = [{"provider":r[0],"store_id":r[1],"name":r[2],"type":r[3],"brand":r[4]} for r in c.fetchall()]
+        conditions, params = [], []
+        if query:
+            conditions.append("(p.name LIKE ? OR p.brand LIKE ?)")
+            params.extend([like, like])
+        if providers:
+            conditions.append(f"p.provider IN ({','.join('?' for _ in providers)})")
+            params.extend(providers)
+        where_sql = " WHERE " + " AND ".join(conditions) if conditions else ""
+        c.execute(f'''SELECT p.provider, p.product_id, p.store_id, p.name, s.name, p.brand, s.type
+                      FROM products p JOIN stores s ON p.provider=s.provider AND p.store_id=s.store_id
+                      {where_sql} LIMIT {limit}''', params)
+        p_results = [{"provider":r[0],"product_id":r[1],"store_id":r[2],"name":r[3],"store_name":r[4],"brand":r[5],"store_type":r[6]} for r in c.fetchall()]
+    return {"merchants":merchant_results,"locations":location_results,"browse_nodes":browse_results,"categories":c_results,"stores":s_results,"products":p_results}
 
 def get_available_stores(db_path, vertical=None, filters=None):
     conn = sqlite3.connect(db_path)

@@ -14,6 +14,8 @@ BEST_SORTS = {"score", "discount", "savings", "price", "recent"}
 DEAL_SORTS = {"opportunity", "discount", "drop", "price", "recent", "name"}
 DEAL_TABS = {"Todo", "NEW_LOW", "REAL_DEAL", "GOOD_PRICE", "PRICE_DROP", "TARGET_PRICE", "BACK_IN_STOCK", "SUSPICIOUS_REFERENCE_PRICE"}
 CHANNELS = {"PUBLIC", "PRO", "ALL"}
+BRANCH_SCOPES = {"ALL", "INCLUDE", "EXCLUDE"}
+ALERT_TYPES = {"NEW_LOW", "REAL_DEAL", "PRICE_DROP", "TARGET_PRICE", "BACK_IN_STOCK"}
 FILTER_LIST_KEYS = (
     "store", "category", "merchant", "location", "exclude_location",
     "commerce_type", "catalog_domain", "brand", "browse_node",
@@ -61,6 +63,25 @@ def register_routes(app):
             values = [value for value in request.args.getlist(key) if value]
             if values:
                 filters[key] = values
+        # Modern branch scope uses one location selector. Legacy exclude_location
+        # URLs remain accepted and are translated to the same query contract.
+        explicit_scope = request.args.get('branch_scope')
+        if explicit_scope:
+            branch_scope = _query_value(parse_enum, explicit_scope, name='branch_scope', allowed=BRANCH_SCOPES, default='ALL')
+        elif filters.get('exclude_location'):
+            branch_scope = 'EXCLUDE'
+        elif filters.get('location'):
+            branch_scope = 'INCLUDE'
+        else:
+            branch_scope = 'ALL'
+        selected_locations = list(filters.get('location') or filters.get('exclude_location') or [])
+        filters.pop('location', None)
+        filters.pop('exclude_location', None)
+        if branch_scope == 'INCLUDE' and selected_locations:
+            filters['location'] = selected_locations
+        elif branch_scope == 'EXCLUDE' and selected_locations:
+            filters['exclude_location'] = selected_locations
+        filters['branch_scope'] = branch_scope
         if request.args.get('only_deals'):
             filters['only_deals'] = True
         if request.args.get('min_discount') not in (None, ''):
@@ -91,6 +112,13 @@ def register_routes(app):
             'av_brands': facets.get('brands', []),
             'av_browse_nodes': facets.get('browse_nodes', []),
         }
+
+    def _render_catalog_partial(data, filters, sort, current_path=None):
+        template = 'partials/catalog_append.html' if request.args.get('cursor') else 'partials/catalog_grid.html'
+        return render_template(
+            template, data=data, filters=filters, sort=sort,
+            view_mode=request.cookies.get('view_mode', 'cards'), current_path=current_path or request.path,
+        )
 
     @app.context_processor
     def provider_context():
@@ -201,7 +229,7 @@ def register_routes(app):
         filters = _base_filters({"tab": tab})
         data = get_deals(db_path, filters, sort, page)
         if request.headers.get('HX-Request') and not request.headers.get('HX-Boosted'):
-            return render_template('partials/catalog_grid.html', data=data, filters=filters, sort=sort, view_mode=request.cookies.get('view_mode', 'cards'))
+            return _render_catalog_partial(data, filters, sort)
         return render_template('deals.html', data=data, tab=tab, sort=sort, current_path='/deals')
         
     @app.route('/market')
@@ -212,7 +240,7 @@ def register_routes(app):
         filters = _catalog_request_filters({"vertical": "market", "commerce_type": ["SUPERMARKET"], "catalog_domain": ["RETAIL"]})
         data = get_catalog(db_path, filters, sort, page, cursor=_cursor())
         if request.headers.get('HX-Request') and not request.headers.get('HX-Boosted'):
-            return render_template('partials/catalog_grid.html', data=data, filters=filters, sort=sort, view_mode=request.cookies.get('view_mode', 'cards'))
+            return _render_catalog_partial(data, filters, sort)
         facets = get_ui_facets(db_path, filters)
         return render_template('catalog.html', data=data, sort=sort, filters=filters,
                                title="Supermercados", current_path='/market', emoji="🛒",
@@ -226,7 +254,7 @@ def register_routes(app):
         filters = _catalog_request_filters({"vertical": "turbo"})
         data = get_catalog(db_path, filters, sort, page, cursor=_cursor())
         if request.headers.get('HX-Request') and not request.headers.get('HX-Boosted'):
-            return render_template('partials/catalog_grid.html', data=data, filters=filters, sort=sort, view_mode=request.cookies.get('view_mode', 'cards'))
+            return _render_catalog_partial(data, filters, sort)
         facets = get_ui_facets(db_path, filters)
         return render_template('catalog.html', data=data, sort=sort, filters=filters,
                                title="Rappi Turbo", current_path='/turbo', emoji="⚡",
@@ -263,7 +291,7 @@ def register_routes(app):
         filters = _catalog_request_filters({"browse_node": [node_id]})
         data = get_catalog(db_path, filters, sort, page, cursor=_cursor())
         if request.headers.get('HX-Request') and not request.headers.get('HX-Boosted'):
-            return render_template('partials/catalog_grid.html', data=data, filters=filters, sort=sort, view_mode=request.cookies.get('view_mode', 'cards'))
+            return _render_catalog_partial(data, filters, sort)
         facets = get_ui_facets(db_path, filters)
         return render_template('catalog.html', data=data, sort=sort, filters=filters,
                                title=f"Categoría: {node['name']}", current_path='/categories', emoji="📦",
@@ -277,7 +305,7 @@ def register_routes(app):
         filters = _catalog_request_filters({"category": category})
         data = get_catalog(db_path, filters, sort, page, cursor=_cursor())
         if request.headers.get('HX-Request') and not request.headers.get('HX-Boosted'):
-            return render_template('partials/catalog_grid.html', data=data, filters=filters, sort=sort, view_mode=request.cookies.get('view_mode', 'cards'))
+            return _render_catalog_partial(data, filters, sort)
         facets = get_ui_facets(db_path, filters)
         return render_template('catalog.html', data=data, sort=sort, filters=filters,
                                title=f"Categoría: {category}", current_path='/categories', emoji="📦",
@@ -308,7 +336,7 @@ def register_routes(app):
         filters = {"provider": provider, "store": f"{provider}::{store_id}"}
         data = get_catalog(db_path, filters, sort, page, cursor=_cursor())
         if request.headers.get('HX-Request') and not request.headers.get('HX-Boosted'):
-            return render_template('partials/catalog_grid.html', data=data, filters=filters, sort=sort, view_mode=request.cookies.get('view_mode', 'cards'))
+            return _render_catalog_partial(data, filters, sort)
         return render_template('store_detail.html', detail=detail, data=data, sort=sort, filters=filters, current_path='/stores')
 
 
@@ -325,7 +353,7 @@ def register_routes(app):
         data = get_catalog(db_path, filters, sort, page, cursor=_cursor())
         
         if request.headers.get('HX-Request'):
-            return render_template('partials/catalog_grid.html', data=data, filters=filters, sort=sort, current_path='/restaurants')
+            return _render_catalog_partial(data, filters, sort, current_path='/restaurants')
             
         facets = get_ui_facets(db_path, filters)
         return render_template('catalog.html', data=data, sort=sort, filters=filters,
@@ -347,7 +375,12 @@ def register_routes(app):
         return render_template('watchlist.html', items=items, current_path='/watchlist')
     
     @app.route('/alerts')
-    def alerts(): return render_template('placeholder.html', title="Alertas", current_path='/alerts')
+    def alerts():
+        from dealhunter.alerts import AlertEngine
+        db_path = current_app.config['DATABASE']
+        alert_type = _query_value(parse_enum, request.args.get('type'), name='type', allowed=ALERT_TYPES, default=None)
+        alerts_data = AlertEngine.read_alerts(db_path, top=200, alert_type=alert_type)
+        return render_template('alerts.html', alerts=alerts_data, selected_type=alert_type, alert_types=sorted(ALERT_TYPES), current_path='/alerts')
     
 
     @app.route('/api/open-rappi', methods=['POST'])

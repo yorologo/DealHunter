@@ -1,7 +1,7 @@
 from dealhunter.time_utils import utc_now_iso
 import sqlite3
 from datetime import datetime
-from .db import setup_db
+from .db import setup_db, read_connection
 from .historico import analyze_history
 
 class AlertEngine:
@@ -149,9 +149,8 @@ class AlertEngine:
             "reason": reason
         })
 
-    def get_alerts(self, new_only=False, top=50, status=None, store=None, alert_type=None):
-        c = self.conn.cursor()
-
+    @staticmethod
+    def _query_alerts(conn, new_only=False, top=50, status=None, store=None, alert_type=None):
         query = '''
             SELECT a.id, a.alert_type, a.product_id, a.store_id, p.name, s.name, a.provider,
                    a.price, a.previous_price, a.deal_status, a.triggered_at, a.reason, a.seen
@@ -161,43 +160,32 @@ class AlertEngine:
             WHERE 1=1
         '''
         params = []
-
         if new_only:
             query += " AND a.seen = 0"
         if status:
-            query += " AND a.deal_status = ?"
-            params.append(status)
+            query += " AND a.deal_status = ?"; params.append(status)
         if store:
-            query += " AND a.store_id = ?"
-            params.append(store)
+            query += " AND a.store_id = ?"; params.append(store)
         if alert_type:
-            query += " AND a.alert_type = ?"
-            params.append(alert_type)
-
-        query += " ORDER BY a.triggered_at DESC LIMIT ?"
+            query += " AND a.alert_type = ?"; params.append(alert_type)
+        query += " ORDER BY a.triggered_at DESC, a.id DESC LIMIT ?"
         params.append(top)
+        rows = conn.execute(query, params).fetchall()
+        return [{
+            "id":r[0], "alert_type":r[1], "product_id":r[2], "store_id":r[3],
+            "product_name":r[4], "store_name":r[5], "provider":r[6],
+            "current_price":r[7], "previous_price":r[8], "deal_status":r[9],
+            "triggered_at":r[10], "reason":r[11], "seen":bool(r[12])
+        } for r in rows]
 
-        c.execute(query, params)
-        rows = c.fetchall()
+    def get_alerts(self, new_only=False, top=50, status=None, store=None, alert_type=None):
+        return self._query_alerts(self.conn, new_only, top, status, store, alert_type)
 
-        res = []
-        for r in rows:
-            res.append({
-                "id": r[0],
-                "alert_type": r[1],
-                "product_id": r[2],
-                "store_id": r[3],
-                "product_name": r[4],
-                "store_name": r[5],
-                "provider": r[6],
-                "current_price": r[7],
-                "previous_price": r[8],
-                "deal_status": r[9],
-                "triggered_at": r[10],
-                "reason": r[11],
-                "seen": bool(r[12])
-            })
-        return res
+    @classmethod
+    def read_alerts(cls, db_path, new_only=False, top=50, status=None, store=None, alert_type=None):
+        """Read alerts without initializing or mutating the database."""
+        with read_connection(db_path) as conn:
+            return cls._query_alerts(conn, new_only, top, status, store, alert_type)
 
     def mark_seen(self, alert_id=None, all=False):
         c = self.conn.cursor()

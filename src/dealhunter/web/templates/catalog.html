@@ -17,13 +17,28 @@
     </div>
 </div>
 
-<div class="row mb-4">
-    <div class="col-12">
-        <div class="card shadow-sm border-0">
-            <div class="card-body">
+{% set fc = namespace(n=0) %}
+{% for key in ['store','category','merchant','location','exclude_location','commerce_type','catalog_domain','browse_node','brand','collections','store_facets'] %}
+  {% set vals = filters.get(key, []) %}{% if vals %}{% set fc.n = fc.n + (vals|length) %}{% endif %}
+{% endfor %}
+{% if filters.get('only_deals') %}{% set fc.n = fc.n + 1 %}{% endif %}
+{% if filters.get('min_discount') is not none %}{% set fc.n = fc.n + 1 %}{% endif %}
+{% if filters.get('max_price') is not none %}{% set fc.n = fc.n + 1 %}{% endif %}
+<div class="d-flex flex-wrap gap-2 mb-3">
+  {% for key, label in [('merchant','Comercio'),('location','Sucursal'),('exclude_location','Excluir'),('browse_node','Categoría'),('brand','Marca'),('store','Listing')] %}
+    {% for value in filters.get(key, []) %}<span class="badge rounded-pill text-bg-light border">{{ label }}: {{ value }}</span>{% endfor %}
+  {% endfor %}
+</div>
+<button class="btn btn-outline-primary d-md-none mb-3" type="button" data-bs-toggle="offcanvas" data-bs-target="#filtersPanel">Filtros ({{ fc.n }})</button>
+<div class="row g-4 mb-4">
+  <aside class="col-12 col-md-3">
+    <div class="offcanvas-md offcanvas-start" tabindex="-1" id="filtersPanel" aria-labelledby="filtersPanelLabel">
+      <div class="offcanvas-header d-md-none"><h5 class="offcanvas-title" id="filtersPanelLabel">Filtros ({{ fc.n }})</h5><button type="button" class="btn-close" data-bs-dismiss="offcanvas" data-bs-target="#filtersPanel"></button></div>
+      <div class="offcanvas-body d-block p-md-0">
+        <div class="card shadow-sm border-0"><div class="card-body">
                 <form id="filter-form" hx-get="{{ current_path }}" hx-target="#catalog-grid" hx-push-url="true" class="row g-3 align-items-end">
                     {% if filters.vertical %}<input type="hidden" name="vertical" value="{{ filters.vertical }}">{% endif %}
-                    <div class="col-md-3">
+                    <div class="col-12">
                         <label class="form-label small text-secondary fw-bold">Ordenar por</label>
                         <select name="sort" class="form-select form-select-sm" onchange="document.getElementById('filter-form').dispatchEvent(new Event('submit'))">
                             <option value="discount" {% if sort == 'discount' %}selected{% endif %}>Mayor Descuento %</option>
@@ -35,13 +50,13 @@
                         </select>
                     </div>
                     {% if current_path != '/stores' and current_path != '/stores/' ~ filters.store %}
-                    <div class="col-md-3">
+                    <div class="col-12">
                         <label class="form-label small text-secondary fw-bold">Tiendas</label>
                         {{ multiselect('store', 'Tiendas', av_stores, filters.store, 'Buscar tienda...', '/partials/categories', '#category-options') }}
                     </div>
                     {% endif %}
                     {% if current_path != '/categories' and '/categories/' not in current_path %}
-                    <div class="col-md-3">
+                    <div class="col-12">
                         <label class="form-label small text-secondary fw-bold">Categorías</label>
                         {% set formatted_cats = [] %}
                         {% for c in av_cats %}
@@ -50,7 +65,7 @@
                         {{ multiselect('category', 'Categorías', formatted_cats, filters.category, 'Buscar categoría...', None, None) }}
                     </div>
                     {% endif %}
-                    <div class="col-md-3">
+                    <div class="col-12">
                         <div class="form-check mt-4">
                             <input class="form-check-input" type="checkbox" name="only_deals" id="only_deals" value="1" {% if filters.only_deals %}checked{% endif %} onchange="document.getElementById('filter-form').dispatchEvent(new Event('submit'))">
                             <label class="form-check-label small" for="only_deals">
@@ -60,7 +75,7 @@
                     </div>
                     
                     {% if av_collections %}
-                    <div class="col-md-3">
+                    <div class="col-12">
                         <label class="form-label small text-secondary fw-bold">Colecciones</label>
                         {% set formatted_colls = [] %}
                         {% for c in av_collections %}
@@ -71,7 +86,7 @@
                     {% endif %}
                     
                     {% if av_store_facets %}
-                    <div class="col-md-3">
+                    <div class="col-12">
                         <label class="form-label small text-secondary fw-bold">Atributos de Tienda</label>
                         {% set formatted_facets = [] %}
                         {% for c in av_store_facets %}
@@ -82,27 +97,33 @@
                     {% endif %}
                     
                     {% if av_merchants %}
-                    <div class="col-md-3">
+                    <div class="col-12">
                         <label class="form-label small text-secondary fw-bold">Comercios</label>
                         {{ multiselect('merchant', 'Comercios', av_merchants, filters.merchant, 'Buscar comercio...', None, None) }}
                     </div>
                     {% endif %}
 
                     {% if av_locations %}
-                    <div class="col-md-3">
-                        <label class="form-label small text-secondary fw-bold">Sucursales incluidas</label>
-                        {{ multiselect('location', 'Incluir sucursales', av_locations, filters.location, 'Buscar sucursal...', None, None) }}
+                    {% set branch_scope = filters.get('branch_scope', 'ALL') %}
+                    {% set branch_values = filters.get('exclude_location', []) if branch_scope == 'EXCLUDE' else filters.get('location', []) %}
+                    <div class="col-12">
+                        <label class="form-label small text-secondary fw-bold">Alcance de sucursal</label>
+                        <select name="branch_scope" class="form-select form-select-sm">
+                            <option value="ALL" {% if branch_scope == 'ALL' %}selected{% endif %}>Todas</option>
+                            <option value="INCLUDE" {% if branch_scope == 'INCLUDE' %}selected{% endif %}>Sólo seleccionadas</option>
+                            <option value="EXCLUDE" {% if branch_scope == 'EXCLUDE' %}selected{% endif %}>Excluir seleccionadas</option>
+                        </select>
                     </div>
-                    <div class="col-md-3">
-                        <label class="form-label small text-secondary fw-bold">Sucursales excluidas</label>
-                        {{ multiselect('exclude_location', 'Excluir sucursales', av_locations, filters.exclude_location, 'Buscar sucursal...', None, None) }}
+                    <div class="col-12">
+                        <label class="form-label small text-secondary fw-bold">Sucursales</label>
+                        {{ multiselect('location', 'Sucursales', av_locations, branch_values, 'Buscar sucursal...', None, None) }}
                     </div>
                     {% endif %}
 
                     {% if av_commerce_types %}
                     {% set commerce_options = [] %}
                     {% for c in av_commerce_types %}{% set _ = commerce_options.append({'id': c, 'name': c|replace('_', ' ')|title}) %}{% endfor %}
-                    <div class="col-md-3">
+                    <div class="col-12">
                         <label class="form-label small text-secondary fw-bold">Tipo de comercio</label>
                         {{ multiselect('commerce_type', 'Tipo de comercio', commerce_options, filters.commerce_type, 'Buscar tipo...', None, None) }}
                     </div>
@@ -111,14 +132,14 @@
                     {% if av_catalog_domains %}
                     {% set domain_options = [] %}
                     {% for c in av_catalog_domains %}{% set _ = domain_options.append({'id': c, 'name': c|title}) %}{% endfor %}
-                    <div class="col-md-3">
+                    <div class="col-12">
                         <label class="form-label small text-secondary fw-bold">Dominio</label>
                         {{ multiselect('catalog_domain', 'Dominio', domain_options, filters.catalog_domain, 'Buscar dominio...', None, None) }}
                     </div>
                     {% endif %}
 
                     {% if av_browse_nodes %}
-                    <div class="col-md-3">
+                    <div class="col-12">
                         <label class="form-label small text-secondary fw-bold">Taxonomía DealHunter</label>
                         {{ multiselect('browse_node', 'Categoría browse', av_browse_nodes, filters.browse_node, 'Buscar categoría...', None, None) }}
                     </div>
@@ -127,22 +148,22 @@
                     {% if av_brands %}
                     {% set brand_options = [] %}
                     {% for c in av_brands %}{% set _ = brand_options.append({'id': c, 'name': c}) %}{% endfor %}
-                    <div class="col-md-3">
+                    <div class="col-12">
                         <label class="form-label small text-secondary fw-bold">Marca</label>
                         {{ multiselect('brand', 'Marcas', brand_options, filters.brand, 'Buscar marca...', None, None) }}
                     </div>
                     {% endif %}
 
-                    <div class="col-md-2">
+                    <div class="col-12">
                         <label class="form-label small text-secondary fw-bold">Descuento mínimo %</label>
                         <input type="number" name="min_discount" class="form-control form-control-sm" min="0" max="100" step="0.1" value="{{ filters.min_discount if filters.min_discount is defined else '' }}">
                     </div>
-                    <div class="col-md-2">
+                    <div class="col-12">
                         <label class="form-label small text-secondary fw-bold">Precio máximo</label>
                         <input type="number" name="max_price" class="form-control form-control-sm" min="0" step="0.01" value="{{ filters.max_price if filters.max_price is defined else '' }}">
                     </div>
 
-                    <div class="col-md-3">
+                    <div class="col-12">
                         <label class="form-label small text-secondary fw-bold">Tipo de Oferta</label>
                         <select name="channel" class="form-select form-select-sm" onchange="document.getElementById('filter-form').dispatchEvent(new Event('submit'))">
                             <option value="PUBLIC" {% if not filters.channel or filters.channel == 'PUBLIC' %}selected{% endif %}>Públicas (Default)</option>
@@ -151,17 +172,17 @@
                         </select>
                     </div>
 
-                    <div class="col-md-auto ms-auto">
+                    <div class="col-12">
                         <button type="submit" class="btn btn-sm btn-primary">Filtrar</button>
                     </div>
                 </form>
-            </div>
-        </div>
+            </div></div>
+      </div>
     </div>
-</div>
-
-<div id="catalog-grid">
-    {% include 'partials/catalog_grid.html' %}
+  </aside>
+  <main class="col-md-9">
+    <div id="catalog-grid">{% include 'partials/catalog_grid.html' %}</div>
+  </main>
 </div>
 
 {% endblock %}
