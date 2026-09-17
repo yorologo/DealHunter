@@ -57,6 +57,16 @@ ERROR_CATALOG = {
         "recoverable": False,
         "recommended_action": "Install the cryptography package before storing a session",
     },
+    "SECRET_STORE_CORRUPTED": {
+        "message": "Secure credential storage is corrupted",
+        "recoverable": False,
+        "recommended_action": "Remove or replace the corrupted local session explicitly",
+    },
+    "SECRET_STORE_IO": {
+        "message": "Secure credential storage could not be read or written safely",
+        "recoverable": True,
+        "recommended_action": "Check local filesystem permissions/storage and retry",
+    },
     "PARTIAL_RUN": {
         "message": "Run completed partially with some data collected",
         "recoverable": True,

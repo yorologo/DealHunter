@@ -12,6 +12,7 @@ from datetime import datetime, timezone
 import getpass
 import logging
 import time
+import tempfile
 from typing import Optional, Dict, Any, List
 
 from .errors import DealHunterError
@@ -20,7 +21,7 @@ logger = logging.getLogger(__name__)
 
 # Secure persistent storage requires authenticated encryption.
 try:
-    from cryptography.fernet import Fernet
+    from cryptography.fernet import Fernet, InvalidToken
     from cryptography.hazmat.primitives import hashes
     from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
     CRYPTO_AVAILABLE = True
@@ -36,6 +37,7 @@ SESSION_TEMPORARY = 'TEMPORARY'
 SESSION_EPHEMERAL = 'EPHEMERAL'  # from env var
 SESSION_EXPIRED = 'EXPIRED'
 SESSION_CORRUPTED = 'CORRUPTED'
+SESSION_STORAGE_ERROR = 'STORAGE_ERROR'
 
 # Test helper
 DEALHUNTER_SUPER_SECRET_CANARY_987654321 = "secret_canary_value"
@@ -62,23 +64,57 @@ class SecretStore:
         return f'<SecretStore config_dir={self.config_dir}>'
 
     def _ensure_dir(self):
-        """Ensure config directory exists with correct permissions (0700)."""
-        if not os.path.exists(self.config_dir):
+        """Ensure config directory exists privately or fail closed."""
+        try:
             os.makedirs(self.config_dir, mode=0o700, exist_ok=True)
-        else:
-            # Enforce permissions if it exists
-            try:
-                os.chmod(self.config_dir, 0o700)
-            except Exception as e:
-                logger.warning(f"Could not set permissions on config dir: {e}")
+            os.chmod(self.config_dir, 0o700)
+            mode = os.stat(self.config_dir).st_mode
+        except OSError as exc:
+            raise DealHunterError("SECRET_STORE_IO", message=f"Cannot secure config directory: {exc}") from exc
+        if mode & (stat.S_IRWXG | stat.S_IRWXO):
+            raise DealHunterError("SECRET_STORE_IO", message="Config directory permissions are not private")
 
     def _enforce_file_perms(self, path: str):
-        """Enforce 0600 permissions on a file."""
-        if os.path.exists(path):
-            try:
-                os.chmod(path, stat.S_IRUSR | stat.S_IWUSR)
-            except Exception as e:
-                logger.warning(f"Could not set permissions on file {path}: {e}")
+        """Enforce and verify 0600 permissions or fail closed."""
+        try:
+            os.chmod(path, stat.S_IRUSR | stat.S_IWUSR)
+            mode = os.stat(path).st_mode
+        except OSError as exc:
+            raise DealHunterError("SECRET_STORE_IO", message=f"Cannot secure secret file: {exc}") from exc
+        if mode & (stat.S_IRWXG | stat.S_IRWXO):
+            raise DealHunterError("SECRET_STORE_IO", message="Secret file permissions are not private")
+
+    def _atomic_write_private(self, path: str, payload: bytes):
+        """Write temp -> fsync -> private permissions -> atomic replace."""
+        self._ensure_dir()
+        fd = None
+        tmp_path = None
+        try:
+            fd, tmp_path = tempfile.mkstemp(prefix=f".{os.path.basename(path)}.", dir=self.config_dir)
+            os.fchmod(fd, 0o600)
+            with os.fdopen(fd, "wb") as handle:
+                fd = None
+                handle.write(payload)
+                handle.flush()
+                os.fsync(handle.fileno())
+            mode = os.stat(tmp_path).st_mode
+            if mode & (stat.S_IRWXG | stat.S_IRWXO):
+                raise OSError("temporary secret permissions are not private")
+            os.replace(tmp_path, path)
+            tmp_path = None
+        except OSError as exc:
+            raise DealHunterError("SECRET_STORE_IO", message=f"Atomic secret write failed: {exc}") from exc
+        finally:
+            if fd is not None:
+                try:
+                    os.close(fd)
+                except OSError:
+                    pass
+            if tmp_path is not None:
+                try:
+                    os.remove(tmp_path)
+                except FileNotFoundError:
+                    pass
 
     def check_permissions(self) -> List[str]:
         """Check if files have appropriate permissions. Return warnings."""
@@ -135,23 +171,20 @@ class SecretStore:
             raise DealHunterError("SECRET_STORE_UNAVAILABLE")
 
     def _get_or_create_salt(self) -> bytes:
-        """Get existing salt or create a new one and store it securely."""
+        """Get the existing 16-byte salt or create it atomically."""
         if os.path.exists(self.salt_file):
             try:
-                with open(self.salt_file, 'rb') as f:
-                    return f.read()
-            except Exception as e:
-                logger.error(f"Failed to read salt file: {e}")
-                
-        # Create new salt
-        salt = os.urandom(16)
-        try:
-            with open(self.salt_file, 'wb') as f:
-                f.write(salt)
+                with open(self.salt_file, 'rb') as handle:
+                    salt = handle.read()
+            except OSError as exc:
+                raise DealHunterError("SECRET_STORE_IO", message=f"Cannot read session salt: {exc}") from exc
+            if len(salt) != 16:
+                raise DealHunterError("SECRET_STORE_CORRUPTED", message="Session salt is invalid")
             self._enforce_file_perms(self.salt_file)
-        except Exception as e:
-            logger.error(f"Failed to write salt file: {e}")
-            
+            return salt
+
+        salt = os.urandom(16)
+        self._atomic_write_private(self.salt_file, salt)
         return salt
 
     def _derive_key(self, salt: bytes) -> bytes:
@@ -167,59 +200,45 @@ class SecretStore:
         return base64.urlsafe_b64encode(kdf.derive(entropy))
 
     def store(self, token: str, is_expired: bool = False, last_validation_status: str = None, last_validated_at: str = None) -> bool:
-        """Encrypt and persist token."""
+        """Encrypt and atomically persist token; failures are explicit."""
         self._require_crypto()
-        try:
-            self._ensure_dir()
-            salt = self._get_or_create_salt()
-            key = self._derive_key(salt)
-            
-            data = {
-                'stored_at': time.time(),
-                'token': token,
-                'is_expired': is_expired,
-                'last_validation_status': last_validation_status,
-                'last_validated_at': last_validated_at,
-                'encryption': ENCRYPTION_METHOD
-            }
-            raw_data = json.dumps(data).encode('utf-8')
-            
-            encrypted = Fernet(key).encrypt(raw_data)
-                
-            with open(self.session_file, 'wb') as f:
-                f.write(encrypted)
-                
-            self._enforce_file_perms(self.session_file)
-            return True
-        except Exception as e:
-            logger.error(f"Failed to store secret: {e}")
-            return False
+        self._ensure_dir()
+        salt = self._get_or_create_salt()
+        key = self._derive_key(salt)
+        data = {
+            'stored_at': time.time(),
+            'token': token,
+            'is_expired': is_expired,
+            'last_validation_status': last_validation_status,
+            'last_validated_at': last_validated_at,
+            'encryption': ENCRYPTION_METHOD,
+        }
+        encrypted = Fernet(key).encrypt(json.dumps(data).encode('utf-8'))
+        self._atomic_write_private(self.session_file, encrypted)
+        return True
 
     def load_with_metadata(self) -> dict:
-        """Load and decrypt full data dictionary."""
+        """Load metadata, distinguishing absence, corruption and storage errors."""
         if not os.path.exists(self.session_file):
             return None
         self._require_crypto()
-            
+        if not os.path.exists(self.salt_file):
+            raise DealHunterError("SECRET_STORE_CORRUPTED", message="Encrypted session exists without its salt")
         try:
-            with open(self.session_file, 'rb') as f:
-                encrypted = f.read()
-                
-            if not os.path.exists(self.salt_file):
-                return None
-                
-            with open(self.salt_file, 'rb') as f:
-                salt = f.read()
-                
+            with open(self.session_file, 'rb') as handle:
+                encrypted = handle.read()
+            with open(self.salt_file, 'rb') as handle:
+                salt = handle.read()
+        except OSError as exc:
+            raise DealHunterError("SECRET_STORE_IO", message=f"Cannot read secure session storage: {exc}") from exc
+        if len(salt) != 16 or not encrypted:
+            raise DealHunterError("SECRET_STORE_CORRUPTED", message="Secure session storage is incomplete")
+        try:
             key = self._derive_key(salt)
-            
             raw_data = Fernet(key).decrypt(encrypted)
-            data = json.loads(raw_data.decode('utf-8'))
-                
-            return data
-            
-        except Exception:
-            return None
+            return json.loads(raw_data.decode('utf-8'))
+        except (InvalidToken, json.JSONDecodeError, UnicodeDecodeError, ValueError) as exc:
+            raise DealHunterError("SECRET_STORE_CORRUPTED", message="Secure session cannot be decrypted") from exc
 
     def load(self) -> Optional[str]:
         """Load and decrypt token."""
@@ -245,38 +264,28 @@ class SecretStore:
         return os.path.exists(self.session_file)
 
     def metadata(self) -> Dict[str, Any]:
-        """Return metadata without the token."""
+        """Return safe metadata without collapsing corruption/storage failures."""
         meta = {
             'storage_secure': True,
             'encryption_method': ENCRYPTION_METHOD,
             'mode': SESSION_NOT_CONFIGURED,
-            'stored_at': None
+            'stored_at': None,
         }
-        
         if not self.exists():
             return meta
-
         self._require_crypto()
-            
-        meta['mode'] = SESSION_PERSISTENT
-        
         try:
-            with open(self.session_file, 'rb') as f:
-                encrypted = f.read()
-            with open(self.salt_file, 'rb') as f:
-                salt = f.read()
-                
-            key = self._derive_key(salt)
-            
-            raw_data = Fernet(key).decrypt(encrypted)
-            data = json.loads(raw_data.decode('utf-8'))
-                
-            meta['stored_at'] = data.get('stored_at')
-        except Exception:
-            meta['mode'] = SESSION_CORRUPTED
-            
+            data = self.load_with_metadata()
+            meta['mode'] = SESSION_PERSISTENT
+            meta['stored_at'] = data.get('stored_at') if data else None
+        except DealHunterError as exc:
+            if exc.code == "SECRET_STORE_CORRUPTED":
+                meta['mode'] = SESSION_CORRUPTED
+            elif exc.code == "SECRET_STORE_IO":
+                meta['mode'] = SESSION_STORAGE_ERROR
+            else:
+                raise
         return meta
-
 
 class SessionService:
     """
@@ -318,22 +327,22 @@ class SessionService:
         return self.store.load()
 
     def get_mode(self) -> str:
-        """Returns actual session source mode constant."""
+        """Return source mode while preserving corruption vs storage failures."""
         if os.environ.get('RAPPI_BEARER_TOKEN'):
             return SESSION_EPHEMERAL
-            
         if self._temp_token:
             return SESSION_TEMPORARY
-            
         if self.store.exists():
             try:
-                # Quick load test to see if it's corrupted
                 if self.store.load_with_metadata() is None:
                     return SESSION_CORRUPTED
                 return SESSION_PERSISTENT
-            except Exception:
-                return SESSION_CORRUPTED
-                
+            except DealHunterError as exc:
+                if exc.code == "SECRET_STORE_CORRUPTED":
+                    return SESSION_CORRUPTED
+                if exc.code == "SECRET_STORE_IO":
+                    return SESSION_STORAGE_ERROR
+                raise
         return SESSION_NOT_CONFIGURED
 
     def get_token(self) -> Optional[str]:

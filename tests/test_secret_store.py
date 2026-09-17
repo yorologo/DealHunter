@@ -60,14 +60,20 @@ class TestSecretStore:
         session_file = tmp_path / "session.enc"
         with open(session_file, "w") as f:
             f.write("garbage")
-        assert store.load() is None
+        from dealhunter.errors import DealHunterError
+        with pytest.raises(DealHunterError) as exc:
+            store.load()
+        assert exc.value.code == "SECRET_STORE_CORRUPTED"
 
     def test_missing_salt(self, tmp_path):
         store = SecretStore(config_dir=str(tmp_path))
         store.store("token")
         salt_file = tmp_path / ".session_salt"
         os.remove(salt_file)
-        assert store.load() is None
+        from dealhunter.errors import DealHunterError
+        with pytest.raises(DealHunterError) as exc:
+            store.load()
+        assert exc.value.code == "SECRET_STORE_CORRUPTED"
 
     def test_file_permissions(self, tmp_path):
         store = SecretStore(config_dir=str(tmp_path))
@@ -211,3 +217,56 @@ def test_persistent_secret_store_fails_closed_without_cryptography(tmp_path, mon
         store.store("must-not-be-written")
     assert exc.value.code == "SECRET_STORE_UNAVAILABLE"
     assert not (tmp_path / "session.enc").exists()
+
+
+def test_atomic_store_failure_preserves_previous_secret(tmp_path, monkeypatch):
+    import dealhunter.secret_store as secret_store_module
+    from dealhunter.errors import DealHunterError
+
+    store = secret_store_module.SecretStore(config_dir=str(tmp_path))
+    assert store.store("token-A") is True
+    previous = (tmp_path / "session.enc").read_bytes()
+
+    def fail_replace(src, dst):
+        raise OSError("simulated replace failure")
+
+    monkeypatch.setattr(secret_store_module.os, "replace", fail_replace)
+    with pytest.raises(DealHunterError) as exc:
+        store.store("token-B")
+    assert exc.value.code == "SECRET_STORE_IO"
+    assert (tmp_path / "session.enc").read_bytes() == previous
+    assert store.load() == "token-A"
+
+
+def test_secret_store_permission_failure_is_not_success(tmp_path, monkeypatch):
+    import dealhunter.secret_store as secret_store_module
+    from dealhunter.errors import DealHunterError
+
+    store = secret_store_module.SecretStore(config_dir=str(tmp_path))
+    monkeypatch.setattr(secret_store_module.os, "fchmod", lambda *args: (_ for _ in ()).throw(OSError("no chmod")))
+    with pytest.raises(DealHunterError) as exc:
+        store.store("token")
+    assert exc.value.code == "SECRET_STORE_IO"
+    assert not (tmp_path / "session.enc").exists()
+
+
+def test_corruption_and_storage_error_have_distinct_modes(tmp_path, monkeypatch):
+    import dealhunter.secret_store as secret_store_module
+
+    store = secret_store_module.SecretStore(config_dir=str(tmp_path))
+    store.store("token")
+    (tmp_path / "session.enc").write_bytes(b"corrupt")
+    service = secret_store_module.SessionService(config_dir=str(tmp_path))
+    assert service.get_mode() == secret_store_module.SESSION_CORRUPTED
+
+    # Restore a valid store, then simulate a storage read error.
+    (tmp_path / "session.enc").unlink()
+    store.store("token")
+    real_open = open
+    def fail_session_open(path, mode='r', *args, **kwargs):
+        if str(path).endswith('session.enc') and 'r' in mode:
+            raise OSError("storage unavailable")
+        return real_open(path, mode, *args, **kwargs)
+    monkeypatch.setattr(secret_store_module, "open", fail_session_open, raising=False)
+    service = secret_store_module.SessionService(config_dir=str(tmp_path))
+    assert service.get_mode() == secret_store_module.SESSION_STORAGE_ERROR
