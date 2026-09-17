@@ -105,3 +105,24 @@ def test_runtime_consumed_cli_options_are_part_of_config_contract(monkeypatch, t
     assert cfg["promo"] == ["NxM"]
     assert cfg["min_promo_discount"] == 15
     assert cfg["discovery_mode"] == "normal"
+
+
+def test_location_parser_requires_complete_valid_pair():
+    import pytest
+    from dealhunter.config import parse_location
+
+    assert parse_location("20.5", "-103.4") == (20.5, -103.4)
+    for lat, lng in ((None, None), ("20", None), (None, "-103"), ("x", "-103"), ("91", "-103"), ("20", "-181")):
+        with pytest.raises(ValueError):
+            parse_location(lat, lng)
+
+
+def test_discovery_mode_authority_is_shared_with_cli():
+    import pytest
+    from dealhunter.config import DISCOVERY_MODES
+
+    assert DISCOVERY_MODES == ("normal", "deep", "full")
+    for mode in DISCOVERY_MODES:
+        assert _parsed_discover("--discovery-mode", mode).discovery_mode == mode
+    with pytest.raises(SystemExit):
+        _parsed_discover("--discovery-mode", "custom")

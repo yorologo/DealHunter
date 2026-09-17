@@ -327,8 +327,9 @@ class TestAdminSettings:
         rv = client.post('/admin/settings/update',
                          data={'key': 'bearer_token', 'value': 'HACK'},
                          headers={'X-CSRF-Token': token})
-        assert rv.status_code == 200
-        assert b'no es editable' in rv.data or b'No se permiten secretos' in rv.data
+        assert rv.status_code == 302
+        followed = client.get(rv.headers['Location'])
+        assert b'no es editable' in followed.data or b'No se permiten secretos' in followed.data
 
     def test_settings_rejects_unknown_and_readonly(self, client):
         """Web interface must reject modifications to keys not in SAFE_EDITABLE allowlist."""
@@ -338,8 +339,9 @@ class TestAdminSettings:
             rv = client.post('/admin/settings/update',
                              data={'key': key, 'value': 'test'},
                              headers={'X-CSRF-Token': token})
-            assert rv.status_code == 200
-            assert b'no es editable' in rv.data or b'No se permiten secretos' in rv.data
+            assert rv.status_code == 302
+            followed = client.get(rv.headers['Location'])
+            assert b'no es editable' in followed.data or b'No se permiten secretos' in followed.data
 
     def test_settings_canary_token_never_exposed(self, client, monkeypatch):
         """A canary secret in the configuration must never be exposed in the HTTP response."""
@@ -445,3 +447,220 @@ class TestServerBinding:
         import inspect
         src = inspect.getsource(run_server)
         assert '127.0.0.1' in src
+
+
+class TestSettingsTaskUX:
+    def test_settings_get_is_local_and_geolocation_is_click_only(self, client, monkeypatch):
+        monkeypatch.setattr(
+            "urllib.request.urlopen",
+            lambda *_a, **_k: (_ for _ in ()).throw(AssertionError("GET settings used network")),
+        )
+        rv = client.get('/admin/settings')
+        assert rv.status_code == 200
+        html = rv.get_data(as_text=True)
+        assert 'navigator.geolocation' in html
+        assert 'window.isSecureContext' in html
+        assert "trigger.addEventListener('click'" in html
+        assert html.index("trigger.addEventListener('click'") < html.index("navigator.geolocation.getCurrentPosition")
+        assert 'name="accuracy"' not in html
+        assert 'id="found-accuracy"' in html
+        assert 'Introducir coordenadas manualmente' in html
+
+    def test_global_discovery_mode_is_editable(self, client):
+        from dealhunter.config import load_config
+        token = _get_csrf_token(client)
+        rv = client.post(
+            '/admin/settings/update',
+            data={
+                'csrf_token': token,
+                'key': 'discovery_mode',
+                'value': 'deep',
+                'return_to': '/admin/settings#crawler',
+            },
+        )
+        assert rv.status_code == 302
+        assert load_config()['discovery_mode'] == 'deep'
+
+
+    def test_web_rejects_invalid_discovery_mode(self, client):
+        from dealhunter.config import load_config
+        token = _get_csrf_token(client)
+        rv = client.post(
+            '/admin/settings/update',
+            data={
+                'csrf_token': token,
+                'key': 'discovery_mode',
+                'value': 'custom',
+            },
+        )
+        assert rv.status_code == 302
+        assert 'discovery_mode' not in load_config()
+
+    def test_profile_view_is_read_only_and_does_not_write_global(self, client):
+        from dealhunter.config import load_config, save_config
+        save_config({
+            'discovery_mode': 'full',
+            'profiles': {'audit': {'discovery_mode': 'deep', 'lat': 20.0, 'lng': -103.0}},
+        })
+        rv = client.get('/admin/settings?profile=audit')
+        html = rv.get_data(as_text=True)
+        assert rv.status_code == 200
+        assert 'solo lectura' in html
+        assert 'action="/admin/settings/location"' not in html
+        assert 'action="/admin/settings/update"' not in html
+        assert 'action="/admin/settings/provider"' not in html
+        assert 'action="/admin/settings/membership"' not in html
+
+        token = _get_csrf_token(client)
+        blocked = client.post(
+            '/admin/settings/update',
+            data={
+                'csrf_token': token,
+                'profile': 'audit',
+                'key': 'discovery_mode',
+                'value': 'normal',
+            },
+        )
+        assert blocked.status_code == 400
+        assert load_config()['discovery_mode'] == 'full'
+
+    def test_memberships_are_independent(self, client):
+        from dealhunter.config import load_config, save_config
+        save_config({
+            'memberships': {
+                'rappi_pro': {'status': 'unknown'},
+                'uber_one': {'status': 'inactive'},
+            }
+        })
+        token = _get_csrf_token(client)
+        rv = client.post(
+            '/admin/settings/membership',
+            data={
+                'csrf_token': token,
+                'membership': 'rappi_pro',
+                'status': 'active',
+            },
+        )
+        assert rv.status_code == 302
+        cfg = load_config()
+        assert cfg['memberships']['rappi_pro']['status'] == 'active'
+        assert cfg['memberships']['uber_one']['status'] == 'inactive'
+
+        page = client.get('/admin/settings').get_data(as_text=True)
+        assert 'name="membership" value="rappi_pro"' in page
+        assert 'name="membership" value="uber_one"' in page
+
+    def test_location_post_requires_csrf(self, client):
+        rv = client.post('/admin/settings/location', data={'lat': '20', 'lng': '-103'})
+        assert rv.status_code == 400
+
+    @pytest.mark.parametrize(
+        "payload",
+        [
+            {'lat': '20'},
+            {'lng': '-103'},
+            {'lat': '91', 'lng': '-103'},
+            {'lat': '20', 'lng': '-181'},
+            {'lat': 'abc', 'lng': '-103'},
+        ],
+    )
+    def test_location_rejects_incomplete_or_invalid_pair(self, client, payload):
+        from dealhunter.config import load_config
+        token = _get_csrf_token(client)
+        rv = client.post(
+            '/admin/settings/location',
+            data={'csrf_token': token, **payload},
+        )
+        assert rv.status_code == 302
+        cfg = load_config()
+        assert 'lat' not in cfg
+        assert 'lng' not in cfg
+
+    def test_location_saves_pair_atomically(self, client):
+        from dealhunter.config import load_config
+        token = _get_csrf_token(client)
+        rv = client.post(
+            '/admin/settings/location',
+            data={'csrf_token': token, 'lat': '20.5', 'lng': '-103.4'},
+        )
+        assert rv.status_code == 302
+        cfg = load_config()
+        assert cfg['lat'] == 20.5
+        assert cfg['lng'] == -103.4
+        assert 'accuracy' not in cfg
+
+    def test_location_save_failure_never_reports_success(self, client, monkeypatch):
+        monkeypatch.setattr(
+            'dealhunter.web.admin.save_config',
+            lambda *_a, **_k: (_ for _ in ()).throw(RuntimeError('simulated')),
+        )
+        token = _get_csrf_token(client)
+        rv = client.post(
+            '/admin/settings/location',
+            data={'csrf_token': token, 'lat': '20.5', 'lng': '-103.4'},
+            follow_redirects=True,
+        )
+        assert rv.status_code == 200
+        assert b'No se pudo guardar la ubicaci' in rv.data
+        assert 'Ubicación guardada'.encode('utf-8') not in rv.data
+
+    def test_location_return_to_is_same_origin_only(self, client):
+        token = _get_csrf_token(client)
+        external = client.post(
+            '/admin/settings/location',
+            data={
+                'csrf_token': token,
+                'lat': '20.5',
+                'lng': '-103.4',
+                'return_to': 'https://evil.example/steal',
+            },
+        )
+        assert external.status_code == 302
+        assert external.headers['Location'].startswith('/admin/settings')
+        assert 'evil.example' not in external.headers['Location']
+
+        local = client.post(
+            '/admin/settings/location',
+            data={
+                'csrf_token': token,
+                'lat': '20.6',
+                'lng': '-103.5',
+                'return_to': '/admin/runs',
+            },
+        )
+        assert local.status_code == 302
+        assert local.headers['Location'] == '/admin/runs'
+
+    def test_restore_recommended_removes_override(self, client):
+        from dealhunter.config import get_merged_config, load_config, save_config
+        save_config({'max_runtime': 120})
+        token = _get_csrf_token(client)
+        rv = client.post(
+            '/admin/settings/restore',
+            data={'csrf_token': token, 'key': 'max_runtime'},
+        )
+        assert rv.status_code == 302
+        assert 'max_runtime' not in load_config()
+        assert get_merged_config(None)['max_runtime'] == 3600
+
+    @pytest.mark.parametrize('key', ['token', 'radius', 'output_format', 'unknown_setting'])
+    def test_restore_rejects_secret_readonly_and_unknown(self, client, key):
+        token = _get_csrf_token(client)
+        rv = client.post(
+            '/admin/settings/restore',
+            data={'csrf_token': token, 'key': key},
+        )
+        assert rv.status_code == 400
+
+    def test_basic_and_advanced_settings_are_task_oriented(self, client):
+        rv = client.get('/admin/settings')
+        html = rv.get_data(as_text=True)
+        assert 'Configuración básica' in html
+        assert 'Ubicación de entrega' in html
+        assert 'Proveedores' in html
+        assert 'Membresías' in html
+        assert 'Modo de exploración' in html
+        assert 'Ajustes avanzados' in html
+        assert 'Procedencia del run; no limita adquisición.' in html
+        assert 'Provider principal' not in html
+        assert 'Integración secundaria' not in html

@@ -2,6 +2,8 @@
 
 El comando instalado principal es `dealhunter`. `rappi-ofertas` se conserva como alias compatible del mismo parser.
 
+La CLI y la Web comparten la misma autoridad de configuración. La Web edita el runtime global; los profiles siguen siendo una capacidad avanzada de CLI/configuración. El enum de `--discovery-mode` es común y sólo acepta `normal`, `deep` o `full`.
+
 Consulta siempre la autoridad ejecutable:
 
 ```bash

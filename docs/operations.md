@@ -42,8 +42,8 @@ Ruta recomendada para un usuario nuevo:
 
 1. Ejecuta `dealhunter web`.
 2. Abre `http://127.0.0.1:8765`.
-3. Ve a **Admin → Settings**.
-4. Guarda `lat` y `lng` válidos.
+3. Ve a **Admin → Configuración**.
+4. En **Ubicación de entrega**, usa la ubicación del dispositivo y confirma antes de guardar; si el navegador no la ofrece, introduce `lat` y `lng` manualmente.
 5. Ejecuta un sync desde Catalog Sync o por CLI.
 
 Alternativa CLI:
@@ -56,6 +56,8 @@ dealhunter doctor
 ```
 
 La configuración vive fuera del repositorio, bajo `XDG_CONFIG_HOME` o `~/.config/dealhunter`. Los secretos no se guardan en `config.toml`.
+
+La Web separa **Configuración básica** de **Ajustes avanzados** sin crear una segunda autoridad. Los profiles pueden inspeccionarse desde Settings, pero son de solo lectura; su edición se realiza mediante CLI/configuración. La ubicación automática usa únicamente la API estándar del navegador, solicita permiso sólo tras un click explícito y guarda únicamente `lat`/`lng`; la precisión mostrada no se persiste.
 
 ### Configuración opcional
 
@@ -73,7 +75,7 @@ dealhunter web
 
 La Web inicializa/migra SQLite antes de servir y escucha en `127.0.0.1:8765`. En Termux intenta adquirir wake lock si `termux-wake-lock` está disponible. El wake lock es compartido por la app Termux y no se libera automáticamente al cerrar DealHunter.
 
-`Admin → Runs → Iniciar Crawler` también requiere `lat/lng` válidos. El inicio usa POST + CSRF y, tras reservar el run, redirige a su detalle. El progreso real queda persistido en SQLite: Zone Inventory pasa de discovery indeterminado a progreso por merchants cuando conoce el total; Search Discovery no fabrica porcentaje si el trabajo sigue siendo dinámico. Recargar la página no detiene el crawler ni pierde su progreso.
+`Admin → Runs → Iniciar crawler Rappi` requiere `lat/lng` válidos. Si faltan, el GET local muestra un preflight para ir a Configuración; guardar la ubicación vuelve a Runs sin arrancar el crawler. El inicio sigue siendo una acción explícita POST + CSRF y el backend valida de nuevo la ubicación antes de reservar el run. El progreso real queda persistido en SQLite: Zone Inventory pasa de discovery indeterminado a progreso por merchants cuando conoce el total; Search Discovery no fabrica porcentaje si el trabajo sigue siendo dinámico. Recargar la página no detiene el crawler ni pierde su progreso.
 
 Comandos de salud:
 

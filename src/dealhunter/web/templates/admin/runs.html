@@ -10,15 +10,55 @@
 
     <div class="d-flex justify-content-between align-items-center mb-1">
         <h2 class="m-0">🔄 Ejecuciones (Runs)</h2>
+        {% if active_run %}
+        <button type="button" class="btn btn-primary btn-sm" disabled title="Ya hay un crawler ejecutándose">
+            🚀 Iniciar crawler Rappi
+        </button>
+        {% elif location_ready %}
         <form action="/admin/runs/start" method="POST" class="d-inline">
             <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-            <button type="submit" class="btn btn-primary btn-sm"
-                    {% if active_run %}disabled title="Ya hay un crawler ejecutándose"{% endif %}>
-                🚀 Iniciar Crawler
-            </button>
+            <button type="submit" class="btn btn-primary btn-sm">🚀 Iniciar crawler Rappi</button>
         </form>
+        {% else %}
+        <button type="button" class="btn btn-primary btn-sm"
+                data-bs-toggle="modal" data-bs-target="#missingLocationModal">
+            🚀 Iniciar crawler Rappi
+        </button>
+        {% endif %}
     </div>
     <p class="text-muted">Historial de crawleo y progreso.</p>
+
+    <div class="card shadow-sm mb-4">
+        <div class="card-body py-3">
+            <div class="row g-2 small">
+                <div class="col-md-4"><strong>Proveedor:</strong> {{ crawler_provider }}</div>
+                <div class="col-md-4"><strong>Ubicación:</strong>
+                    {% if location_ready %}<span class="text-success">Configurada</span>{% else %}<span class="text-warning">Falta configurar</span>{% endif %}
+                </div>
+                <div class="col-md-4"><strong>Modo:</strong> {{ crawler_mode_label }}</div>
+            </div>
+        </div>
+    </div>
+
+    {% if not location_ready and not active_run %}
+    <div class="modal fade" id="missingLocationModal" tabindex="-1" aria-labelledby="missingLocationTitle" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="missingLocationTitle">📍 Falta configurar tu ubicación</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+                </div>
+                <div class="modal-body">
+                    DealHunter necesita una ubicación de entrega para consultar tiendas disponibles en tu zona.
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cerrar</button>
+                    <a class="btn btn-primary" href="/admin/settings?return_to=/admin/runs#location">Configurar ubicación</a>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
 
     {% if active_run %}
     <div class="alert alert-info d-flex justify-content-between align-items-center shadow-sm border-0 mb-4">

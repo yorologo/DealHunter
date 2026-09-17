@@ -10,6 +10,8 @@ from .providers.registry import KNOWN_PROVIDERS, validate_provider
 KNOWN_MEMBERSHIPS = ("rappi_pro", "uber_one")
 MEMBERSHIP_STATUSES = ("active", "inactive", "unknown")
 COMPARISON_POLICIES = ("exclude", "show_but_exclude", "include")
+DISCOVERY_MODES = ("normal", "deep", "full")
+SORT_OPTIONS = ("discount", "price", "store", "name", "deal-score", "historical-discount")
 TRUE_VALUES = {"true", "1", "yes", "on"}
 FALSE_VALUES = {"false", "0", "no", "off"}
 
@@ -41,6 +43,22 @@ def validate_comparison_policy(policy):
     if policy not in COMPARISON_POLICIES:
         raise ValueError(f"unsupported comparison policy: {policy}")
     return policy
+
+
+def parse_location(lat, lng):
+    """Validate one complete location pair and return normalized floats."""
+    if lat is None or lng is None or str(lat).strip() == "" or str(lng).strip() == "":
+        raise ValueError("both lat and lng are required")
+    try:
+        lat_value = float(lat)
+        lng_value = float(lng)
+    except (TypeError, ValueError) as exc:
+        raise ValueError("lat/lng must be numeric") from exc
+    if not -90 <= lat_value <= 90:
+        raise ValueError("lat must be between -90 and 90")
+    if not -180 <= lng_value <= 180:
+        raise ValueError("lng must be between -180 and 180")
+    return lat_value, lng_value
 
 
 

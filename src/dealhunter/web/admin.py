@@ -15,7 +15,7 @@ from dealhunter.account import get_account_status, get_account_token
 from dealhunter.config import (
     load_config, get_config_path, get_default_config, get_merged_config, save_config,
     parse_strict_bool, validate_membership, validate_membership_status,
-    validate_comparison_policy,
+    validate_comparison_policy, DISCOVERY_MODES, SORT_OPTIONS, parse_location,
 )
 from dealhunter.providers.registry import validate_provider
 from dealhunter.web.security import local_redirect_target
@@ -32,13 +32,15 @@ RAPPI_MOBILE_AUTH_TTL_SECONDS = 300
 RAPPI_MOBILE_AUTH_MAX_PAYLOAD_BYTES = 64 * 1024
 
 
-# Settings classification
-SAFE_EDITABLE = {
-    'min_discount', 'max_discount', 'radius', 'top', 'sort',
-    'output_format', 'vertical', 'store', 'exclude_store',
-    'query', 'exclude', 'compact', 'dry_run',
-    'max_requests', 'max_runtime', 'lat', 'lng',
+# Settings classification. Location is edited atomically through its own POST.
+BASIC_EDITABLE = {'discovery_mode'}
+ADVANCED_EDITABLE = {
+    'min_discount', 'max_discount', 'sort',
+    'vertical', 'store', 'exclude_store', 'query', 'exclude',
+    'dry_run', 'max_requests', 'max_runtime',
 }
+TECHNICAL_READ_ONLY = {'radius', 'top', 'output_format', 'compact'}
+SAFE_EDITABLE = BASIC_EDITABLE | ADVANCED_EDITABLE
 
 SECRET_FORBIDDEN = {
     'RAPPI_BEARER_TOKEN', 'bearer_token', 'token', 'secret',
@@ -326,6 +328,13 @@ def runs():
     } if active_row else None
     conn.close()
 
+    cfg = get_merged_config(None)
+    try:
+        parse_location(cfg.get("lat"), cfg.get("lng"))
+        location_ready = True
+    except ValueError:
+        location_ready = False
+
     if request.headers.get('HX-Request'):
         return render_template('admin/partials/runs_table.html',
                                runs=runs_data, page=page,
@@ -335,6 +344,9 @@ def runs():
                            runs=runs_data, page=page,
                            total_pages=total_pages, total=total,
                            summary=summary, status_filter=status_filter,
+                           location_ready=location_ready,
+                           crawler_provider='Rappi',
+                           crawler_mode_label='Automático según sesión',
                            current_path='/admin/runs')
 
 
@@ -355,17 +367,11 @@ def runs_start():
         run_id = f"run_{uuid.uuid4().hex[:12]}"
 
         cfg = get_merged_config(None)
-        lat = cfg.get("lat")
-        lng = cfg.get("lng")
         try:
-            lat = float(lat)
-            lng = float(lng)
-        except (TypeError, ValueError):
+            lat, lng = parse_location(cfg.get("lat"), cfg.get("lng"))
+        except ValueError:
             conn.close()
-            return "Ubicación (lat/lng) no configurada. Configúrala en Administración → Configuración.", 400
-        if not (-90 <= lat <= 90 and -180 <= lng <= 180):
-            conn.close()
-            return "Ubicación fuera de rango válido.", 400
+            return "Ubicación (lat/lng) no configurada o inválida. Configúrala en Administración → Configuración.", 400
 
         from dealhunter.run_lifecycle import ActiveRunError, reserve_run
         try:
@@ -545,7 +551,7 @@ def database_integrity():
 
 @admin_bp.route('/settings')
 def settings():
-    """Settings view with precedence and classification."""
+    """Task-oriented settings view backed by the canonical config layer."""
     global_cfg = load_config()
     config_path = get_config_path()
     config_exists = os.path.exists(config_path)
@@ -556,32 +562,50 @@ def settings():
     defaults = get_default_config()
     effective_cfg = get_merged_config(None, profile_name=selected_profile)
     profile_cfg = global_cfg.get('profiles', {}).get(selected_profile, {}) if selected_profile else {}
+    settings_editable = selected_profile is None
 
-    # Build the editable runtime view from the same merge authority as CLI/runtime.
+    return_to = local_redirect_target(
+        request.args.get('return_to'),
+        host=request.host,
+        default='/admin/settings',
+    )
+
+    def setting_source(key):
+        if key in profile_cfg:
+            return f"profile:{selected_profile}"
+        if key in global_cfg:
+            return "config.toml"
+        return "default"
+
+    try:
+        location_lat, location_lng = parse_location(
+            effective_cfg.get("lat"), effective_cfg.get("lng")
+        )
+        location_ready = True
+    except ValueError:
+        location_lat = location_lng = None
+        location_ready = False
+
     settings_list = []
-    for key in sorted(SAFE_EDITABLE):
+    for key in sorted(ADVANCED_EDITABLE | TECHNICAL_READ_ONLY):
         default_val = defaults.get(key)
         effective = effective_cfg.get(key)
-        if key in profile_cfg:
-            source = f"profile:{selected_profile}"
-        elif key in global_cfg:
-            source = "config.toml"
-        else:
-            source = "default"
+        editable = settings_editable and key in ADVANCED_EDITABLE
         settings_list.append({
             'key': key,
             'value': effective,
             'default': default_val,
-            'source': source,
-            'classification': "SAFE_EDITABLE",
-            'type': ("float" if key in ("lat", "lng") else type(default_val).__name__),
+            'source': setting_source(key),
+            'classification': "SAFE_EDITABLE" if editable else "READ_ONLY",
+            'type': type(default_val).__name__,
+            'editable': editable,
+            'choices': SORT_OPTIONS if key == 'sort' else None,
+            'overridden': key in global_cfg,
         })
 
-    # Add any extra keys from config that aren't in defaults
+    # Extra config keys remain visible for diagnostics but never become editable.
     for key in sorted(global_cfg.keys()):
-        if key in defaults:
-            continue
-        if key == 'profiles':
+        if key in defaults or key == 'profiles':
             continue
         lower_key = key.lower()
         if any(s in lower_key for s in ('token', 'secret', 'password', 'cookie', 'key', 'bearer')):
@@ -595,7 +619,10 @@ def settings():
                 'configured': bool(global_cfg[key]),
                 'editable': False,
                 'classification': classification,
-                'source': 'config.toml'
+                'source': 'config.toml',
+                'default': None,
+                'type': type(global_cfg[key]).__name__,
+                'overridden': True,
             })
         else:
             settings_list.append({
@@ -606,22 +633,74 @@ def settings():
                 'classification': classification,
                 'type': type(global_cfg[key]).__name__,
                 'editable': False,
+                'overridden': True,
             })
 
-    return render_template('admin/settings.html',
-                           current_path='/admin/settings',
-                           settings=settings_list,
-                           profiles=profiles,
-                           config_path=config_path,
-                           config_exists=config_exists,
-                           raw_config=global_cfg,
-                           effective_config=effective_cfg,
-                           selected_profile=selected_profile)
+    return render_template(
+        'admin/settings.html',
+        current_path='/admin/settings',
+        settings=settings_list,
+        profiles=profiles,
+        config_path=config_path,
+        config_exists=config_exists,
+        raw_config=global_cfg,
+        effective_config=effective_cfg,
+        selected_profile=selected_profile,
+        settings_editable=settings_editable,
+        return_to=return_to,
+        location_ready=location_ready,
+        location_lat=location_lat,
+        location_lng=location_lng,
+        location_error=request.args.get('location_error') == '1',
+        advanced_open=request.args.get('advanced') == '1',
+        discovery_modes=DISCOVERY_MODES,
+        discovery_source=setting_source('discovery_mode'),
+    )
 
+
+def _settings_post_scope_guard():
+    """Fail closed if a read-only profile view attempts a global write."""
+    if request.form.get('profile', '').strip():
+        abort(400, "Los profiles son de solo lectura desde la Web.")
+
+
+def _settings_safe_return(default='/admin/settings'):
+    return local_redirect_target(
+        request.form.get('return_to'),
+        host=request.host,
+        default=default,
+    )
+
+
+@admin_bp.route('/settings/location', methods=['POST'])
+def settings_location():
+    _settings_post_scope_guard()
+    try:
+        lat, lng = parse_location(
+            request.form.get('lat'),
+            request.form.get('lng'),
+        )
+    except ValueError:
+        flash("Ubicación inválida. Introduce latitud y longitud válidas juntas.", "danger")
+        return redirect('/admin/settings?location_error=1#location')
+
+    try:
+        cfg = load_config()
+        cfg['lat'] = lat
+        cfg['lng'] = lng
+        save_config(cfg)
+    except Exception:
+        current_app.logger.error("Could not persist location configuration")
+        flash("No se pudo guardar la ubicación.", "danger")
+        return redirect('/admin/settings?location_error=1#location')
+
+    flash("Ubicación guardada.", "success")
+    return redirect(_settings_safe_return('/admin/settings#location'))
 
 
 @admin_bp.route('/settings/provider', methods=['POST'])
 def settings_provider():
+    _settings_post_scope_guard()
     try:
         provider = validate_provider(request.form.get('provider'))
         enabled = parse_strict_bool(request.form.get('enabled'))
@@ -634,10 +713,13 @@ def settings_provider():
         cfg['providers'][provider] = {}
     cfg['providers'][provider]['enabled'] = enabled
     save_config(cfg)
-    return redirect(url_for('admin_bp.settings'))
+    flash("Proveedor actualizado.", "success")
+    return redirect(_settings_safe_return('/admin/settings'))
+
 
 @admin_bp.route('/settings/membership', methods=['POST'])
 def settings_membership():
+    _settings_post_scope_guard()
     try:
         membership = validate_membership(request.form.get('membership'))
         status = validate_membership_status(request.form.get('status'))
@@ -650,10 +732,13 @@ def settings_membership():
         cfg['memberships'][membership] = {}
     cfg['memberships'][membership]['status'] = status
     save_config(cfg)
-    return redirect(url_for('admin_bp.settings'))
+    flash("Membresía actualizada.", "success")
+    return redirect(_settings_safe_return('/admin/settings'))
+
 
 @admin_bp.route('/settings/comparison', methods=['POST'])
 def settings_comparison():
+    _settings_post_scope_guard()
     try:
         policy = validate_comparison_policy(request.form.get('policy'))
     except ValueError as exc:
@@ -663,70 +748,107 @@ def settings_comparison():
         cfg['comparison'] = {}
     cfg['comparison']['inactive_membership_offers'] = policy
     save_config(cfg)
-    return redirect(url_for('admin_bp.settings'))
+    flash("Política de comparación actualizada.", "success")
+    return redirect(_settings_safe_return('/admin/settings?advanced=1#advanced-settings'))
+
+
+def _settings_parse_value(key, value):
+    default_val = get_default_config().get(key)
+    if key == 'discovery_mode':
+        if value not in DISCOVERY_MODES:
+            raise ValueError("unsupported discovery mode")
+        return value
+    if key == 'sort':
+        if value not in SORT_OPTIONS:
+            raise ValueError("unsupported sort option")
+        return value
+    if isinstance(default_val, bool):
+        return parse_strict_bool(value)
+    if isinstance(default_val, int):
+        return int(value)
+    if isinstance(default_val, float):
+        return float(value)
+    if isinstance(default_val, list):
+        return [v.strip() for v in value.split(',') if v.strip()]
+    return value
 
 
 @admin_bp.route('/settings/update', methods=['POST'])
 def settings_update():
-    """Update a safe-editable setting — POST only."""
+    """Update one allowlisted global setting."""
+    _settings_post_scope_guard()
     key = request.form.get('key', '').strip()
     value = request.form.get('value', '').strip()
 
-    # Validate key is safe-editable
     if key not in SAFE_EDITABLE:
-        return render_template('admin/partials/settings_result.html',
-                               success=False,
-                               message=f"'{key}' no es editable desde la web.")
+        message = f"'{key}' no es editable desde la web."
+        if request.headers.get('HX-Request'):
+            return render_template('admin/partials/settings_result.html', success=False, message=message)
+        flash(message, "danger")
+        return redirect('/admin/settings?advanced=1#advanced-settings')
 
-    # Reject anything that looks like a secret
     lower_key = key.lower()
     if any(s in lower_key for s in ('token', 'secret', 'password', 'cookie', 'bearer')):
-        return render_template('admin/partials/settings_result.html',
-                               success=False,
-                               message="No se permiten secretos en la configuración web.")
+        message = "No se permiten secretos en la configuración web."
+        if request.headers.get('HX-Request'):
+            return render_template('admin/partials/settings_result.html', success=False, message=message)
+        flash(message, "danger")
+        return redirect('/admin/settings?advanced=1#advanced-settings')
 
-    # Parse value to correct type
-    default_val = get_default_config().get(key)
     try:
-        if key in ("lat", "lng"):
-            parsed = float(value)
-        elif isinstance(default_val, bool):
-            parsed = parse_strict_bool(value)
-        elif isinstance(default_val, int):
-            parsed = int(value)
-        elif isinstance(default_val, float):
-            parsed = float(value)
-        elif isinstance(default_val, list):
-            # Comma-separated list
-            parsed = [v.strip() for v in value.split(',') if v.strip()]
-        else:
-            parsed = value
+        parsed = _settings_parse_value(key, value)
+        if key in ("min_discount", "max_discount") and not 0 <= parsed <= 100:
+            raise ValueError("discount range")
+        if key in ("max_requests", "max_runtime") and parsed <= 0:
+            raise ValueError("positive value required")
     except (ValueError, TypeError):
-        return render_template('admin/partials/settings_result.html',
-                               success=False,
-                               message=f"Valor inválido para '{key}'."), 400
+        message = f"Valor inválido para '{key}'."
+        if request.headers.get('HX-Request'):
+            return render_template(
+                'admin/partials/settings_result.html',
+                success=False,
+                message=message,
+            ), 400
+        flash(message, "danger")
+        suffix = '#crawler' if key == 'discovery_mode' else '#advanced-settings'
+        query = '' if key == 'discovery_mode' else '?advanced=1'
+        return redirect(f"/admin/settings{query}{suffix}")
 
-    if key == "lat" and not -90 <= parsed <= 90:
-        return render_template('admin/partials/settings_result.html', success=False, message="lat debe estar entre -90 y 90.")
-    if key == "lng" and not -180 <= parsed <= 180:
-        return render_template('admin/partials/settings_result.html', success=False, message="lng debe estar entre -180 y 180.")
-    if key in ("min_discount", "max_discount") and not 0 <= parsed <= 100:
-        return render_template('admin/partials/settings_result.html', success=False, message=f"{key} debe estar entre 0 y 100.")
-    if key in ("radius", "top", "max_requests", "max_runtime") and parsed <= 0:
-        return render_template('admin/partials/settings_result.html', success=False, message=f"{key} debe ser mayor que 0.")
-
-    # Use config layer to save
     try:
         cfg = load_config()
         cfg[key] = parsed
         save_config(cfg)
-        return render_template('admin/partials/settings_result.html',
-                               success=True,
-                               message=f"'{key}' actualizado a: {parsed}")
-    except Exception as e:
-        return render_template('admin/partials/settings_result.html',
-                               success=False,
-                               message=f"Error al guardar: {e}")
+    except Exception:
+        current_app.logger.error("Could not persist Web setting: %s", key)
+        message = "No se pudo guardar la configuración."
+        if request.headers.get('HX-Request'):
+            return render_template('admin/partials/settings_result.html', success=False, message=message), 500
+        flash(message, "danger")
+        return redirect('/admin/settings?advanced=1#advanced-settings')
+
+    if request.headers.get('HX-Request'):
+        return render_template(
+            'admin/partials/settings_result.html',
+            success=True,
+            message=f"'{key}' actualizado.",
+        )
+    flash("Configuración actualizada.", "success")
+    return redirect(_settings_safe_return('/admin/settings'))
+
+
+@admin_bp.route('/settings/restore', methods=['POST'])
+def settings_restore():
+    """Remove one advanced global override so normal precedence resolves again."""
+    _settings_post_scope_guard()
+    key = request.form.get('key', '').strip()
+    if key not in ADVANCED_EDITABLE:
+        abort(400, "El ajuste no se puede restaurar desde la Web.")
+    cfg = load_config()
+    if key in cfg:
+        del cfg[key]
+        save_config(cfg)
+    flash("Valor recomendado restaurado.", "success")
+    return redirect(_settings_safe_return('/admin/settings?advanced=1#advanced-settings'))
 
 
 # ──────────────────────────────────

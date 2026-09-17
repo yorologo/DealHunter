@@ -8,271 +8,390 @@
         </ol>
     </nav>
 
-    <h2 class="mb-1">⚙️ Configuración</h2>
-    <p class="text-muted">Valores efectivos con origen y precedencia.</p>
-
-    <!-- Precedence Info -->
-    <div class="card shadow-sm mb-4">
-        <div class="card-body">
-            <h5 class="card-title">Precedencia de Configuración</h5>
-            <div class="d-flex flex-wrap align-items-center gap-2 mt-2">
-                <span class="badge bg-primary px-3 py-2">CLI</span>
-                <span class="text-muted">&gt;</span>
-                <span class="badge bg-info px-3 py-2">Profile</span>
-                <span class="text-muted">&gt;</span>
-                <span class="badge bg-secondary px-3 py-2">config.toml</span>
-                <span class="text-muted">&gt;</span>
-                <span class="badge bg-light text-dark border px-3 py-2">Default</span>
-            </div>
-            <p class="text-muted small mt-2 mb-1">
-                La vista muestra el runtime global o el profile seleccionado. Overrides CLI son específicos de cada ejecución y no se presentan como globales.
-            </p>
-            <p class="text-muted small mb-0">
-                Archivo: <code>{{ config_path }}</code>
-                {% if config_exists %}
-                <span class="badge bg-success ms-1">existe</span>
-                {% else %}
-                <span class="badge bg-warning text-dark ms-1">no encontrado (usando defaults)</span>
-                {% endif %}
-            </p>
-        </div>
+    <div class="mb-4">
+        <h2 class="mb-1">⚙️ Configuración</h2>
+        <p class="text-muted mb-0">Configura lo necesario para operar DealHunter. Los detalles técnicos siguen disponibles en Ajustes avanzados.</p>
     </div>
 
-    <!-- Legend -->
-    <div class="d-flex flex-wrap gap-2 mb-3">
-        <span class="badge bg-success">SAFE_EDITABLE</span>
-        <span class="badge bg-secondary">READ_ONLY</span>
-        <span class="badge bg-danger">SECRET_FORBIDDEN</span>
+    {% for category, message in get_flashed_messages(with_categories=true) %}
+    <div class="alert alert-{{ 'danger' if category == 'danger' else 'success' }} alert-dismissible fade show" role="alert">
+        {{ message }}
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Cerrar"></button>
     </div>
+    {% endfor %}
 
-    <!-- Profiles -->
     {% if profiles %}
     <div class="card shadow-sm mb-4">
         <div class="card-body">
-            <h6 class="card-title">Profiles configurados</h6>
-            <div class="d-flex flex-wrap gap-2 mt-2">
-                <a href="/admin/settings" class="badge text-decoration-none px-2 py-1 {{ 'bg-primary' if not selected_profile else 'bg-secondary' }}">runtime global</a>
-                {% for p in profiles %}
-                <a href="/admin/settings?profile={{ p|urlencode }}" class="badge text-decoration-none px-2 py-1 {{ 'bg-primary' if selected_profile == p else 'bg-info' }}">{{ p }}</a>
-                {% endfor %}
+            <div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
+                <div>
+                    <h6 class="mb-1">Scope de configuración</h6>
+                    <div class="text-muted small">El runtime global se puede editar desde Web. Los profiles se muestran únicamente para diagnóstico.</div>
+                </div>
+                <div class="d-flex flex-wrap gap-2">
+                    <a href="/admin/settings" class="btn btn-sm {{ 'btn-primary' if not selected_profile else 'btn-outline-secondary' }}">Runtime global</a>
+                    {% for p in profiles %}
+                    <a href="/admin/settings?profile={{ p|urlencode }}" class="btn btn-sm {{ 'btn-info' if selected_profile == p else 'btn-outline-info' }}">{{ p }}</a>
+                    {% endfor %}
+                </div>
             </div>
+            {% if selected_profile %}
+            <div class="alert alert-info mt-3 mb-0">
+                <strong>Profile {{ selected_profile }} · solo lectura.</strong>
+                Este profile se muestra para diagnóstico. La edición avanzada de profiles se realiza actualmente mediante CLI/configuración.
+            </div>
+            {% endif %}
         </div>
     </div>
     {% endif %}
 
-    
-    <!-- Providers & Memberships Phase 5E -->
-    <div class="row mb-4">
-        <div class="col-md-6">
+    <h5 class="text-uppercase text-muted small fw-bold mb-3">Configuración básica</h5>
+
+    <div class="row g-4 mb-4">
+        <div class="col-12 col-xl-6" id="location">
             <div class="card shadow-sm h-100">
-                <div class="card-header bg-light">
-                    <h5 class="mb-0">🔌 Proveedores (Providers)</h5>
+                <div class="card-header bg-body">
+                    <h5 class="mb-0">📍 Ubicación de entrega</h5>
                 </div>
                 <div class="card-body">
-                    <p class="text-muted small">Activa o desactiva las integraciones de tiendas. Los datos históricos se conservan si desactivas uno.</p>
-                    <ul class="list-group list-group-flush">
-                        {% set p_rappi = effective_config.get("providers", {}).get("rappi", {}).get("enabled", True) %}
-                        {% set p_uber = effective_config.get("providers", {}).get("uber_eats", {}).get("enabled", True) %}
-                        
-                        <li class="list-group-item d-flex justify-content-between align-items-center">
-                            <div>
-                                <strong>Rappi</strong>
-                                <div class="small text-muted">Provider principal</div>
+                    <p class="text-muted">DealHunter utiliza esta ubicación para encontrar tiendas y catálogos disponibles en tu zona.</p>
+
+                    {% if location_ready %}
+                    <div class="alert alert-success">
+                        <strong>Ubicación configurada</strong>
+                        <div class="small mt-2">Latitud: <code>{{ location_lat }}</code></div>
+                        <div class="small">Longitud: <code>{{ location_lng }}</code></div>
+                    </div>
+                    {% else %}
+                    <div class="alert alert-warning">
+                        <strong>No configurada.</strong> El crawler no puede iniciar hasta guardar una ubicación válida.
+                    </div>
+                    {% endif %}
+
+                    {% if settings_editable %}
+                    <button type="button" class="btn btn-primary mb-3" id="use-device-location">
+                        📍 Usar ubicación de este dispositivo
+                    </button>
+                    <div id="geolocation-status" class="small text-muted mb-3" role="status"></div>
+
+                    <div id="location-confirmation" class="border rounded p-3 mb-3 d-none">
+                        <h6>Ubicación encontrada</h6>
+                        <dl class="row small mb-3">
+                            <dt class="col-5">Latitud</dt>
+                            <dd class="col-7"><code id="found-lat"></code></dd>
+                            <dt class="col-5">Longitud</dt>
+                            <dd class="col-7"><code id="found-lng"></code></dd>
+                            <dt class="col-5">Precisión aproximada</dt>
+                            <dd class="col-7">±<span id="found-accuracy"></span> m</dd>
+                        </dl>
+                        <form method="POST" action="/admin/settings/location" id="geolocation-save-form" class="d-flex gap-2">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                            <input type="hidden" name="profile" value="">
+                            <input type="hidden" name="return_to" value="{{ return_to }}">
+                            <input type="hidden" name="lat" id="geolocation-lat">
+                            <input type="hidden" name="lng" id="geolocation-lng">
+                            <button type="submit" class="btn btn-success btn-sm">Guardar ubicación</button>
+                            <button type="button" class="btn btn-outline-secondary btn-sm" id="cancel-device-location">Cancelar</button>
+                        </form>
+                    </div>
+
+                    <details {% if location_error %}open{% endif %}>
+                        <summary class="mb-3">Introducir coordenadas manualmente</summary>
+                        <form method="POST" action="/admin/settings/location" class="row g-3">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                            <input type="hidden" name="profile" value="">
+                            <input type="hidden" name="return_to" value="{{ return_to }}">
+                            <div class="col-md-6">
+                                <label class="form-label" for="manual-lat">Latitud</label>
+                                <input class="form-control" id="manual-lat" name="lat" inputmode="decimal" required
+                                       value="{{ location_lat if location_ready else '' }}">
+                                <div class="form-text">Entre -90 y 90.</div>
                             </div>
-                            <form method="POST" action="/admin/settings/provider">
-                                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-                                <input type="hidden" name="provider" value="rappi">
-                                <input type="hidden" name="enabled" value="{{ 'false' if p_rappi else 'true' }}">
-                                <button type="submit" class="btn btn-sm {{ 'btn-success' if p_rappi else 'btn-outline-secondary' }}">
-                                    {{ 'ON' if p_rappi else 'OFF' }}
-                                </button>
-                            </form>
-                        </li>
-                        
-                        <li class="list-group-item d-flex justify-content-between align-items-center">
-                            <div>
-                                <strong>Uber Eats</strong>
-                                <div class="small text-muted">Integración secundaria</div>
+                            <div class="col-md-6">
+                                <label class="form-label" for="manual-lng">Longitud</label>
+                                <input class="form-control" id="manual-lng" name="lng" inputmode="decimal" required
+                                       value="{{ location_lng if location_ready else '' }}">
+                                <div class="form-text">Entre -180 y 180.</div>
                             </div>
-                            <form method="POST" action="/admin/settings/provider">
-                                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-                                <input type="hidden" name="provider" value="uber_eats">
-                                <input type="hidden" name="enabled" value="{{ 'false' if p_uber else 'true' }}">
-                                <button type="submit" class="btn btn-sm {{ 'btn-success' if p_uber else 'btn-outline-secondary' }}">
-                                    {{ 'ON' if p_uber else 'OFF' }}
-                                </button>
-                            </form>
-                        </li>
-                    </ul>
+                            <div class="col-12">
+                                <button class="btn btn-outline-primary" type="submit">Guardar ubicación</button>
+                            </div>
+                        </form>
+                    </details>
+                    {% else %}
+                    <div class="text-muted small">La ubicación efectiva de este profile no puede modificarse desde la Web.</div>
+                    {% endif %}
                 </div>
             </div>
         </div>
 
-        <div class="col-md-6">
+        <div class="col-12 col-xl-6" id="providers">
             <div class="card shadow-sm h-100">
-                <div class="card-header bg-light">
-                    <h5 class="mb-0">💳 Membresías y Políticas</h5>
+                <div class="card-header bg-body">
+                    <h5 class="mb-0">🔌 Proveedores</h5>
                 </div>
                 <div class="card-body">
-                    <p class="text-muted small">Configura el estado de tus membresías y qué hacer con ofertas exclusivas a las que no tienes acceso.</p>
-                    
+                    <p class="text-muted">Activa o desactiva cada integración. Desactivarla no elimina datos históricos.</p>
+                    {% set p_rappi = effective_config.get("providers", {}).get("rappi", {}).get("enabled", True) %}
+                    {% set p_uber = effective_config.get("providers", {}).get("uber_eats", {}).get("enabled", True) %}
+                    {% for provider_id, provider_name, enabled in [('rappi', 'Rappi', p_rappi), ('uber_eats', 'Uber Eats', p_uber)] %}
+                    <div class="d-flex justify-content-between align-items-center border rounded p-3 mb-2">
+                        <div>
+                            <strong>{{ provider_name }}</strong>
+                            <div class="small text-muted">{{ 'Habilitado' if enabled else 'Deshabilitado' }}</div>
+                        </div>
+                        {% if settings_editable %}
+                        <form method="POST" action="/admin/settings/provider">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                            <input type="hidden" name="profile" value="">
+                            <input type="hidden" name="return_to" value="/admin/settings#providers">
+                            <input type="hidden" name="provider" value="{{ provider_id }}">
+                            <input type="hidden" name="enabled" value="{{ 'false' if enabled else 'true' }}">
+                            <button class="btn btn-sm {{ 'btn-success' if enabled else 'btn-outline-secondary' }}" type="submit">
+                                {{ 'ON' if enabled else 'OFF' }}
+                            </button>
+                        </form>
+                        {% else %}
+                        <span class="badge {{ 'bg-success' if enabled else 'bg-secondary' }}">{{ 'ON' if enabled else 'OFF' }}</span>
+                        {% endif %}
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+
+        <div class="col-12 col-xl-6" id="memberships">
+            <div class="card shadow-sm h-100">
+                <div class="card-header bg-body">
+                    <h5 class="mb-0">💳 Membresías</h5>
+                </div>
+                <div class="card-body">
+                    <p class="text-muted">Cada membresía conserva su propio estado y afecta únicamente la elegibilidad de sus ofertas.</p>
                     {% set m_rappi = effective_config.get("memberships", {}).get("rappi_pro", {}).get("status", "unknown") %}
                     {% set m_uber = effective_config.get("memberships", {}).get("uber_one", {}).get("status", "unknown") %}
-                    {% set c_policy = effective_config.get("comparison", {}).get("inactive_membership_offers", "show_but_exclude") %}
-                    
-                    <form method="POST" action="/admin/settings/membership" class="mb-3 d-flex gap-2">
-                        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-                        <select name="membership" class="form-select form-select-sm" style="width: auto;">
-                            <option value="rappi_pro">Rappi Pro</option>
-                            <option value="uber_one">Uber One</option>
-                        </select>
-                        <select name="status" class="form-select form-select-sm" style="width: auto;">
-                            <option value="unknown" {% if m_rappi == 'unknown' %}selected{% endif %}>Desconocido (Unknown)</option>
-                            <option value="active" {% if m_rappi == 'active' %}selected{% endif %}>Activa (Active)</option>
-                            <option value="inactive" {% if m_rappi == 'inactive' %}selected{% endif %}>Inactiva (Inactive)</option>
-                        </select>
-                        <button type="submit" class="btn btn-sm btn-primary">Guardar</button>
-                    </form>
 
-                    <hr>
-                    
-                    <form method="POST" action="/admin/settings/comparison">
-                        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-                        <label class="form-label small fw-bold">Política para ofertas de membresías inactivas/desconocidas</label>
-                        <div class="d-flex gap-2">
-                            <select name="policy" class="form-select form-select-sm">
-                                <option value="exclude" {% if c_policy == 'exclude' %}selected{% endif %}>Ocultar completamente (Exclude)</option>
-                                <option value="show_but_exclude" {% if c_policy == 'show_but_exclude' %}selected{% endif %}>Mostrar pero excluir del ranking (Show but exclude)</option>
-                                <option value="include" {% if c_policy == 'include' %}selected{% endif %}>Incluir en ranking con advertencia (Include)</option>
+                    {% for membership_id, membership_name, membership_status in [('rappi_pro', 'Rappi Pro', m_rappi), ('uber_one', 'Uber One', m_uber)] %}
+                    <div class="border rounded p-3 mb-3">
+                        <strong>{{ membership_name }}</strong>
+                        {% if settings_editable %}
+                        <form method="POST" action="/admin/settings/membership" class="d-flex gap-2 mt-2">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                            <input type="hidden" name="profile" value="">
+                            <input type="hidden" name="return_to" value="/admin/settings#memberships">
+                            <input type="hidden" name="membership" value="{{ membership_id }}">
+                            <select name="status" class="form-select form-select-sm">
+                                <option value="unknown" {% if membership_status == 'unknown' %}selected{% endif %}>Desconocida</option>
+                                <option value="active" {% if membership_status == 'active' %}selected{% endif %}>Activa</option>
+                                <option value="inactive" {% if membership_status == 'inactive' %}selected{% endif %}>Inactiva</option>
                             </select>
-                            <button type="submit" class="btn btn-sm btn-primary">Guardar</button>
+                            <button class="btn btn-sm btn-primary" type="submit">Guardar</button>
+                        </form>
+                        {% else %}
+                        <div class="mt-2"><span class="badge bg-secondary">{{ membership_status }}</span></div>
+                        {% endif %}
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+
+        <div class="col-12 col-xl-6" id="crawler">
+            <div class="card shadow-sm h-100">
+                <div class="card-header bg-body">
+                    <h5 class="mb-0">🕷️ Crawler</h5>
+                </div>
+                <div class="card-body">
+                    <p class="text-muted">Selecciona cuánta exploración debe realizar Zone Inventory cuando la sesión lo permite.</p>
+                    {% set current_mode = effective_config.get('discovery_mode', 'full') %}
+                    {% if settings_editable %}
+                    <form method="POST" action="/admin/settings/update">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                        <input type="hidden" name="profile" value="">
+                        <input type="hidden" name="return_to" value="/admin/settings#crawler">
+                        <input type="hidden" name="key" value="discovery_mode">
+                        <label class="form-label" for="discovery-mode">Modo de exploración</label>
+                        <select class="form-select mb-2" id="discovery-mode" name="value">
+                            {% for mode in discovery_modes %}
+                            <option value="{{ mode }}" {% if current_mode == mode %}selected{% endif %}>
+                                {% if mode == 'normal' %}Rápida{% elif mode == 'deep' %}Profunda{% else %}Completa{% endif %}
+                            </option>
+                            {% endfor %}
+                        </select>
+                        <div class="form-text mb-3">
+                            Rápida: cobertura parcial optimizada · Profunda: cobertura parcial más amplia · Completa: máxima exploración soportada.
                         </div>
+                        <button class="btn btn-primary" type="submit">Guardar modo</button>
                     </form>
+                    {% else %}
+                    <div class="mb-2"><strong>Modo:</strong> {{ current_mode }}</div>
+                    {% endif %}
+                    <div class="small text-muted mt-3">Origen efectivo: <code>{{ discovery_source }}</code></div>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- Settings Table -->
-    <div class="card shadow-sm mb-4">
-        <div class="card-body p-0">
+    <details id="advanced-settings" class="card shadow-sm mb-4" {% if advanced_open %}open{% endif %}>
+        <summary class="card-header bg-body p-3" style="cursor: pointer;">
+            <strong>▸ Ajustes avanzados</strong>
+            <span class="text-muted ms-2">Configuración técnica, precedencia y valores efectivos</span>
+        </summary>
+        <div class="card-body">
+            <div class="alert alert-light border">
+                <strong>Precedencia:</strong> CLI &gt; Profile &gt; config.toml &gt; Default<br>
+                <span class="small text-muted">Archivo: <code>{{ config_path }}</code> · {{ 'existe' if config_exists else 'usando defaults' }}</span>
+            </div>
+
+            <div class="mb-4">
+                <h6>Política de ofertas con membresía</h6>
+                {% set c_policy = effective_config.get("comparison", {}).get("inactive_membership_offers", "show_but_exclude") %}
+                {% if settings_editable %}
+                <form method="POST" action="/admin/settings/comparison" class="d-flex gap-2">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                    <input type="hidden" name="profile" value="">
+                    <input type="hidden" name="return_to" value="/admin/settings?advanced=1#advanced-settings">
+                    <select name="policy" class="form-select form-select-sm">
+                        <option value="exclude" {% if c_policy == 'exclude' %}selected{% endif %}>Ocultar</option>
+                        <option value="show_but_exclude" {% if c_policy == 'show_but_exclude' %}selected{% endif %}>Mostrar, excluir del ranking</option>
+                        <option value="include" {% if c_policy == 'include' %}selected{% endif %}>Incluir con advertencia</option>
+                    </select>
+                    <button type="submit" class="btn btn-sm btn-primary">Guardar</button>
+                </form>
+                {% else %}
+                <code>{{ c_policy }}</code>
+                {% endif %}
+            </div>
+
             <div class="table-responsive">
-                <table class="table table-striped table-hover mb-0">
-                    <thead class="table-light">
+                <table class="table table-sm align-middle">
+                    <thead>
                         <tr>
                             <th>Clave</th>
-                            <th>Valor Efectivo</th>
-                            <th class="d-none d-md-table-cell">Origen</th>
-                            <th class="d-none d-md-table-cell">Default</th>
-                            <th>Tipo</th>
-                            <th></th>
+                            <th>Valor efectivo</th>
+                            <th>Origen</th>
+                            <th>Default</th>
+                            <th>Estado</th>
+                            <th>Acción</th>
                         </tr>
                     </thead>
                     <tbody>
-                        {% for s in settings %}
+                    {% for s in settings %}
                         <tr>
                             <td>
                                 <code>{{ s.key }}</code>
-                                <span class="badge ms-1 {% if s.classification == 'SAFE_EDITABLE' %}bg-success{% elif s.classification == 'SECRET_FORBIDDEN' %}bg-danger{% else %}bg-secondary{% endif %}" style="font-size: 0.65em;">
-                                    {{ s.classification[:4] }}
-                                </span>
+                                {% if s.key == 'radius' %}
+                                <div class="small text-muted">Procedencia del run; no limita adquisición.</div>
+                                {% elif s.key in ('top', 'output_format', 'compact') %}
+                                <div class="small text-muted">Detalle técnico sin efecto global activo en el crawler Web.</div>
+                                {% endif %}
                             </td>
                             <td>
                                 {% if s.classification == 'SECRET_FORBIDDEN' %}
-                                {% if s.configured %}
-                                <span class="badge bg-success">CONFIGURADO</span>
-                                <div class="text-muted small mt-1">Valor protegido y no persistible desde la web.</div>
-                                {% else %}
-                                <span class="badge bg-secondary">NO CONFIGURADO</span>
-                                {% endif %}
+                                    <span class="badge bg-success">CONFIGURADO</span>
                                 {% elif s.value is iterable and s.value is not string %}
-                                <code class="small">{{ s.value }}</code>
+                                    <code class="small">{{ s.value }}</code>
                                 {% else %}
-                                <code>{{ s.value }}</code>
+                                    <code>{{ s.value }}</code>
                                 {% endif %}
                             </td>
-                            <td class="d-none d-md-table-cell">
-                                <span class="badge {% if s.source.startswith('profile:') %}bg-info{% elif s.source == 'config.toml' %}bg-secondary{% else %}bg-light text-dark border{% endif %}">
-                                    {{ s.source }}
+                            <td><span class="badge bg-light text-dark border">{{ s.source }}</span></td>
+                            <td class="small text-muted">{{ s.default if s.default is not none else '—' }}</td>
+                            <td>
+                                <span class="badge {{ 'bg-success' if s.classification == 'SAFE_EDITABLE' else ('bg-danger' if s.classification == 'SECRET_FORBIDDEN' else 'bg-secondary') }}">
+                                    {{ s.classification }}
                                 </span>
                             </td>
-                            <td class="d-none d-md-table-cell small text-muted">
-                                {% if s.default is not none %}{{ s.default }}{% else %}—{% endif %}
-                            </td>
-                            <td class="small text-muted">{{ s.type }}</td>
-                            <td>
-                                {% if s.classification == 'SAFE_EDITABLE' %}
-                                <button class="btn btn-sm btn-outline-primary"
-                                        data-bs-toggle="modal"
-                                        data-bs-target="#edit-{{ loop.index }}">
-                                    Editar
-                                </button>
-
-                                <!-- Edit Modal -->
-                                <div class="modal fade" id="edit-{{ loop.index }}" tabindex="-1">
-                                    <div class="modal-dialog">
-                                        <div class="modal-content">
-                                            <form hx-post="/admin/settings/update"
-                                                  hx-target="#settings-result"
-                                                  hx-headers='{"X-CSRF-Token": "{{ csrf_token }}"}'>
-                                                <div class="modal-header">
-                                                    <h5 class="modal-title">Editar: {{ s.key }}</h5>
-                                                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                                                </div>
-                                                <div class="modal-body">
-                                                    <input type="hidden" name="key" value="{{ s.key }}">
-                                                    <div class="mb-3">
-                                                        <label class="form-label">Valor actual</label>
-                                                        <p class="text-muted"><code>{{ s.value }}</code></p>
-                                                    </div>
-                                                    <div class="mb-3">
-                                                        <label class="form-label">Nuevo valor</label>
-                                                        {% if s.type == 'bool' %}
-                                                        <select class="form-select" name="value">
-                                                            <option value="true" {% if s.value %}selected{% endif %}>true</option>
-                                                            <option value="false" {% if not s.value %}selected{% endif %}>false</option>
-                                                        </select>
-                                                        {% elif s.type == 'list' %}
-                                                        <input type="text" class="form-control" name="value"
-                                                               value="{{ s.value|join(', ') if s.value is iterable and s.value is not string else s.value }}"
-                                                               placeholder="valor1, valor2, valor3">
-                                                        <div class="form-text">Separar valores con comas.</div>
-                                                        {% else %}
-                                                        <input type="text" class="form-control" name="value"
-                                                               value="{{ s.value }}" placeholder="{{ s.default }}">
-                                                        {% endif %}
-                                                    </div>
-                                                    <div class="form-text">Default: <code>{{ s.default }}</code></div>
-                                                </div>
-                                                <div class="modal-footer">
-                                                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-                                                    <button type="submit" class="btn btn-primary" data-bs-dismiss="modal">Guardar</button>
-                                                </div>
-                                            </form>
-                                        </div>
-                                    </div>
-                                </div>
+                            <td style="min-width: 260px;">
+                                {% if s.editable %}
+                                <form method="POST" action="/admin/settings/update" class="d-flex gap-2 mb-1">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                                    <input type="hidden" name="profile" value="">
+                                    <input type="hidden" name="return_to" value="/admin/settings?advanced=1#advanced-settings">
+                                    <input type="hidden" name="key" value="{{ s.key }}">
+                                    {% if s.choices %}
+                                    <select class="form-select form-select-sm" name="value">
+                                        {% for choice in s.choices %}
+                                        <option value="{{ choice }}" {% if s.value == choice %}selected{% endif %}>{{ choice }}</option>
+                                        {% endfor %}
+                                    </select>
+                                    {% elif s.type == 'bool' %}
+                                    <select class="form-select form-select-sm" name="value">
+                                        <option value="true" {% if s.value %}selected{% endif %}>true</option>
+                                        <option value="false" {% if not s.value %}selected{% endif %}>false</option>
+                                    </select>
+                                    {% elif s.type == 'list' %}
+                                    <input class="form-control form-control-sm" name="value" value="{{ s.value|join(', ') if s.value is iterable and s.value is not string else s.value }}">
+                                    {% elif s.type in ('int', 'float') %}
+                                    <input class="form-control form-control-sm" type="number" step="any" name="value" value="{{ s.value }}">
+                                    {% else %}
+                                    <input class="form-control form-control-sm" name="value" value="{{ s.value }}">
+                                    {% endif %}
+                                    <button class="btn btn-sm btn-outline-primary" type="submit">Guardar</button>
+                                </form>
+                                {% if s.overridden %}
+                                <form method="POST" action="/admin/settings/restore">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                                    <input type="hidden" name="profile" value="">
+                                    <input type="hidden" name="return_to" value="/admin/settings?advanced=1#advanced-settings">
+                                    <input type="hidden" name="key" value="{{ s.key }}">
+                                    <button class="btn btn-sm btn-link p-0" type="submit">Restaurar recomendado</button>
+                                </form>
+                                {% endif %}
+                                {% else %}
+                                <span class="small text-muted">Solo lectura</span>
                                 {% endif %}
                             </td>
                         </tr>
-                        {% endfor %}
+                    {% endfor %}
                     </tbody>
                 </table>
             </div>
         </div>
-    </div>
-
-    <div id="settings-result"></div>
-
-    <!-- View Preferences Note -->
-    <div class="card shadow-sm">
-        <div class="card-body">
-            <h6 class="card-title">Preferencias de Visualización</h6>
-            <p class="text-muted small mb-0">
-                Tema, densidad, vista (cards/tabla) y filtros se almacenan localmente en el navegador (localStorage).
-                No son parte de la configuración global de DealHunter.
-            </p>
-        </div>
-    </div>
+    </details>
 </div>
+
+{% if settings_editable %}
+<script>
+(() => {
+    const trigger = document.getElementById('use-device-location');
+    const status = document.getElementById('geolocation-status');
+    const confirmation = document.getElementById('location-confirmation');
+    const cancel = document.getElementById('cancel-device-location');
+    if (!trigger) return;
+
+    trigger.addEventListener('click', () => {
+        if (!window.isSecureContext || !navigator.geolocation) {
+            status.textContent = 'La ubicación automática no está disponible en este navegador. Puedes introducir las coordenadas manualmente.';
+            return;
+        }
+
+        status.textContent = 'Solicitando ubicación al navegador...';
+        navigator.geolocation.getCurrentPosition(
+            (position) => {
+                const lat = position.coords.latitude;
+                const lng = position.coords.longitude;
+                document.getElementById('found-lat').textContent = lat.toFixed(6);
+                document.getElementById('found-lng').textContent = lng.toFixed(6);
+                document.getElementById('found-accuracy').textContent = Math.round(position.coords.accuracy);
+                document.getElementById('geolocation-lat').value = String(lat);
+                document.getElementById('geolocation-lng').value = String(lng);
+                confirmation.classList.remove('d-none');
+                status.textContent = 'Ubicación recibida. Confirma antes de guardarla.';
+            },
+            () => {
+                status.textContent = 'No se pudo obtener la ubicación. Puedes introducir las coordenadas manualmente.';
+            },
+            {enableHighAccuracy: true, timeout: 10000, maximumAge: 0}
+        );
+    });
+
+    cancel.addEventListener('click', () => {
+        document.getElementById('geolocation-lat').value = '';
+        document.getElementById('geolocation-lng').value = '';
+        confirmation.classList.add('d-none');
+        status.textContent = '';
+    });
+})();
+</script>
+{% endif %}
 {% endblock %}

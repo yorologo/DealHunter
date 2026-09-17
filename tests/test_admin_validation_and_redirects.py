@@ -62,10 +62,11 @@ def test_admin_settings_unknown_boolean_is_explicit_error_and_no_write(tmp_path,
     client = _client(tmp_path, monkeypatch)
     before = load_config()
     rv = client.post('/admin/settings/update', data={
-        'csrf_token': 'token', 'key': 'compact', 'value': 'maybe'
+        'csrf_token': 'token', 'key': 'dry_run', 'value': 'maybe'
     })
-    assert rv.status_code == 400
-    assert b'inv' in rv.data.lower()
+    assert rv.status_code == 302
+    followed = client.get(rv.headers['Location'])
+    assert b'inv' in followed.data.lower()
     assert load_config() == before
 
 

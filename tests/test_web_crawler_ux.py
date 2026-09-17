@@ -357,8 +357,12 @@ def test_refresh_reconstructs_blocking_modal_from_sqlite(app_and_db):
     assert b'hx-get="/admin/runs/refresh-run"' not in response.data
 
 
-def test_runs_page_uses_normal_post_and_htmx_asset_is_available(app_and_db):
+def test_runs_page_uses_normal_post_and_htmx_asset_is_available(app_and_db, monkeypatch):
     app, _ = app_and_db
+    monkeypatch.setattr(
+        "dealhunter.web.admin.get_merged_config",
+        lambda *_a, **_k: {"lat": 19.43, "lng": -99.13, "radius": 5.0},
+    )
     with app.test_client() as c:
         page = c.get("/admin/runs")
         asset = c.get("/static/js/htmx.min.js")
@@ -367,6 +371,8 @@ def test_runs_page_uses_normal_post_and_htmx_asset_is_available(app_and_db):
     assert b'action="/admin/runs/start"' in page.data
     assert b'hx-post="/admin/runs/start"' not in page.data
     assert b"Iniciando..." not in page.data
+    assert b"Iniciar crawler Rappi" in page.data
+    assert b"Ubicaci" in page.data and b"Configurada" in page.data
 
 
 def test_runs_page_uses_lifecycle_active_window(app_and_db):
@@ -384,3 +390,98 @@ def test_runs_page_uses_lifecycle_active_window(app_and_db):
     assert page.status_code == 200
     assert b"Ya hay un crawler ejecut" not in page.data
     assert b"disabled title=" not in page.data
+
+
+def test_runs_missing_location_shows_preflight_without_post_or_process(app_and_db, monkeypatch):
+    app, db_path = app_and_db
+    import subprocess
+
+    monkeypatch.setattr(
+        "dealhunter.web.admin.get_merged_config",
+        lambda *_a, **_k: {"lat": None, "lng": None, "radius": 5.0},
+    )
+    calls = []
+    monkeypatch.setattr(subprocess, "Popen", lambda *a, **k: calls.append((a, k)))
+
+    with app.test_client() as c:
+        page = c.get("/admin/runs")
+
+    assert page.status_code == 200
+    assert b'id="missingLocationModal"' in page.data
+    assert b'/admin/settings?return_to=/admin/runs#location' in page.data
+    assert b'action="/admin/runs/start"' not in page.data
+    assert calls == []
+    conn = sqlite3.connect(db_path)
+    try:
+        assert conn.execute("SELECT COUNT(*) FROM runs").fetchone()[0] == 0
+    finally:
+        conn.close()
+
+
+def test_direct_start_without_location_still_rejected_without_run_or_process(app_and_db, monkeypatch):
+    app, db_path = app_and_db
+    import subprocess
+
+    monkeypatch.setattr(
+        "dealhunter.web.admin.get_merged_config",
+        lambda *_a, **_k: {"lat": None, "lng": None, "radius": 5.0},
+    )
+    calls = []
+    monkeypatch.setattr(subprocess, "Popen", lambda *a, **k: calls.append((a, k)))
+
+    with app.test_client() as c:
+        with c.session_transaction() as sess:
+            sess["csrf_token"] = "token"
+        rv = c.post("/admin/runs/start", data={"csrf_token": "token"})
+
+    assert rv.status_code == 400
+    assert calls == []
+    conn = sqlite3.connect(db_path)
+    try:
+        assert conn.execute("SELECT COUNT(*) FROM runs").fetchone()[0] == 0
+    finally:
+        conn.close()
+
+
+def test_location_save_return_to_runs_does_not_autostart_crawler(app_and_db, monkeypatch):
+    app, db_path = app_and_db
+    import subprocess
+
+    calls = []
+    monkeypatch.setattr(subprocess, "Popen", lambda *a, **k: calls.append((a, k)))
+    with app.test_client() as c:
+        with c.session_transaction() as sess:
+            sess["csrf_token"] = "token"
+        rv = c.post(
+            "/admin/settings/location",
+            data={
+                "csrf_token": "token",
+                "lat": "20.5",
+                "lng": "-103.4",
+                "return_to": "/admin/runs",
+            },
+        )
+
+    assert rv.status_code == 302
+    assert rv.headers["Location"] == "/admin/runs"
+    assert calls == []
+    conn = sqlite3.connect(db_path)
+    try:
+        assert conn.execute("SELECT COUNT(*) FROM runs").fetchone()[0] == 0
+    finally:
+        conn.close()
+
+
+def test_runs_get_is_local_only_with_preflight(app_and_db, monkeypatch):
+    app, _ = app_and_db
+    monkeypatch.setattr(
+        "urllib.request.urlopen",
+        lambda *_a, **_k: (_ for _ in ()).throw(AssertionError("GET runs used network")),
+    )
+    monkeypatch.setattr(
+        "dealhunter.web.admin.get_merged_config",
+        lambda *_a, **_k: {"lat": None, "lng": None, "radius": 5.0},
+    )
+    with app.test_client() as c:
+        rv = c.get("/admin/runs")
+    assert rv.status_code == 200

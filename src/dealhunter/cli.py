@@ -6,7 +6,8 @@ import os
 import logging
 from .config import (
     get_merged_config, save_config, load_config, KNOWN_MEMBERSHIPS,
-    MEMBERSHIP_STATUSES, COMPARISON_POLICIES,
+    MEMBERSHIP_STATUSES, COMPARISON_POLICIES, DISCOVERY_MODES, SORT_OPTIONS,
+    parse_location,
 )
 from .db import setup_db, db_status, db_integrity, db_vacuum, backup_db, get_default_db_path
 from .crawler import run_discover, run_update
@@ -21,21 +22,10 @@ LOCATION_CHANGE_WARNING_METERS = 500.0
 
 def _require_location(parser, config):
     """Return an explicit crawl location or stop before creating a run."""
-    lat = config.get("lat")
-    lng = config.get("lng")
-    if lat is None or lng is None:
-        parser.error(
-            "Crawler location is required. Set both --lat/--lng or save lat/lng "
-            "in the DealHunter config."
-        )
     try:
-        lat = float(lat)
-        lng = float(lng)
-    except (TypeError, ValueError):
-        parser.error("Crawler lat/lng must be numeric.")
-    if not -90 <= lat <= 90 or not -180 <= lng <= 180:
-        parser.error("Crawler lat/lng are outside valid coordinate ranges.")
-    return lat, lng
+        return parse_location(config.get("lat"), config.get("lng"))
+    except ValueError as exc:
+        parser.error(f"Crawler location is invalid: {exc}")
 
 
 def _distance_m(lat1, lng1, lat2, lng2):
@@ -120,14 +110,14 @@ def build_parser():
     group_crawler = base_parser.add_argument_group("Crawler Control")
     group_crawler.add_argument('--dry-run', action=argparse.BooleanOptionalAction, default=None, help="Do not execute requests")
     group_crawler.add_argument('--max-requests', type=int, help="Stop after N requests")
-    group_crawler.add_argument('--discovery-mode', choices=['normal', 'deep', 'full'], help="Adaptive discovery policy (normal: exploración parcial optimizada, deep: exploración parcial más profunda, full: máxima exploración soportada)")
+    group_crawler.add_argument('--discovery-mode', choices=DISCOVERY_MODES, help="Adaptive discovery policy (normal: exploración parcial optimizada, deep: exploración parcial más profunda, full: máxima exploración soportada)")
     group_crawler.add_argument('--max-runtime', type=int, help="Stop after N seconds")
     group_crawler.add_argument('--run-id', type=str, help="Specific run ID to use")
 
     # Output
     group_out = base_parser.add_argument_group("Output")
     group_out.add_argument('--top', type=int, help="Limit number of results")
-    group_out.add_argument('--sort', choices=['discount', 'price', 'store', 'name', 'deal-score', 'historical-discount'], help="Sort order")
+    group_out.add_argument('--sort', choices=SORT_OPTIONS, help="Sort order")
     sort_direction = group_out.add_mutually_exclusive_group()
     sort_direction.add_argument('--desc', dest='desc', action='store_const', const=True, default=None, help="Sort descending")
     sort_direction.add_argument('--asc', dest='desc', action='store_const', const=False, help="Sort ascending")
