@@ -20,9 +20,10 @@ DealHunter es un motor local-first de inteligencia de precios y oportunidades pa
 
 ### Current development (`develop`)
 
-- **Base pública**: `v3.2.0`. La rama `develop` contiene trabajo posterior a esa release; la próxima versión se determina sólo al cerrar sus gates.
-- **Runtime version actual**: `3.2.0` (`dealhunter.metadata.VERSION`) hasta que exista una promoción/version bump validado.
-- **Schema DB**: `16` (`dealhunter.db.CURRENT_SCHEMA_VERSION`).
+- **Base pública**: `v3.2.0`. La rama `develop` contiene trabajo posterior a esa release.
+- **Candidato de versión**: `v3.3.0` (minor), por cambios aditivos/migrables de schema, dominio, UX y CLI sin romper las superficies soportadas de v3.2.0.
+- **Runtime version actual**: `3.3.0` (`dealhunter.metadata.VERSION`).
+- **Schema DB**: `17` (`dealhunter.db.CURRENT_SCHEMA_VERSION`).
 - **Validación**: el conteo exacto se obtiene con `PYTHONPATH=src pytest -q`; no se mantiene duplicado como verdad estática.
 
 ### Última release pública
@@ -40,6 +41,9 @@ DealHunter es un motor local-first de inteligencia de precios y oportunidades pa
 | Provider configuration | Production |
 | Membership configuration | Production |
 | Canonical infrastructure | Implemented in schema v16 |
+| Commercial identity (`merchant/location`) | Implemented in schema v17; explicit/reviewed mappings only |
+| Browse taxonomy | Implemented in schema v17; reviewed mappings + `UNCLASSIFIED` |
+| Large catalog pagination | Keyset/cursor in Web; legacy `page=N` links remain compatible |
 | Canonical matcher | Shadow / experimental |
 | Automatic canonicalization | OFF; no automatic membership write path |
 | Human ground truth | Insufficient |
@@ -53,6 +57,8 @@ DealHunter es un motor local-first de inteligencia de precios y oportunidades pa
 - Uber Eats corre normalmente en el propio teléfono mediante Chromium headless nativo de Termux y CDP. No requiere PC ni servidor X durante los runs normales.
 - Carbonyl se reserva para setup o renovación de la sesión/perfil. El bridge de PC es una alternativa opcional de setup, no una dependencia operativa.
 - Las tablas canónicas de schema v16 existen como infraestructura. El matcher sólo evalúa en shadow y no escribe membresías canónicas automáticamente.
+- Schema v17 separa `merchant`, `location`, tipo de comercio y dominio de catálogo de la identidad raw del provider; no infiere estas relaciones desde nombres visibles.
+- La taxonomía de navegación de DealHunter se mantiene separada de la evidencia raw del provider: sólo mappings revisados clasifican productos; lo demás permanece `UNCLASSIFIED`.
 
 ### Experiencia Web
 

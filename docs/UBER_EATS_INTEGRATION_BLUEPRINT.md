@@ -86,6 +86,6 @@ graph TD
     A[Core Engine] -->|discover()| B{BaseProvider}
     B --> C(RappiProvider)
     B --> D(UberProvider)
-    C --> E[(SQLite Schema 16)]
+    C --> E[(SQLite Schema 17)]
     D --> E
 ```

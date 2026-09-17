@@ -23,7 +23,7 @@ Al navegar por **cualquier** página `GET` de Admin, se producen `0 external req
 - La validación contra los servidores del proveedor es estrictamente opt-in mediante POST.
 
 ## Actividad y Eventos (Runs / Events)
-- **Runs**: Paginación de ejecuciones, con estados `COMPLETED`, `PARTIAL`, `FAILED`. El Detalle preserva la privacidad ignorando `lat`/`lng` de los checkpoints.
+- **Runs**: Paginación de ejecuciones, con estados canónicos `SUCCESS`, `PARTIAL`, `FAILED`, `RUNNING` (filas legacy `COMPLETED` siguen siendo legibles). El Detalle preserva la privacidad ignorando `lat`/`lng` de los checkpoints.
 - **Events**: Se generan estructurados parseando el payload de la columna `vertical` de los `runs` parciales o fallidos. **No se introducen nuevas tablas redundantes**.
 
 ## Doctor
@@ -40,8 +40,14 @@ Acciones limitadas por UI a:
 Muestra visualmente la precedencia de los ajustes:
 `CLI > Profile > Global (config.toml) > Default`
 
-Diferencia el valor efectivo del valor guardado y aplica una lista estricta (`allowlist`) de configuración categorizada en:
+Diferencia el valor efectivo del valor guardado usando la misma autoridad `get_merged_config()` que CLI/runtime y aplica una lista estricta (`allowlist`) de configuración categorizada en:
 - `SAFE_EDITABLE`
 - `READ_ONLY`
 - `SECRET_FORBIDDEN` (Token jamas es enviado en HTML, UI recibe solo un boolean).
 - **Background Runtime**: Inspección de `termux-wake-lock` (shared, app-wide lock) para evitar que Android ponga en pausa el servidor web.
+
+
+### Ubicación y scheduler
+- `lat` / `lng` son claves top-level del mismo contrato usado por CLI y Web; la UI valida rango antes de persistir.
+- Catalog Sync no puede habilitar el scheduler sin ubicación explícita válida. No existe fallback a coordenadas hardcodeadas.
+- La cadencia gestionada actual es Rappi `07:00/10:00/13:00/19:00` y Uber Eats `07:30/10:30/13:30/19:30`; ver `docs/SCHEDULER.md`.

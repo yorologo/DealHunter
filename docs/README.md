@@ -1,6 +1,6 @@
 # Documentation Index
 
-Este es el índice oficial de documentación para el desarrollo posterior a la release pública `v3.2.0` (schema v16). La rama de integración es `develop`; la siguiente versión no se fija hasta cerrar los gates de promoción.
+Este es el índice oficial de documentación para el desarrollo posterior a la release pública `v3.2.0` (schema v16). La rama de integración es `develop`; el candidato actual es `v3.3.0` (schema v17) y sólo se publica tras cerrar los gates de promoción.
 
 La última release pública verificada es `v3.2.0` (2026-09-01), tag remoto y GitHub Release sobre `258b449557b3e55f716eabcf566c9455a7d62960`.
 

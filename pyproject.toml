@@ -1,0 +1,48 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "dealhunter"
+dynamic = ["version"]
+description = "Local-first price intelligence for Rappi and Uber Eats"
+readme = "README.md"
+requires-python = ">=3.11"
+license = { file = "LICENSE" }
+dependencies = [
+  "flask",
+  "cryptography",
+  "websockets",
+  "aiohttp",
+]
+
+[project.optional-dependencies]
+test = [
+  "pytest",
+  "pytest-asyncio",
+]
+
+[project.scripts]
+dealhunter = "dealhunter.cli:main"
+rappi-ofertas = "dealhunter.cli:main"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.dynamic]
+version = {attr = "dealhunter.metadata.VERSION"}
+
+[tool.setuptools.package-data]
+dealhunter = [
+  "web/templates/*.html",
+  "web/templates/admin/*.html",
+  "web/templates/admin/partials/*.html",
+  "web/templates/components/*.html",
+  "web/templates/errors/*.html",
+  "web/templates/partials/*.html",
+  "web/static/css/*.css",
+  "web/static/js/*.js",
+]

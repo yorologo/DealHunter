@@ -11,9 +11,9 @@
 - **v2.8**: Background runtime, Wake Lock management.
 - **v2.9**: Catalog Sync con sesión segura, Zone Inventory vs Search Discovery, UI/UX de Sesiones.
 - **KISS Iterations**: Deal Score V1, Taxonomy, Price Integrity, Multiselect Filters, safe zone realignment.
+- **Develop post-v3.2.0**: Schema v17 commercial identity/browse taxonomy, keyset pagination y Watchlist Web de solo lectura.
 
-## Próximo (v2.10 — Follow Experience)
-- UI Web de Watchlist
+## Próximo (Follow Experience)
 - Panel visual de Alertas web
 - Emisión de notificaciones push de Android nativas (Termux:API)
 

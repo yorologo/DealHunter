@@ -22,7 +22,7 @@
 ### `SQLite Database Locked`
 **Causa:** Dos procesos intentan escribir o migrar el mismo archivo a la vez, o
 un proceso conserva una transacción abierta durante demasiado tiempo. Las
-lecturas web normales sobre schema 16 no ejecutan migraciones ni recrean
+lecturas web normales sobre schema 17 no ejecutan migraciones ni recrean
 `trusted_observations`; un error recurrente indica un writer solapado, una
 transacción atascada o un schema que requiere reparación.
 

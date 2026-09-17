@@ -2,10 +2,21 @@
 
 ## [Unreleased]
 
-Development after the public `v3.2.0` baseline. Release version, tag and publication are intentionally deferred until the full promotion gates pass.
+Development after the public `v3.2.0` baseline. Version decision: **v3.3.0 (minor)** because this cycle adds backward-compatible schema/domain/UX/CLI capability; tag and publication remain deferred until promotion gates pass.
+
+### Added
+- **Schema v17 commercial identity**: explicit `merchants`, `merchant_locations`, `stores.merchant_id/location_id`, `commerce_type` and `catalog_domain` without display-name inference.
+- **Reviewed browse taxonomy**: `browse_nodes` / `browse_mappings` keep DealHunter navigation separate from raw provider taxonomy; unmapped products remain explicitly `UNCLASSIFIED`.
+- **Keyset catalog pagination**: Web catalog continuation uses an opaque cursor with deterministic `(provider, store_id, product_id)` tie-breaking while preserving legacy `page=N` URLs.
 
 ### Changed
 - Security/operations hardening keeps SecretStore fail-closed, validates SQLite backups, uses strict atomic TOML writes, removes name-based category authority, and aligns the managed scheduler with the real checkout.
+- Latest-observation reads use the provider-aware history index and deterministic `timestamp DESC, id DESC` selection instead of rebuilding a global window per catalog query.
+- Zone Inventory fails closed on any merchant-fetch failure: the run becomes `PARTIAL`, `coverage_complete=0`, and absence cannot mark stores stale. Current run persistence/UI use canonical `SUCCESS`; legacy `COMPLETED` remains readable for historical rows.
+- Admin Settings now reuses the same merged config authority as CLI/runtime, exposes validated top-level `lat/lng`, and the scheduler refuses activation without a valid explicit location.
+
+### Removed
+- Removed unused legacy catalog/orchestration modules (`dealhunter.catalog` and `providers.uber_eats.sync`) instead of maintaining duplicate production paths.
 
 ## [v3.2.0] - 2026-09-01
 

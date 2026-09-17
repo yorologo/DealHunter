@@ -2,17 +2,19 @@ name: Offline Tests
 
 on:
   push:
-    branches: [ "main" ]
+    branches: [ "develop", "main" ]
   pull_request:
-    branches: [ "main" ]
+    branches: [ "develop", "main" ]
 
 jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
     - name: Set up Python 3.11
-      uses: actions/setup-python@v4
+      uses: actions/setup-python@v5
       with:
         python-version: "3.11"
     - name: Install dependencies
@@ -21,4 +23,6 @@ jobs:
         pip install -r requirements.txt -r requirements-test.txt
     - name: Run offline tests
       run: |
+        python -m compileall -q src tests
+        PYTHONPATH=src python scripts/check_release_trace.py
         PYTHONPATH=src pytest

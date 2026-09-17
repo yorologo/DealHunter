@@ -350,7 +350,7 @@ No lo abortes porque tarde varios minutos.
 
 Comprueba desde DB y Web:
 
-- run COMPLETED;
+- run `SUCCESS` (o `PARTIAL`/`FAILED` con causa explícita);
 - merchants descubiertos;
 - stores procesados;
 - stores con productos;

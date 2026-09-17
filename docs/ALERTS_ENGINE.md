@@ -10,7 +10,7 @@ The Alerts Engine monitors state transitions across crawler runs to detect meani
 5. **Idempotency**: Replaying the same run multiple times will not duplicate events.
 
 ## Persistence
-Events are stored in `alert_events` under the current schema v16 contract. The
+Events are stored in `alert_events` under the current schema v17 contract. The
 table was introduced historically in v14 and now preserves provider provenance;
 a deterministic `event_key` prevents duplicates for the same run.
 Delivery status (`pending`, `sent`, `failed`) is maintained safely without affecting crawler execution.

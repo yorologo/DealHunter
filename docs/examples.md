@@ -72,7 +72,7 @@ crontab -e
 
 Agrega una línea para correr tu escaneo, por ejemplo a las 07:00, 10:00, 13:00 y 19:00 todos los días:
 ```cron
-0 7,10,13,19 * * * cd /data/data/com.termux/files/home/rappi-deal-hunter && ./bin/rappi-ofertas discover --vertical general >> logs/crawler-cron.log 2>&1
+# No copies una ruta fija: habilita el scheduler desde Admin/Catalog Sync o dealhunter.scheduler para generar jobs desde el checkout real.
 ```
 
 La línea programada usa el `lat/lng` canónico de `~/.config/dealhunter/config.toml`; así no puede divergir silenciosamente de una ejecución manual auditada.

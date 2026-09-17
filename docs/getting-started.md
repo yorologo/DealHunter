@@ -3,7 +3,7 @@
 Bienvenido a DealHunter. Para ejecutarlo localmente:
 
 ## Requisitos
-- Python 3.10+
+- Python 3.11+
 - (Recomendado) Entorno virtual o Termux en Android.
 
 ## Instalación

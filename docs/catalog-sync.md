@@ -23,7 +23,7 @@ flowchart TD
 
 ### Schema & Metadata Updates
 
-To support Zone Inventory routing and validation, the DealHunter SQLite Schema (v8) tracks:
+El schema actual v17 conserva y amplía el contrato de Zone Inventory (introducido en versiones anteriores):
 ```mermaid
 erDiagram
     RUNS {
@@ -31,7 +31,7 @@ erDiagram
         DATETIME started_at
         TEXT crawler_mode "ZONE_INVENTORY or SEARCH_DISCOVERY"
         BOOLEAN coverage_complete
-        TEXT status "COMPLETED, PARTIAL, RUNNING"
+        TEXT status "SUCCESS, PARTIAL, FAILED, RUNNING"
     }
     STORES {
         TEXT store_id PK
@@ -77,7 +77,7 @@ Sólo un alcance *completamente verificado* (`coverage_complete=1`) modifica est
 - **Stores**: Si un discovery ZONE se completa y una tienda antes vista está ausente, se marca como `STALE`.
 - **Products**: Si el catálogo de una tienda es descargado exitosamente, y un producto conocido no figura, se marca como `UNAVAILABLE`. (Si más adelante reaparece, Alerts Engine disparará `BACK_IN_STOCK`).
 
-Si ocurre un 401, timeout, 429 o fallo parcial, el run se etiqueta como `PARTIAL` y **no se realiza reconciliación destructiva**.
+Si ocurre un 401, timeout, 429 o cualquier fallo de merchant/catalog parcial, el run no puede declarar cobertura completa: se persiste como `PARTIAL`, `coverage_complete=0`, y **no se realiza reconciliación destructiva por ausencia**.
 
 ### Fallback 401
 Si ZONE_INVENTORY inicia y en medio del proceso recibe un HTTP 401, el run aborta, se guarda como PARTIAL, y se inicia un run SEARCH_DISCOVERY con metadata separada e inequívoca.
@@ -97,6 +97,6 @@ Si ZONE_INVENTORY inicia y en medio del proceso recibe un HTTP 401, el run abort
 
 2. **Zone Inventory Lifecycle**:
    - `READY`: The session is `VALID` but no inventory has been run.
-   - `SYNCHRONIZED (ACTIVE)`: The last run had `crawler_mode = ZONE_INVENTORY`, `status = COMPLETED`, and `coverage_complete = 1`.
+   - `SYNCHRONIZED (ACTIVE)`: The last run had `crawler_mode = ZONE_INVENTORY`, `status = SUCCESS`, and `coverage_complete = 1`.
    - `PARTIAL`: The last run had `coverage_complete = 0` or status `PARTIAL`.
    - `SEARCH DISCOVERY`: Fallback mode when session is missing or expired.

@@ -1,12 +1,12 @@
 # Database Schema
 
-Current `CURRENT_SCHEMA_VERSION = 16`.
+Current `CURRENT_SCHEMA_VERSION = 17`.
 
 La fuente de verdad es `src/dealhunter/db.py`; este documento resume el
 contrato actual y no reemplaza al DDL/migrations ejecutables.
 
 DealHunter verifica el contrato de schema al abrir la DB. Una DB que ya cumple
-schema 16 se abre sin ejecutar DDL: las operaciones web de lectura no eliminan
+schema 17 se abre sin ejecutar DDL: las operaciones web de lectura no eliminan
 ni recrean tablas o vistas. Una DB nueva, antigua o con
 `trusted_observations` ausente/obsoleta entra al proceso de migración/reparación,
 que toma un write lock y realiza el DDL completo dentro de una sola transacción.
@@ -26,9 +26,10 @@ y lecturas normales ni convierte bloqueos prolongados en reintentos ciegos.
 - **v13 → v14**: `alert_events`.
 - **v14 → v15**: identidad raw provider-aware.
 - **v15 → v16**: infraestructura canónica; no activa escrituras automáticas.
+- **v16 → v17**: identidad comercial explícita (`merchant/location`), clasificación estructurada de comercio/dominio, taxonomía browse revisada e índice provider-aware para latest/history.
 
 ## Tablas Principales
-- `stores`: Comercios identificados por `(provider, store_id)`.
+- `stores`: Listings raw identificados por `(provider, store_id)`; pueden enlazar opcionalmente a `merchant_id` / `location_id` y conservan `commerce_type` / `catalog_domain` estructurados.
 - `products`: Catálogo raw identificado por `(provider, store_id, product_id)`.
 - `runs`: Sesiones de crawler y procedencia geográfica (`started_at`, `finished_at`, `lat`, `lng`, `radius`, `vertical`, `status`).
 - `observations`: Serie temporal con unicidad `(run_id, provider, store_id, product_id)`.
@@ -36,6 +37,15 @@ y lecturas normales ni convierte bloqueos prolongados en reintentos ciegos.
 - `alert_events`: Transiciones idempotentes provider-aware.
 - `watchlist`: Productos marcados por el usuario.
 - `product_families`, `canonical_products`, `product_external_identifiers`, `canonical_product_members`, `product_identity_decisions`: infraestructura canónica de v16. Su existencia no implica auto-canonicalización.
+- `merchants`, `merchant_locations`: identidad comercial revisada, separada de listings/provider IDs.
+- `browse_nodes`, `browse_mappings`: taxonomía de navegación DealHunter y mappings explícitos desde evidencia raw; ausencia de mapping significa `UNCLASSIFIED`, no inferencia por nombre.
 - `schema_version`: Tabla de configuración interna.
 
 La respuesta a “¿con qué ubicación se capturó esta observación?” se obtiene enlazando `observations.run_id → runs.run_id`. La ubicación se guarda una vez por run, no duplicada en cada producto. Las filas migradas antiguas pueden tener procedencia nula y deben tratarse como evidencia insuficiente hasta poder atribuirlas por metadata/fingerprint; nunca se eliminan automáticamente.
+
+
+## Latest observation y paginación
+
+`idx_obs_provider_history(provider, store_id, product_id, timestamp DESC, id DESC)` soporta la selección determinista de la observación más reciente. El Query Layer desempata siempre por `id DESC` cuando dos observaciones comparten timestamp.
+
+La Web usa keyset/cursor para continuar catálogos grandes y un orden total que termina en `(provider, store_id, product_id)`. Los enlaces históricos `page=N` siguen aceptándose como fallback compatible; el cursor no cambia el contrato de filtros ni el total reportado.

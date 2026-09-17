@@ -1,5 +1,33 @@
+# DealHunter safe example configuration.
+# Copy only the values you intentionally want to override.
+# Never store bearer tokens, cookies, session files or other credentials here.
+
+# Required for real crawls and scheduler activation. Keep commented until you
+# explicitly set the delivery location used by the provider apps.
+# lat = 0.0
+# lng = 0.0
+
 min_discount = 30
 max_requests = 1000
+radius = 5.0
+discovery_mode = "full"
+compact = false
+dry_run = false
+
+[providers.rappi]
+enabled = true
+
+[providers.uber_eats]
+enabled = true
+
+[memberships.rappi_pro]
+status = "unknown"
+
+[memberships.uber_one]
+status = "unknown"
+
+[comparison]
+inactive_membership_offers = "show_but_exclude"
 
 [profiles.despensa]
 min_discount = 40

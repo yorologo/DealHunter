@@ -28,8 +28,9 @@ The project must prioritize demonstrable value, not the largest advertised disco
 
 ## CURRENT DEVELOPMENT / RC
 
-- **Current version**: v3.2.0
-- **Schema**: 16
+- **Current development version**: v3.3.0
+- **Public baseline**: v3.2.0
+- **Schema**: 17
 - **Release status**: Publication determined by Git tag and GitHub Releases.
 - **Version source of truth**: `src/dealhunter/metadata.py`.
 - **Schema source of truth**: `src/dealhunter/db.py::CURRENT_SCHEMA_VERSION`.
@@ -49,7 +50,7 @@ The project must prioritize demonstrable value, not the largest advertised disco
 ### Web Modules Status:
 - **COMPRAR**: Completado (Deals, Market, Turbo, Restaurants, Categories, Stores)
 - **INVESTIGAR**: Completado (Products, Detail, History, Compare)
-- **SEGUIR**: Watchlist y Alerts Engine operativos en Core/CLI. La interfaz web permanece parcial/placeholder.
+- **SEGUIR**: Watchlist operativo en Core/CLI y con vista Web de solo lectura; Alerts Engine permanece operativo en Core/CLI y su superficie Web sigue separada.
 - **ADMINISTRAR**: Completado (Admin Home, Account Diagnostics, Runs, Events, Doctor, Database Backup, Settings)
 
 ## Core Technical Rules Stabilized:
@@ -1604,7 +1605,7 @@ Do not hardcode current schema physical layout (column counts, positions) withou
 ## Multi-source Intelligence: Uber Eats
 
 Uber Eats acquisition is production-capable on the Termux phone and persists
-provider-aware rows under schema v16. Its implementation remains isolated in
+provider-aware rows under the current schema v17 (building on the v3.2.0/schema16 provider-safe baseline). Its implementation remains isolated in
 `src/dealhunter/providers/uber_eats/`.
 
 - **Normal transport:** native Termux Chromium headless over local CDP; no PC or X server is required for normal runs.
