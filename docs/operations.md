@@ -73,6 +73,8 @@ dealhunter web
 
 La Web inicializa/migra SQLite antes de servir y escucha en `127.0.0.1:8765`. En Termux intenta adquirir wake lock si `termux-wake-lock` está disponible. El wake lock es compartido por la app Termux y no se libera automáticamente al cerrar DealHunter.
 
+`Admin → Runs → Iniciar Crawler` también requiere `lat/lng` válidos. El inicio usa POST + CSRF y, tras reservar el run, redirige a su detalle. El progreso real queda persistido en SQLite: Zone Inventory pasa de discovery indeterminado a progreso por merchants cuando conoce el total; Search Discovery no fabrica porcentaje si el trabajo sigue siendo dinámico. Recargar la página no detiene el crawler ni pierde su progreso.
+
 Comandos de salud:
 
 ```bash

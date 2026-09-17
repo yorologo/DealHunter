@@ -21,7 +21,7 @@ from dealhunter.providers.registry import validate_provider
 from dealhunter.web.security import local_redirect_target
 from dealhunter.db import db_status, db_integrity, backup_db, db_vacuum, CURRENT_SCHEMA_VERSION, read_connection
 from dealhunter.web.admin_queries import (
-    get_runs_paginated, get_run_detail, get_events,
+    get_runs_paginated, get_run_detail, get_run_progress, get_events,
     get_run_status_summary, get_db_extended_stats
 )
 
@@ -59,8 +59,9 @@ def admin_home():
         data_errors.append(f"Runs: {exc}")
 
     try:
+        from dealhunter.run_lifecycle import find_active_run
         with read_connection(db_path) as conn:
-            active_row = conn.execute("SELECT run_id, crawler_mode, started_at FROM runs WHERE status = 'RUNNING' ORDER BY started_at DESC LIMIT 1").fetchone()
+            active_row = find_active_run(conn)
         active_run = {'run_id': active_row[0], 'crawler_mode': active_row[1], 'started_at': active_row[2]} if active_row else None
     except Exception as exc:
         active_run = None
@@ -315,12 +316,14 @@ def runs():
     except Exception:
         pass
 
-    import sqlite3
+    from dealhunter.run_lifecycle import find_active_run
     conn = sqlite3.connect(db_path)
-    c = conn.cursor()
-    c.execute("SELECT run_id, crawler_mode, started_at FROM runs WHERE status = 'RUNNING' ORDER BY started_at DESC LIMIT 1")
-    active_row = c.fetchone()
-    active_run = {'run_id': active_row[0], 'crawler_mode': active_row[1], 'started_at': active_row[2]} if active_row else None
+    active_row = find_active_run(conn)
+    active_run = {
+        'run_id': active_row[0],
+        'crawler_mode': active_row[1],
+        'started_at': active_row[2],
+    } if active_row else None
     conn.close()
 
     if request.headers.get('HX-Request'):
@@ -379,16 +382,33 @@ def runs_start():
         if "PYTHONPATH" not in env:
             env["PYTHONPATH"] = os.path.join(project_root, "src")
 
-        subprocess.Popen(
-            [sys.executable, "-m", "dealhunter", "discover", "--vertical", "general", "--run-id", run_id],
-            cwd=project_root,
-            env=env,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-            start_new_session=True
-        )
+        try:
+            subprocess.Popen(
+                [sys.executable, "-m", "dealhunter", "discover", "--vertical", "general", "--run-id", run_id],
+                cwd=project_root,
+                env=env,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                start_new_session=True
+            )
+        except Exception:
+            from dealhunter.run_lifecycle import update_run_progress
+            fail_conn = sqlite3.connect(db_path, timeout=30)
+            try:
+                update_run_progress(
+                    fail_conn, run_id, phase="FAILED", completed=0, total=None
+                )
+                fail_conn.execute(
+                    "UPDATE runs SET status='FAILED', finished_at=CURRENT_TIMESTAMP WHERE run_id=?",
+                    (run_id,),
+                )
+                fail_conn.commit()
+            finally:
+                fail_conn.close()
+            current_app.logger.error("Crawler process launch failed")
+            return "No se pudo iniciar el crawler.", 500
 
-        # 11. HX-REDIRECT FALLBACK
+        # Preserve compatibility for callers that still send HX-Request.
         if request.headers.get('HX-Request'):
             from flask import make_response
             response = make_response()
@@ -406,16 +426,38 @@ def runs_start():
 
 @admin_bp.route('/runs/<run_id>')
 def run_detail(run_id):
-    """Run detail view."""
-    # Sanitize run_id
+    """Run detail view with persisted progress reconstructed from SQLite."""
     safe_id = str(escape(run_id))
     db_path = current_app.config['DATABASE']
     run = get_run_detail(db_path, safe_id)
     if not run:
-        return render_template('admin/run_detail.html',
-                               run=None, current_path='/admin/runs'), 404
-    return render_template('admin/run_detail.html',
-                           run=run, current_path='/admin/runs')
+        return render_template(
+            'admin/run_detail.html',
+            run=None,
+            progress=None,
+            current_path='/admin/runs',
+        ), 404
+    progress = get_run_progress(db_path, safe_id) if run.get('status') == 'RUNNING' else None
+    return render_template(
+        'admin/run_detail.html',
+        run=run,
+        progress=progress,
+        current_path='/admin/runs',
+    )
+
+
+@admin_bp.route('/runs/<run_id>/progress')
+def run_progress(run_id):
+    """Read-only persisted crawler progress; never performs provider I/O."""
+    safe_id = str(escape(run_id))
+    progress = get_run_progress(current_app.config['DATABASE'], safe_id)
+    if not progress:
+        return "Run no encontrado.", 404
+    if progress['terminal'] or progress['status'] != 'RUNNING':
+        response = make_response("")
+        response.headers['HX-Refresh'] = 'true'
+        return response
+    return render_template('admin/partials/run_progress_modal.html', progress=progress)
 
 
 @admin_bp.route('/events')

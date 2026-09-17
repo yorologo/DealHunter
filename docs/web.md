@@ -41,6 +41,12 @@ El mapa exacto de rutas es código (`src/dealhunter/web/routes.py` y `admin.py`)
 
 El GET es diagnóstico local: no genera nonce, no navega a Uber y no valida Rappi por red. Los botones **Comprobar sesión** ejecutan únicamente la validación explícita del provider correspondiente. Catalog Sync consume la sesión Rappi existente y remite a Account para gestionarla; no mantiene otra UX de autenticación. La existencia del profile Uber se muestra como `UNVERIFIED`, nunca como prueba de sesión válida. Si Uber necesita login o renovación, la Web indica `dealhunter uber setup`; no ejecuta Carbonyl ni expone controles Start/Stop Chromium.
 
+## Runs y progreso del crawler
+
+**Iniciar Crawler** usa un formulario HTML `POST` normal con CSRF. Un inicio válido reserva exactamente un `run_id`, lanza el proceso y navega a su detalle; si faltan `lat/lng`, el backend rechaza el inicio antes de reservar o lanzar nada.
+
+Mientras un run está `RUNNING`, el progreso pertenece al `run_id` y se persiste en `runs.run_metadata`. El detalle reconstruye desde SQLite un modal bloqueante incluso después de recargar la página y consulta únicamente un endpoint local ligero cada 3 segundos. Zone Inventory muestra porcentaje sólo después de conocer el número real de merchants; Search Discovery permanece indeterminado cuando su conjunto de consultas puede crecer dinámicamente. El ETA se deriva de unidades realmente completadas y no avanza por tiempo artificial.
+
 ## Catalog Sync
 
 Con sesión Rappi válida se usa Zone Inventory. Sin sesión o con sesión no válida, Search Discovery mantiene cobertura limitada sin reconciliación destructiva. Un fallo parcial no convierte ausencias no observadas en bajas definitivas.

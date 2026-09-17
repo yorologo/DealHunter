@@ -188,3 +188,59 @@ def test_structured_401_expires_session_without_reconciliation(db_conn):
         state, _ = asyncio.run(_run_zone_inventory_async({"max_runtime": 3600}, 0, 0, db_conn, "run-structured-401"))
     assert state == "SESSION_EXPIRED"
     assert db_conn.execute("SELECT status FROM stores WHERE store_id='legacy401'").fetchone()[0] == "ACTIVE"
+
+
+def test_zone_inventory_persists_real_merchant_progress(db_conn):
+    import json
+    from dealhunter.run_lifecycle import update_run_progress as real_update
+
+    insert_run(
+        db_conn,
+        "run-progress-zone",
+        started_at="2026-09-17T12:00:00Z",
+        status="RUNNING",
+    )
+    db_conn.commit()
+    merchants = [
+        {"store_id": "1", "name": "Store A", "type": "market"},
+        {"store_id": "2", "name": "Store B", "type": "market"},
+    ]
+    calls = []
+
+    def record_progress(conn, run_id, **kwargs):
+        calls.append(dict(kwargs))
+        return real_update(conn, run_id, **kwargs)
+
+    with patch("dealhunter.crawler_zone.RappiSessionProvider.is_authenticated", return_value=True), \
+         patch("dealhunter.crawler_zone.MerchantDiscovery.discover_merchants", return_value=merchants), \
+         patch("dealhunter.crawler_zone.CPGCatalogAdapter.fetch_full_catalog", return_value=[]), \
+         patch("dealhunter.crawler_zone.update_run_progress", side_effect=record_progress):
+        state, _ = asyncio.run(
+            _run_zone_inventory_async(
+                {"max_runtime": 3600, "discovery_mode": "full"},
+                0,
+                0,
+                db_conn,
+                "run-progress-zone",
+                dry_run=True,
+            )
+        )
+
+    assert state == "COMPLETED"
+    phases = [call["phase"] for call in calls]
+    assert phases[0] == "DISCOVERING"
+    assert "CRAWLING" in phases
+    assert phases[-1] == "FINALIZING"
+    crawling_completed = [
+        call["completed"] for call in calls if call["phase"] == "CRAWLING"
+    ]
+    assert crawling_completed == [0, 1, 2]
+
+    raw = db_conn.execute(
+        "SELECT run_metadata FROM runs WHERE run_id='run-progress-zone'"
+    ).fetchone()[0]
+    metadata = json.loads(raw)
+    assert metadata["progress"]["phase"] == "FINALIZING"
+    assert metadata["progress"]["completed"] == 2
+    assert metadata["progress"]["total"] == 2
+    assert metadata["merchants_discovered"] >= 0

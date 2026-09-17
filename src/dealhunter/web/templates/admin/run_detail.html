@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% block content %}
-<div id="run-detail-content" class="container-fluid" {% if run.status == 'RUNNING' %}hx-get="/admin/runs/{{ run.run_id }}" hx-trigger="every 3s" hx-select="#run-detail-content" hx-swap="outerHTML"{% endif %}>
+<div id="run-detail-content" class="container-fluid">
     <nav aria-label="breadcrumb" class="mb-3">
         <ol class="breadcrumb">
             <li class="breadcrumb-item"><a href="/admin">Administración</a></li>
@@ -8,6 +8,10 @@
             <li class="breadcrumb-item active">{{ run.run_id[:12] if run else 'No encontrado' }}…</li>
         </ol>
     </nav>
+
+    {% if run and run.status == 'RUNNING' and progress %}
+        {% include 'admin/partials/run_progress_modal.html' %}
+    {% endif %}
 
     {% if not run %}
     <div class="alert alert-warning">Run no encontrado.</div>

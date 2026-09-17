@@ -1,0 +1,72 @@
+<div id="run-progress-overlay"
+     hx-get="/admin/runs/{{ progress.run_id }}/progress"
+     hx-trigger="every 3s"
+     hx-swap="outerHTML">
+    <div class="modal-backdrop fade show" style="z-index: 1050;"></div>
+    <div class="modal fade show d-block"
+         tabindex="-1"
+         role="dialog"
+         aria-modal="true"
+         aria-labelledby="crawlerProgressTitle"
+         style="z-index: 1060;">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content shadow-lg">
+                <div class="modal-header">
+                    <div>
+                        <h5 class="modal-title" id="crawlerProgressTitle">Crawler ejecutándose</h5>
+                        <div class="small text-muted"><code>{{ progress.run_id[:12] }}…</code></div>
+                    </div>
+                </div>
+                <div class="modal-body">
+                    {% set phase_labels = {
+                        'STARTING': 'Iniciando crawler',
+                        'DISCOVERING': 'Calculando alcance del crawler',
+                        'CRAWLING': 'Procesando tiendas',
+                        'SEARCHING': 'Buscando',
+                        'FINALIZING': 'Finalizando crawler'
+                    } %}
+                    <div class="fw-semibold mb-3">{{ phase_labels.get(progress.phase, progress.phase or 'Ejecutando') }}</div>
+
+                    {% if progress.percentage is not none %}
+                    <div class="progress mb-2" role="progressbar"
+                         aria-label="Progreso del crawler"
+                         aria-valuenow="{{ progress.percentage }}"
+                         aria-valuemin="0" aria-valuemax="100">
+                        <div class="progress-bar" style="width: {{ progress.percentage }}%">{{ progress.percentage }}%</div>
+                    </div>
+                    <div class="small mb-2">
+                        {{ progress.completed }} de {{ progress.total }}
+                        {{ progress.unit or 'unidades' }}
+                    </div>
+                    {% else %}
+                    <div class="d-flex align-items-center gap-2 mb-3">
+                        <div class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></div>
+                        <div>
+                            {% if progress.phase == 'SEARCHING' %}
+                                {{ progress.completed }} consultas completadas
+                            {% else %}
+                                Calculando alcance del crawler...
+                            {% endif %}
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    <div class="text-muted">
+                        {% if progress.phase == 'FINALIZING' %}
+                            Finalizando resultados...
+                        {% elif progress.eta_minutes %}
+                            ~{{ progress.eta_minutes }} min {{ 'restante' if progress.eta_minutes == 1 else 'restantes' }}
+                        {% else %}
+                            Calculando tiempo restante...
+                        {% endif %}
+                    </div>
+
+                    <hr>
+                    <p class="small text-muted mb-0">
+                        El crawler continuará aunque recargues esta página.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

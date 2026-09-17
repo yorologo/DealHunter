@@ -8,6 +8,7 @@ from .catalog_sync import AuthenticatedHttpClient, MerchantDiscovery, CPGCatalog
 from .auth import RappiSessionProvider
 from .core import process_and_insert_product
 from .commerce import classify_store
+from .run_lifecycle import update_run_progress
 
 def run_zone_inventory(config, lat, lng, conn, run_id, dry_run=False):
     try:
@@ -44,6 +45,9 @@ async def _run_zone_inventory_async(config, lat, lng, conn, run_id, dry_run=Fals
 
     report = CoverageReport()
     discovery_mode = config.get("discovery_mode", "full")
+    update_run_progress(
+        conn, run_id, phase="DISCOVERING", completed=0, total=None, unit="tiendas"
+    )
     try:
         merchants = await discovery.discover_merchants(lat, lng, report, discovery_mode=discovery_mode)
     except Exception as e:
@@ -52,6 +56,22 @@ async def _run_zone_inventory_async(config, lat, lng, conn, run_id, dry_run=Fals
         raise e
 
     print(f"[*] Found {len(merchants)} merchants in zone", file=sys.stderr)
+    completed_merchants = 0
+    update_run_progress(
+        conn, run_id, phase="CRAWLING", completed=0, total=len(merchants), unit="tiendas"
+    )
+
+    def mark_merchant_done():
+        nonlocal completed_merchants
+        completed_merchants += 1
+        update_run_progress(
+            conn,
+            run_id,
+            phase="CRAWLING",
+            completed=completed_merchants,
+            total=len(merchants),
+            unit="tiendas",
+        )
 
     global_state = "COMPLETED"
 
@@ -144,6 +164,7 @@ async def _run_zone_inventory_async(config, lat, lng, conn, run_id, dry_run=Fals
         try:
             if m.get("type") and "restaurant" in m.get("type").lower():
                 if not config.get("restaurants", True):
+                    mark_merchant_done()
                     continue
                 result = await rest_adapter.fetch_menu(s_id, report)
             else:
@@ -152,16 +173,20 @@ async def _run_zone_inventory_async(config, lat, lng, conn, run_id, dry_run=Fals
             # Production adapters return CatalogFetchResult, but retain a safe
             # boundary for injected/third-party adapters that still raise.
             if "401" in str(exc):
+                mark_merchant_done()
                 return "SESSION_EXPIRED", report.authenticated_requests
             report.merchants_failed += 1
             global_state = "PARTIAL"
+            mark_merchant_done()
             continue
 
         if isinstance(result, CatalogFetchResult):
             if result.error_code == "ACCOUNT_SESSION_UNAVAILABLE":
+                mark_merchant_done()
                 return "SESSION_EXPIRED", report.authenticated_requests
             if not result.complete:
                 global_state = "PARTIAL"
+                mark_merchant_done()
                 continue
             items = result.items
         else:
@@ -214,6 +239,16 @@ async def _run_zone_inventory_async(config, lat, lng, conn, run_id, dry_run=Fals
 
         if not dry_run:
             time.sleep(2)
+        mark_merchant_done()
+
+    update_run_progress(
+        conn,
+        run_id,
+        phase="FINALIZING",
+        completed=completed_merchants,
+        total=len(merchants),
+        unit="tiendas",
+    )
 
     # Any merchant fetch failure makes zone coverage incomplete. Fail closed
     # before reconciliation so missing data can never mark stores/products stale.
@@ -243,7 +278,16 @@ async def _run_zone_inventory_async(config, lat, lng, conn, run_id, dry_run=Fals
     else:
         expected_expanded = 10 if discovery_mode == "normal" else 20
 
-    metadata_json = json.dumps({
+    metadata = {}
+    row = c.execute("SELECT run_metadata FROM runs WHERE run_id = ?", (run_id,)).fetchone()
+    if row and row[0]:
+        try:
+            parsed = json.loads(row[0])
+            if isinstance(parsed, dict):
+                metadata = parsed
+        except (json.JSONDecodeError, TypeError, ValueError):
+            metadata = {}
+    metadata.update({
         "discovery_mode": discovery_mode,
         "depth1_queries": 26,
         "expanded_parents": expected_expanded,
@@ -257,6 +301,7 @@ async def _run_zone_inventory_async(config, lat, lng, conn, run_id, dry_run=Fals
         "authenticated_requests": report.authenticated_requests,
         "incomplete_reasons": report.incomplete_reasons
     })
+    metadata_json = json.dumps(metadata)
 
     cov_comp = 1 if (global_state == "COMPLETED" and discovery_mode == "full") else 0
     c.execute('''UPDATE runs SET crawler_mode = ?, coverage_complete = ?, status = ?, finished_at = CURRENT_TIMESTAMP, run_metadata = ? WHERE run_id = ?''',

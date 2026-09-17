@@ -10,12 +10,13 @@
 
     <div class="d-flex justify-content-between align-items-center mb-1">
         <h2 class="m-0">🔄 Ejecuciones (Runs)</h2>
-        <div>
-            <span id="run-loading" class="htmx-indicator spinner-border spinner-border-sm text-primary me-2" role="status"></span>
-            <button hx-post="/admin/runs/start" hx-target="#runs-container" hx-indicator="#run-loading" hx-headers='{"X-CSRF-Token": "{{ csrf_token }}"}' class="btn btn-primary btn-sm" hx-disabled-elt="this" onclick="if(!this.disabled) this.innerHTML='🚀 Iniciando...'" {% if active_run %}disabled title="Ya hay un crawler ejecutándose"{% endif %}>
+        <form action="/admin/runs/start" method="POST" class="d-inline">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+            <button type="submit" class="btn btn-primary btn-sm"
+                    {% if active_run %}disabled title="Ya hay un crawler ejecutándose"{% endif %}>
                 🚀 Iniciar Crawler
             </button>
-        </div>
+        </form>
     </div>
     <p class="text-muted">Historial de crawleo y progreso.</p>
 

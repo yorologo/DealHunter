@@ -7,6 +7,7 @@ from .core import process_and_insert_product
 from .commerce import classify_store
 from .errors import DealHunterError, classify_error
 from .checkpoint import RunCheckpoint, save_checkpoint
+from .run_lifecycle import update_run_progress
 
 VERTICALS = {
     "supermercado": ["super", "mercado", "oferta", "descuento", "2x1", "soriana", "fresko", "calii", "costco", "chedraui", "city market", "abastos", "mercado y abarrotes", "bebidas", "abarrotes"],
@@ -87,6 +88,9 @@ def run_discover(config, lat, lng, conn, run_id, dry_run=False):
             c = conn.cursor()
             c.execute('UPDATE runs SET crawler_mode = ? WHERE run_id = ?', ('SEARCH_DISCOVERY', run_id))
             conn.commit()
+            update_run_progress(
+                conn, run_id, phase="SEARCHING", completed=0, total=None, unit="consultas"
+            )
             verticals_to_run = config.get("vertical", [])
             if not verticals_to_run:
                 verticals_to_run = list(VERTICALS.keys())[:-1]
@@ -141,6 +145,14 @@ def run_discover(config, lat, lng, conn, run_id, dry_run=False):
                         print(f"[DRY-RUN] Would search: {q}")
                         checkpoint.queries_completed += 1
                         checkpoint.last_completed_query = q
+                        update_run_progress(
+                            conn,
+                            run_id,
+                            phase="SEARCHING",
+                            completed=checkpoint.queries_completed,
+                            total=None,
+                            unit="consultas",
+                        )
                         continue
 
                     print(f"    [{v_name}] Query: '{q}'", file=sys.stderr)
@@ -161,7 +173,17 @@ def run_discover(config, lat, lng, conn, run_id, dry_run=False):
 
                             save_checkpoint(conn, checkpoint)
                             return global_state, requests_count
-                        # For recoverable errors, skip this query and continue
+                        # For recoverable errors, this query attempt is complete.
+                        checkpoint.queries_completed += 1
+                        checkpoint.last_completed_query = q
+                        update_run_progress(
+                            conn,
+                            run_id,
+                            phase="SEARCHING",
+                            completed=checkpoint.queries_completed,
+                            total=None,
+                            unit="consultas",
+                        )
                         continue
 
                     requests_count += 1
@@ -177,6 +199,14 @@ def run_discover(config, lat, lng, conn, run_id, dry_run=False):
                     elif not data:
                         checkpoint.queries_completed += 1
                         checkpoint.last_completed_query = q
+                        update_run_progress(
+                            conn,
+                            run_id,
+                            phase="SEARCHING",
+                            completed=checkpoint.queries_completed,
+                            total=None,
+                            unit="consultas",
+                        )
                         continue
 
                     stores = data.get("stores", []) or []
@@ -221,6 +251,14 @@ def run_discover(config, lat, lng, conn, run_id, dry_run=False):
                     checkpoint.queries_completed += 1
                     checkpoint.last_completed_query = q
                     checkpoint.requests_made = requests_count
+                    update_run_progress(
+                        conn,
+                        run_id,
+                        phase="SEARCHING",
+                        completed=checkpoint.queries_completed,
+                        total=None,
+                        unit="consultas",
+                    )
 
                     # Simple keyword expansion based on query results (simplified for length)
                     if len(visited) < 10 and not queries_to_run: # only expand if no explicit queries
@@ -233,6 +271,15 @@ def run_discover(config, lat, lng, conn, run_id, dry_run=False):
 
                 if global_state not in ("COMPLETED",):
                     break
+
+            update_run_progress(
+                conn,
+                run_id,
+                phase="FINALIZING",
+                completed=checkpoint.queries_completed,
+                total=None,
+                unit="consultas",
+            )
 
             # Final checkpoint update
             checkpoint.status = global_state

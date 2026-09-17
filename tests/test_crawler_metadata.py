@@ -92,3 +92,38 @@ def test_coverage_complete_adaptive_modes(db_conn):
             run_zone_inventory(config, 0, 0, db_conn, run_id, dry_run=False)
             cur.execute("SELECT coverage_complete FROM runs WHERE run_id = ?", (run_id,))
             assert cur.fetchone()[0] == 1
+
+
+def test_search_discovery_progress_is_indeterminate(db_conn):
+    import json
+    from dealhunter.crawler import run_discover
+
+    run_id = "search-progress"
+    db_conn.execute(
+        "INSERT INTO runs (run_id, started_at, status) VALUES (?, CURRENT_TIMESTAMP, 'RUNNING')",
+        (run_id,),
+    )
+    db_conn.commit()
+
+    state, _ = run_discover(
+        {
+            "vertical": ["supermercado"],
+            "query": ["coca"],
+            "max_requests": 10,
+            "max_runtime": 60,
+        },
+        0,
+        0,
+        db_conn,
+        run_id,
+        dry_run=True,
+    )
+    assert state == "COMPLETED"
+    raw = db_conn.execute(
+        "SELECT run_metadata FROM runs WHERE run_id=?", (run_id,)
+    ).fetchone()[0]
+    progress = json.loads(raw)["progress"]
+    assert progress["phase"] == "FINALIZING"
+    assert progress["completed"] == 1
+    assert progress["total"] is None
+    assert progress["unit"] == "consultas"

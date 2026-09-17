@@ -274,3 +274,96 @@ def _parse_vertical_name(vertical_json):
 def _utc_to_local_str(timestamp_str):
     """Pass through timestamp string for frontend to parse as UTC."""
     return timestamp_str
+
+
+TERMINAL_RUN_STATUSES = {"SUCCESS", "COMPLETED", "PARTIAL", "PARTIAL_RUN", "FAILED"}
+SUCCESS_RUN_STATUSES = {"SUCCESS", "COMPLETED"}
+
+
+def _parse_progress_time(value):
+    if not value:
+        return None
+    try:
+        parsed = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+        if parsed.tzinfo is None:
+            parsed = parsed.replace(tzinfo=timezone.utc)
+        return parsed.astimezone(timezone.utc)
+    except (TypeError, ValueError):
+        return None
+
+
+def get_run_progress(db_path, run_id, now=None):
+    """Read persisted progress and derive display-only percentage/ETA."""
+    conn = sqlite3.connect(db_path)
+    conn.row_factory = sqlite3.Row
+    row = conn.execute(
+        """SELECT run_id, status, crawler_mode, started_at, finished_at, run_metadata
+           FROM runs WHERE run_id = ?""",
+        (run_id,),
+    ).fetchone()
+    conn.close()
+    if not row:
+        return None
+
+    data = dict(row)
+    metadata = {}
+    if data.get("run_metadata"):
+        try:
+            parsed = json.loads(data["run_metadata"])
+            if isinstance(parsed, dict):
+                metadata = parsed
+        except (json.JSONDecodeError, TypeError, ValueError):
+            metadata = {}
+
+    raw = metadata.get("progress")
+    progress = raw if isinstance(raw, dict) else {}
+    status = data.get("status")
+    phase = progress.get("phase") or ("STARTING" if status == "RUNNING" else status)
+    try:
+        completed = max(0, int(progress.get("completed", 0) or 0))
+    except (TypeError, ValueError):
+        completed = 0
+    total = progress.get("total")
+    try:
+        total = None if total is None else max(0, int(total))
+    except (TypeError, ValueError):
+        total = None
+
+    percentage = None
+    if status in SUCCESS_RUN_STATUSES:
+        percentage = 100
+    elif total is not None and total > 0:
+        percentage = min(99, max(0, int((completed / total) * 100)))
+
+    eta_minutes = None
+    current = now or datetime.now(timezone.utc)
+    if current.tzinfo is None:
+        current = current.replace(tzinfo=timezone.utc)
+    phase_started = _parse_progress_time(progress.get("phase_started_at"))
+    if (
+        status == "RUNNING"
+        and total is not None
+        and total > completed
+        and completed >= 2
+        and phase_started is not None
+    ):
+        elapsed = max(0.0, (current.astimezone(timezone.utc) - phase_started).total_seconds())
+        if elapsed >= 5:
+            remaining_seconds = (total - completed) * (elapsed / completed)
+            eta_minutes = max(1, int(round(remaining_seconds / 60.0)))
+
+    return {
+        "run_id": data["run_id"],
+        "status": status,
+        "crawler_mode": data.get("crawler_mode"),
+        "phase": phase,
+        "completed": completed,
+        "total": total,
+        "unit": progress.get("unit"),
+        "percentage": percentage,
+        "eta_minutes": eta_minutes,
+        "updated_at": progress.get("updated_at"),
+        "phase_started_at": progress.get("phase_started_at"),
+        "active": status == "RUNNING",
+        "terminal": status in TERMINAL_RUN_STATUSES,
+    }
