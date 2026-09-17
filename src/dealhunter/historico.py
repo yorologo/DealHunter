@@ -131,7 +131,8 @@ def analyze_history(db_path, config, store=None, product=None):
             "deal_status": estado,
             "reason": metrics["reason"],
             "is_suspicious_reference": metrics.get("is_suspicious_reference", False),
-            "observations_count": metrics.get("observations_count", 0)
+            "observations_count": metrics.get("observations_count", 0),
+            "latest_observed_at": obs_list[-1].get("timestamp")
         }
         
         results.append(res)

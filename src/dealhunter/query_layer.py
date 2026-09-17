@@ -307,12 +307,19 @@ def _ordering_spec(filters: dict, config: dict):
         primary_expr = "COALESCE(p.name, '')"
         secondary_expr = "''"
         primary_dir, secondary_dir = direction, "ASC"
-    else:
-        # Preserve existing fallback semantics for opportunity/savings/recent until
-        # those sort modes get their own DB-native score columns.
-        primary_expr = "COALESCE(p.product_id, '')"
-        secondary_expr = "''"
+    elif sort == "savings":
+        primary_expr = (
+            f"CASE WHEN {price_expr} > 0 AND o.original_price > {price_expr} "
+            f"THEN o.original_price - {price_expr} ELSE 0 END"
+        )
+        secondary_expr = f"COALESCE({price_expr}, 0)"
         primary_dir, secondary_dir = direction, "ASC"
+    elif sort == "recent":
+        primary_expr = "COALESCE(o.timestamp, '')"
+        secondary_expr = "o.id"
+        primary_dir, secondary_dir = direction, direction
+    else:
+        raise ValueError(f"unsupported catalog sort: {sort}")
 
     return [
         (ranking_expr, "DESC", "__rank"),

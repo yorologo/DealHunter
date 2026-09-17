@@ -9,7 +9,7 @@ from dealhunter.web.queries import (
     get_deals, get_catalog, get_categories, get_browse_categories, get_browse_node, get_merchants_directory, get_stores, get_store_detail, get_available_stores, get_available_categories, get_ui_facets
 )
 
-CATALOG_SORTS = {"opportunity", "discount", "savings", "price_asc", "price_desc", "name_asc", "recent"}
+CATALOG_SORTS = {"discount", "savings", "price_asc", "price_desc", "name_asc", "recent"}
 BEST_SORTS = {"score", "discount", "savings", "price", "recent"}
 DEAL_SORTS = {"opportunity", "discount", "drop", "price", "recent", "name"}
 DEAL_TABS = {"Todo", "NEW_LOW", "REAL_DEAL", "GOOD_PRICE", "PRICE_DROP", "TARGET_PRICE", "BACK_IN_STOCK", "SUSPICIOUS_REFERENCE_PRICE"}
@@ -210,7 +210,7 @@ def register_routes(app):
     def market():
         db_path = current_app.config['DATABASE']
         page = _page()
-        sort = _sort(CATALOG_SORTS, 'opportunity')
+        sort = _sort(CATALOG_SORTS, 'discount')
         filters = _catalog_request_filters({"vertical": "market", "commerce_type": ["SUPERMARKET"], "catalog_domain": ["RETAIL"]})
         data = get_catalog(db_path, filters, sort, page, cursor=_cursor())
         if request.headers.get('HX-Request') and not request.headers.get('HX-Boosted'):
@@ -224,7 +224,7 @@ def register_routes(app):
     def turbo():
         db_path = current_app.config['DATABASE']
         page = _page()
-        sort = _sort(CATALOG_SORTS, 'opportunity')
+        sort = _sort(CATALOG_SORTS, 'discount')
         filters = _catalog_request_filters({"vertical": "turbo"})
         data = get_catalog(db_path, filters, sort, page, cursor=_cursor())
         if request.headers.get('HX-Request') and not request.headers.get('HX-Boosted'):
@@ -261,7 +261,7 @@ def register_routes(app):
         if not node:
             abort(404)
         page = _page()
-        sort = _sort(CATALOG_SORTS, 'opportunity')
+        sort = _sort(CATALOG_SORTS, 'discount')
         filters = _catalog_request_filters({"browse_node": [node_id]})
         data = get_catalog(db_path, filters, sort, page, cursor=_cursor())
         if request.headers.get('HX-Request') and not request.headers.get('HX-Boosted'):
@@ -275,7 +275,7 @@ def register_routes(app):
     def category_detail(category):
         db_path = current_app.config['DATABASE']
         page = _page()
-        sort = _sort(CATALOG_SORTS, 'opportunity')
+        sort = _sort(CATALOG_SORTS, 'discount')
         filters = _catalog_request_filters({"category": category})
         data = get_catalog(db_path, filters, sort, page, cursor=_cursor())
         if request.headers.get('HX-Request') and not request.headers.get('HX-Boosted'):
@@ -306,7 +306,7 @@ def register_routes(app):
         if not detail:
             return "Store not found", 404
         page = _page()
-        sort = _sort(CATALOG_SORTS, 'opportunity')
+        sort = _sort(CATALOG_SORTS, 'discount')
         filters = {"provider": provider, "store": f"{provider}::{store_id}"}
         data = get_catalog(db_path, filters, sort, page, cursor=_cursor())
         if request.headers.get('HX-Request') and not request.headers.get('HX-Boosted'):

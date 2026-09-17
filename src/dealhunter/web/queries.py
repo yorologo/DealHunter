@@ -244,7 +244,7 @@ def get_deals(db_path, filters, sort, page, per_page=25):
             items.append({
                 "type": "pi", # Price Intelligence
                 "data": r,
-                "sort_date": r.get("timestamp", datetime.now()) # wait, analyze_history doesn't return timestamp of deal. It returns current_price. We can use latest observation.
+                "sort_date": r["latest_observed_at"]
             })
     elif tab in ["PRICE_DROP", "TARGET_PRICE", "BACK_IN_STOCK"]:
         # Alerts
@@ -277,6 +277,7 @@ def get_deals(db_path, filters, sort, page, per_page=25):
                     "unit": r.get("UNIT"),
                     "current_price": r["current_price"],
                     "unit_price": r.get("UNIT_PRICE"),
+                    "latest_observed_at": r.get("latest_observed_at"),
                     "metrics": {
                         "deal_status": r["deal_status"],
                         "original_price": r.get("original_price"),
@@ -293,7 +294,7 @@ def get_deals(db_path, filters, sort, page, per_page=25):
                 items.append({
                     "type": "pi",
                     "data": item_data,
-                    "sort_date": datetime.now()
+                    "sort_date": r["latest_observed_at"]
                 })
     else:
         # Todo
@@ -329,7 +330,7 @@ def get_deals(db_path, filters, sort, page, per_page=25):
             items.append({
                 "type": "pi",
                 "data": item_data,
-                "sort_date": datetime.now()
+                "sort_date": r["latest_observed_at"]
             })
             
         engine = AlertEngine(db_path)
@@ -773,7 +774,11 @@ def get_restaurants_home(db_path, filters=None):
             SELECT COUNT(DISTINCT o.product_id)
             FROM trusted_observations o
             WHERE o.provider = ? AND o.store_id = ? AND o.availability = 'AVAILABLE'
-            AND o.timestamp = (SELECT MAX(timestamp) FROM trusted_observations WHERE provider = o.provider AND product_id = o.product_id AND store_id = o.store_id)
+            AND o.id = (
+                SELECT o2.id FROM trusted_observations o2
+                WHERE o2.provider=o.provider AND o2.product_id=o.product_id AND o2.store_id=o.store_id
+                ORDER BY o2.timestamp DESC, o2.id DESC LIMIT 1
+            )
         ''', (provider, store_id))
         available = c.fetchone()[0]
         
@@ -782,7 +787,11 @@ def get_restaurants_home(db_path, filters=None):
             SELECT COUNT(DISTINCT o.product_id)
             FROM trusted_observations o
             WHERE o.provider = ? AND o.store_id = ? AND o.discount_effective > 0
-            AND o.timestamp = (SELECT MAX(timestamp) FROM trusted_observations WHERE provider = o.provider AND product_id = o.product_id AND store_id = o.store_id)
+            AND o.id = (
+                SELECT o2.id FROM trusted_observations o2
+                WHERE o2.provider=o.provider AND o2.product_id=o.product_id AND o2.store_id=o.store_id
+                ORDER BY o2.timestamp DESC, o2.id DESC LIMIT 1
+            )
         ''', (provider, store_id))
         promos = c.fetchone()[0]
         
@@ -821,11 +830,16 @@ def get_restaurant_detail(db_path, provider, store_id):
     c.execute('''
         SELECT p.product_id, p.name, COALESCE(NULLIF(TRIM(p.category), ''), 'Otros') as category,
                o.price, o.original_price, o.discount_effective, o.promotion_label, o.promotion_type, o.availability,
-               MAX(o.timestamp) as ts, p.has_toppings
+               o.timestamp as ts, p.has_toppings
         FROM products p
-        JOIN trusted_observations o ON p.provider = o.provider AND p.product_id = o.product_id AND p.store_id = o.store_id
+        JOIN trusted_observations o
+          ON p.provider = o.provider AND p.product_id = o.product_id AND p.store_id = o.store_id
+         AND o.id = (
+            SELECT o2.id FROM trusted_observations o2
+            WHERE o2.provider=p.provider AND o2.store_id=p.store_id AND o2.product_id=p.product_id
+            ORDER BY o2.timestamp DESC, o2.id DESC LIMIT 1
+         )
         WHERE p.provider = ? AND p.store_id = ?
-        GROUP BY p.provider, p.product_id
         ORDER BY category ASC, p.name ASC
     ''', (provider, store_id))
     
@@ -867,7 +881,7 @@ def get_restaurant_detail(db_path, provider, store_id):
     res["available_dishes"] = available_dishes
     res["promos"] = promos
     res["categories"] = cats
-    res["last_obs"] = dishes[0]["ts"] if dishes else None
+    res["last_obs"] = max((dish["ts"] for dish in dishes if dish["ts"]), default=None)
     
     conn.close()
     return res
@@ -1001,7 +1015,7 @@ def _translate_filters(filters, sort=None, page=None, per_page=None):
             "limit": per_page,
             "offset": offset,
             "sort": sort.replace("_asc", "").replace("_desc", "") if sort in ["price_asc", "price_desc", "name_asc"] else sort,
-            "desc": "desc" in sort or sort in ["discount", "savings"]
+            "desc": "desc" in sort or sort in ["discount", "savings", "recent"]
         })
         if sort == "price_asc" or sort == "name_asc":
             facets["desc"] = False

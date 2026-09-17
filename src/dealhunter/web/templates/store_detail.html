@@ -67,7 +67,8 @@
                     </div>
                     <div class="col-auto">
                         <select name="sort" class="form-select form-select-sm" onchange="document.getElementById('filter-form').dispatchEvent(new Event('submit'))">
-                            <option value="opportunity" {% if sort == 'opportunity' %}selected{% endif %}>Prioridad</option>
+                            <option value="discount" {% if sort == 'discount' %}selected{% endif %}>Mayor Descuento %</option>
+                            <option value="savings" {% if sort == 'savings' %}selected{% endif %}>Mayor Ahorro $</option>
                             <option value="price_asc" {% if sort == 'price_asc' %}selected{% endif %}>Menor Precio</option>
                             <option value="name_asc" {% if sort == 'name_asc' %}selected{% endif %}>Nombre A-Z</option>
                             <option value="recent" {% if sort == 'recent' %}selected{% endif %}>Más reciente</option>

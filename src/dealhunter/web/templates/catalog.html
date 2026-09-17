@@ -26,7 +26,6 @@
                     <div class="col-md-3">
                         <label class="form-label small text-secondary fw-bold">Ordenar por</label>
                         <select name="sort" class="form-select form-select-sm" onchange="document.getElementById('filter-form').dispatchEvent(new Event('submit'))">
-                            <option value="opportunity" {% if sort == 'opportunity' %}selected{% endif %}>Mejor Oportunidad (Pi)</option>
                             <option value="discount" {% if sort == 'discount' %}selected{% endif %}>Mayor Descuento %</option>
                             <option value="savings" {% if sort == 'savings' %}selected{% endif %}>Mayor Ahorro $</option>
                             <option value="price_asc" {% if sort == 'price_asc' %}selected{% endif %}>Menor Precio</option>
