@@ -53,7 +53,7 @@ class CoverageReport:
 
 class MerchantDiscovery:
     def __init__(self, client: AuthenticatedHttpClient):
-        self.client = client
+        self.client = client or AuthenticatedHttpClient(None)
 
     def _normalize_store(self, s: Dict) -> Dict:
         return {
@@ -65,70 +65,50 @@ class MerchantDiscovery:
             "tags": s.get("tags")
         }
 
-    def _run_context_stores_sync(self, lat: float, lng: float, report: CoverageReport) -> tuple[list[dict], Exception]:
-        import urllib.request, json
-        from dealhunter.auth import RappiSessionProvider
-        url = f"https://services.mxgrability.rappi.com/api/dynamic/context/stores?lat={lat}&lng={lng}"
-        headers = {
-            "Accept": "application/json",
-            "Content-Type": "application/json",
-            "User-Agent": "Mozilla/5.0",
-            "language": "es-MX"
-        }
-        prov = RappiSessionProvider()
-        if prov.context and prov.context._access_token:
-            headers["Authorization"] = f"Bearer {prov.context._access_token}"
+    @staticmethod
+    def _record_client_error(report: CoverageReport, exc: Exception) -> None:
+        text = str(exc)
+        for code in (401, 403, 429):
+            if f"HTTP {code}" in text:
+                report.log_error(code)
+                return
+        if "HTTP ERROR 5" in text:
+            try:
+                report.log_error(int(text.rsplit(" ", 1)[-1]))
+            except ValueError:
+                pass
 
+    def _run_context_stores_sync(self, lat: float, lng: float, report: CoverageReport) -> tuple[list[dict], Exception]:
+        url = f"https://services.mxgrability.rappi.com/api/dynamic/context/stores?lat={lat}&lng={lng}"
         report.authenticated_requests += 1
-        req = urllib.request.Request(url, headers=headers, method='GET')
         try:
-            with urllib.request.urlopen(req, timeout=15) as response:
-                data = json.loads(response.read().decode('utf-8'))
-                stores = []
-                for group in data.get("stores", []):
-                    group_name = group.get("name", "Otras").strip()
-                    for s in group.get("stores", []):
-                        if "vertical_sub_group" not in s or not s["vertical_sub_group"]:
-                            s["vertical_sub_group"] = group_name
-                        stores.append(s)
-                return stores, None
-        except Exception as e:
-            status = getattr(e, 'code', 0)
-            if status == 401: report.http_401 += 1
-            elif status == 403: report.http_403 += 1
-            elif status == 429: report.http_429 += 1
-            elif status >= 500: report.http_5xx += 1
-            return [], e
+            data = self.client.request_sync("GET", url, headers={"language": "es-MX"}, require_auth=False)
+            stores = []
+            for group in data.get("stores", []):
+                group_name = group.get("name", "Otras").strip()
+                for store in group.get("stores", []):
+                    if not store.get("vertical_sub_group"):
+                        store["vertical_sub_group"] = group_name
+                    stores.append(store)
+            return stores, None
+        except Exception as exc:
+            self._record_client_error(report, exc)
+            return [], exc
 
     def _run_query_sync(self, query: str, lat: float, lng: float, report: CoverageReport) -> tuple[List[Dict], Exception]:
-        import urllib.request, json
-        from dealhunter.auth import RappiSessionProvider
         url = "https://services.mxgrability.rappi.com/api/pns-global-search-api/v1/unified-search"
-        headers = {
-            "Accept": "application/json",
-            "Content-Type": "application/json",
-            "User-Agent": "Mozilla/5.0",
-            "Origin": "https://www.rappi.com.mx"
-        }
-        prov = RappiSessionProvider()
-        if prov.context and prov.context._access_token:
-            headers["Authorization"] = f"Bearer {prov.context._access_token}"
-
         report.authenticated_requests += 1
-        payload = json.dumps({"query": query, "lat": lat, "lng": lng, "limit": 100}).encode('utf-8')
-        req = urllib.request.Request(url, data=payload, headers=headers, method='POST')
         try:
-            with urllib.request.urlopen(req, timeout=15) as response:
-                data = json.loads(response.read().decode('utf-8'))
-                stores = data.get("stores", [])
-                return stores, None
-        except Exception as e:
-            status = getattr(e, 'code', 0)
-            if status == 401: report.http_401 += 1
-            elif status == 403: report.http_403 += 1
-            elif status == 429: report.http_429 += 1
-            elif status >= 500: report.http_5xx += 1
-            return [], e
+            data = self.client.request_sync(
+                "POST", url,
+                payload={"query": query, "lat": lat, "lng": lng, "limit": 100},
+                headers={"Origin": "https://www.rappi.com.mx"},
+                require_auth=False,
+            )
+            return data.get("stores", []), None
+        except Exception as exc:
+            self._record_client_error(report, exc)
+            return [], exc
 
     async def discover_targeted(self, query: str, lat: float, lng: float, report: CoverageReport, expected_store_id: str = None) -> tuple[str, Optional[Dict]]:
         stores, err = self._run_query_sync(query, lat, lng, report)

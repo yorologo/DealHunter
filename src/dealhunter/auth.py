@@ -78,36 +78,40 @@ class AuthenticatedHttpClient:
             text = text.replace(self.provider.context._access_token, "eyJ...<REDACTED>")
         return text
 
-    async def request(self, method: str, url: str, payload: Optional[Dict] = None, headers: Optional[Dict] = None) -> Any:
-        ctx = await self.provider.get_access_context()
+    def request_sync(self, method: str, url: str, payload: Optional[Dict] = None, headers: Optional[Dict] = None, require_auth: bool = True) -> Any:
+        context = self.provider.context if self.provider else None
+        if require_auth and (not context or not context._access_token):
+            raise RuntimeError("AUTH_REQUIRED: No active session available.")
         req_headers = {
             "Accept": "application/json",
             "Content-Type": "application/json",
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) DealHunter/3.0"
         }
-        req_headers.update(ctx.get_auth_headers())
+        if context:
+            req_headers.update(context.get_auth_headers())
         if headers:
             req_headers.update(headers)
-            
-        data = json.dumps(payload).encode('utf-8') if payload else None
+        data = json.dumps(payload).encode('utf-8') if payload is not None else None
         req = urllib.request.Request(url, data=data, headers=req_headers, method=method.upper())
-        
         try:
-            # Note: since this is an async method, in a real async environment we would use aiohttp.
-            # Using urllib in an async function for simplicity in this Termux port.
             with urllib.request.urlopen(req, timeout=15) as response:
                 body = response.read().decode('utf-8')
                 return json.loads(body)
         except urllib.error.HTTPError as e:
             if e.code in [401, 403]:
-                # Invalidate if token is dead
-                # await self.provider.invalidate()
                 raise RuntimeError(f"AUTH_EXPIRED or UNAUTHORIZED: HTTP {e.code}")
             if e.code == 429:
                 raise RuntimeError("RATE_LIMIT: HTTP 429")
             raise RuntimeError(f"HTTP ERROR {e.code}")
+        except RuntimeError:
+            raise
         except Exception as e:
             raise RuntimeError(f"NETWORK_ERROR: {e}")
+
+    async def request(self, method: str, url: str, payload: Optional[Dict] = None, headers: Optional[Dict] = None) -> Any:
+        # Synchronous urllib is intentional for this small Termux client; keep a
+        # single auth/header/error contract for sync catalog discovery and async callers.
+        return self.request_sync(method, url, payload=payload, headers=headers)
 
 
 import http.server
