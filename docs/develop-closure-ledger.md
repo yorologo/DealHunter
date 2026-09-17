@@ -2,7 +2,7 @@
 
 Scope: `develop`, schema 17, v3.3.1 patch candidate after public v3.3.0. This is the current closure ledger; historical audits remain historical.
 
-Final software gate before the post-release Web-init hotfix: `PYTHONPATH=src pytest -q` → **576 passed, 0 failed**. Hotfix gate: **577 passed, 0 failed**. `python -m compileall -q src tests bin` → PASS. Fresh schema bootstrap → schema 17, `PRAGMA integrity_check=ok`, `foreign_keys=1`, `foreign_key_check=[]`.
+Final software gate before the post-release Web-init hotfix: `PYTHONPATH=src pytest -q` → **576 passed, 0 failed**. Hotfix/release gate is rerun after every final-tree change; the exact count is taken from the final pytest/CI evidence rather than treated as a static contract. `python -m compileall -q src tests bin` → PASS. Fresh schema bootstrap → schema 17, `PRAGMA integrity_check=ok`, `foreign_keys=1`, `foreign_key_check=[]`.
 
 | ID | PRIORITY | STATUS | FINDING | CHANGE | EVIDENCE | TESTS | FILES | BENCHMARK / NOTES |
 |---:|:---:|:---|:---|:---|:---|:---|:---|:---|

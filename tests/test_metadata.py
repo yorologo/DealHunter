@@ -14,3 +14,15 @@ def test_runtime_metadata_has_one_version_source():
         context = {}
         app.update_template_context(context)
     assert context["dealhunter_version"] == VERSION
+
+
+def test_android_packaging_uses_native_cryptography():
+    import tomllib
+    from pathlib import Path
+
+    root = Path(__file__).resolve().parents[1]
+    project = tomllib.loads((root / "pyproject.toml").read_text())
+    crypto_deps = [d for d in project["project"]["dependencies"] if d.startswith("cryptography")]
+    assert crypto_deps == ["cryptography; sys_platform != 'android'"]
+    requirements = (root / "requirements.txt").read_text()
+    assert 'cryptography; sys_platform != "android"' in requirements

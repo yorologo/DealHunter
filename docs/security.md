@@ -22,6 +22,8 @@ En Termux usa preferentemente el paquete nativo cuando esté disponible:
 pkg install python-cryptography
 ```
 
+Si trabajas dentro de un venv en Termux, usa `python -m venv --system-site-packages .venv` para que el entorno vea ese backend nativo. DealHunter marca la dependencia pip de `cryptography` como no aplicable en `sys_platform == "android"` para evitar sustituirla accidentalmente por un wheel incompatible.
+
 En el entorno validado con Python 3.14.6, `python-cryptography 50.0.1` carga Fernet sin `LD_PRELOAD`. No configures `LD_PRELOAD` global como requisito de DealHunter. Si `cryptography` no carga, corrige el runtime/paquete; no debilites SecretStore.
 
 ## Privacy Philosophy

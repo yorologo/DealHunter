@@ -11,6 +11,7 @@ Patch release on top of public `v3.3.0`; schema remains v17.
 ### Fixed
 - Initialize/migrate the default SQLite database before starting the Web server, so a first `rappi-historico web` launch cannot serve against an empty zero-byte database and fail with missing-table errors.
 - Added a regression that starts the Web server path against a nonexistent database and verifies schema v17 plus core tables before serving.
+- On Android/Termux, pip metadata no longer attempts to replace the native `python-cryptography` backend with an incompatible wheel; Termux venvs use `--system-site-packages` to inherit the validated native backend.
 
 ## [v3.3.0] - 2026-09-16
 

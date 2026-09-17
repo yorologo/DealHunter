@@ -24,6 +24,15 @@ cd DealHunter
 pip install -r requirements.txt
 ```
 
+En Android/Termux, `requirements.txt` no intenta reemplazar `python-cryptography` con un wheel pip. Si usas un entorno virtual, créalo con acceso a los paquetes nativos del sistema:
+
+```bash
+python -m venv --system-site-packages .venv
+source .venv/bin/activate
+```
+
+Un venv Termux completamente aislado no puede ver `python-cryptography` instalado por `pkg`; SecretStore fallará cerrado en lugar de usar almacenamiento débil.
+
 En Termux, si `cryptography` ya proviene de `python-cryptography`, conserva el paquete nativo funcional. Verifica:
 
 ```bash

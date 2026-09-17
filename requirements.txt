@@ -1,4 +1,4 @@
 flask
-cryptography
+cryptography; sys_platform != "android"
 websockets
 aiohttp
