@@ -13,7 +13,7 @@ from dealhunter.config import (
 )
 from dealhunter.providers.registry import validate_provider
 from dealhunter.web.security import local_redirect_target
-from dealhunter.db import db_status, db_integrity, backup_db, db_vacuum, CURRENT_SCHEMA_VERSION
+from dealhunter.db import db_status, db_integrity, backup_db, db_vacuum, CURRENT_SCHEMA_VERSION, read_connection
 from dealhunter.web.admin_queries import (
     get_runs_paginated, get_run_detail, get_events,
     get_run_status_summary, get_db_extended_stats
@@ -40,41 +40,44 @@ def admin_home():
     """Admin home — system overview dashboard."""
     db_path = current_app.config['DATABASE']
 
-    # Gather quick stats
-    summary = {}
+    data_errors = []
     try:
         summary = get_run_status_summary(db_path)
-    except Exception:
-        pass
+    except Exception as exc:
+        summary = None
+        data_errors.append(f"Runs: {exc}")
 
-    import sqlite3
-    conn = sqlite3.connect(db_path)
-    c = conn.cursor()
-    c.execute("SELECT run_id, crawler_mode, started_at FROM runs WHERE status = 'RUNNING' ORDER BY started_at DESC LIMIT 1")
-    active_row = c.fetchone()
-    active_run = {'run_id': active_row[0], 'crawler_mode': active_row[1], 'started_at': active_row[2]} if active_row else None
-    conn.close()
+    try:
+        with read_connection(db_path) as conn:
+            active_row = conn.execute("SELECT run_id, crawler_mode, started_at FROM runs WHERE status = 'RUNNING' ORDER BY started_at DESC LIMIT 1").fetchone()
+        active_run = {'run_id': active_row[0], 'crawler_mode': active_row[1], 'started_at': active_row[2]} if active_row else None
+    except Exception as exc:
+        active_run = None
+        data_errors.append(f"Active run: {exc}")
 
-    stats = {}
     try:
         stats = db_status(db_path)
-    except Exception:
-        pass
+        if stats.get('error'):
+            data_errors.append(f"Database: {stats['error']}")
+    except Exception as exc:
+        stats = {'error': str(exc)}
+        data_errors.append(f"Database: {exc}")
 
-    # Quick doctor (local only, no network)
     health = "UNKNOWN"
     try:
         checks = run_doctor(db_path=db_path, check_network=False)
-        has_error = any(s == "ERROR" for _, s, _ in checks)
+        has_error = any(status == "ERROR" for _, status, _ in checks)
         health = "ERROR" if has_error else "HEALTHY"
-    except Exception:
-        pass
+    except Exception as exc:
+        health = "ERROR"
+        data_errors.append(f"Doctor: {exc}")
 
     return render_template('admin/home.html',
                            current_path='/admin',
                            summary=summary,
                            stats=stats,
-                           health=health)
+                           health=health,
+                           data_errors=data_errors)
 
 
 
@@ -583,30 +586,23 @@ def catalog_sync():
         ).strftime('%d %b %Y %H:%M')
 
     db_path = current_app.config.get('DATABASE')
-    import sqlite3
+    db_error = None
     try:
-        conn = sqlite3.connect(db_path)
-        cur = conn.cursor()
-        cur.execute("SELECT COUNT(*) FROM stores")
-        stores_count = cur.fetchone()[0]
-
-        cur.execute("SELECT started_at, status, coverage_complete FROM runs WHERE crawler_mode='ZONE_INVENTORY' ORDER BY started_at DESC LIMIT 1")
-        row = cur.fetchone()
-        last_zone_attempt = row[0] if row else None
-        last_zone_status = row[1] if row else None
-        last_zone_coverage = row[2] if row else 0
-
-        cur.execute("SELECT started_at FROM runs WHERE crawler_mode='ZONE_INVENTORY' AND status='SUCCESS' AND coverage_complete=1 ORDER BY started_at DESC LIMIT 1")
-        row2 = cur.fetchone()
-        last_zone_complete = row2[0] if row2 else None
-
-        conn.close()
-    except Exception:
-        stores_count = 0
+        with read_connection(db_path) as conn:
+            stores_count = conn.execute("SELECT COUNT(*) FROM stores").fetchone()[0]
+            row = conn.execute("SELECT started_at, status, coverage_complete FROM runs WHERE crawler_mode='ZONE_INVENTORY' ORDER BY started_at DESC LIMIT 1").fetchone()
+            last_zone_attempt = row[0] if row else None
+            last_zone_status = row[1] if row else None
+            last_zone_coverage = row[2] if row else 0
+            row2 = conn.execute("SELECT started_at FROM runs WHERE crawler_mode='ZONE_INVENTORY' AND status='SUCCESS' AND coverage_complete=1 ORDER BY started_at DESC LIMIT 1").fetchone()
+            last_zone_complete = row2[0] if row2 else None
+    except Exception as exc:
+        db_error = str(exc)
+        stores_count = None
         last_zone_attempt = None
         last_zone_status = None
         last_zone_complete = None
-        last_zone_coverage = 0
+        last_zone_coverage = None
 
     from dealhunter.scheduler import is_scheduler_enabled, get_next_run
     scheduler_enabled = is_scheduler_enabled()
@@ -622,6 +618,7 @@ def catalog_sync():
                            warnings=svc.store.check_permissions(),
                            status=acc['status'],
                            stores_count=stores_count,
+                           db_error=db_error,
                            last_zone_attempt=last_zone_attempt,
                            last_zone_complete=last_zone_complete,
                            last_zone_status=last_zone_status,

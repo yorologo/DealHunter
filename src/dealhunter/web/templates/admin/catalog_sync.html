@@ -76,13 +76,16 @@
                     </div>
                     {% endif %}
 
+                    {% if db_error %}
+                    <div class="alert alert-danger"><strong>Error de base de datos:</strong> {{ db_error }}</div>
+                    {% endif %}
                     <h5 class="mt-4">Métricas de Sincronización</h5>
                     <dl class="row mb-0 mt-3">
                         <dt class="col-sm-5 text-muted fw-normal">Estado de Sesión:</dt>
                         <dd class="col-sm-7 fw-bold">{{ status }}</dd>
 
                         <dt class="col-sm-5 text-muted fw-normal">Tiendas conocidas en inventario:</dt>
-                        <dd class="col-sm-7">{{ stores_count }}</dd>
+                        <dd class="col-sm-7">{{ stores_count if stores_count is not none else "No disponible" }}</dd>
 
                         <dt class="col-sm-5 text-muted fw-normal">Último intento de Zone Inventory:</dt>
                         <dd class="col-sm-7">

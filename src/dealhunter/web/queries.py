@@ -1,5 +1,5 @@
 import sqlite3
-from dealhunter.db import get_default_db_path, db_status
+from dealhunter.db import get_default_db_path, db_status, read_connection
 from dealhunter.historico import analyze_history
 from dealhunter.alerts import AlertEngine
 
@@ -11,13 +11,8 @@ def get_home_metrics(db_path):
     # - newest REAL_DEAL (top 5)
     # - biggest price drops (PRICE_DROP)
     
-    conn = sqlite3.connect(db_path)
-    try:
-        c = conn.cursor()
-        c.execute("SELECT COUNT(*) FROM alerts WHERE seen = 0")
-        new_alerts = c.fetchone()[0]
-    finally:
-        conn.close()
+    with read_connection(db_path) as conn:
+        new_alerts = conn.execute("SELECT COUNT(*) FROM alerts WHERE seen = 0").fetchone()[0]
     
     return {
         "stats": stats,
@@ -36,15 +31,9 @@ def get_home_deals(db_path, filters=None):
     return {"new_lows": buckets["NEW_LOW"], "real_deals": buckets["REAL_DEAL"], "good_prices": buckets["GOOD_PRICE"]}
 
 def get_watchlist(db_path, filters=None):
-    conn = sqlite3.connect(db_path)
-    try:
-        c = conn.cursor()
-        c.execute("SELECT query, store_filter, target_price FROM watchlist WHERE enabled = 1 ORDER BY id ASC")
-        return [{"query": r[0], "store": r[1], "target_price": r[2]} for r in c.fetchall()]
-    except sqlite3.OperationalError:
-        return []
-    finally:
-        conn.close()
+    with read_connection(db_path) as conn:
+        rows = conn.execute("SELECT query, store_filter, target_price FROM watchlist WHERE enabled = 1 ORDER BY id ASC").fetchall()
+        return [{"query": r[0], "store": r[1], "target_price": r[2]} for r in rows]
 
 from dealhunter.historico import compute_price_metrics, compare_stores, compare_with_anchor
 from dealhunter.normalization import format_unit_price
@@ -739,7 +728,6 @@ def get_store_detail(db_path, provider, store_id):
 
 def get_restaurants_home(db_path, filters=None):
     """Return restaurant cards with latest-observation metrics in one SELECT."""
-    conn = sqlite3.connect(db_path)
     providers = (filters or {}).get("providers") or []
     provider_sql = ""
     params = []
@@ -775,11 +763,9 @@ def get_restaurants_home(db_path, filters=None):
           {provider_sql} AND pc.total_dishes > 0
         ORDER BY s.name ASC, s.provider ASC, s.store_id ASC
     """
-    try:
+    with read_connection(db_path) as conn:
         rows = conn.execute(query, params).fetchall()
-        return [{"provider":r[0],"store_id":r[1],"name":r[2],"brand":r[3],"total_dishes":r[4],"available_dishes":r[5],"promos":r[6],"last_obs":r[7]} for r in rows]
-    finally:
-        conn.close()
+    return [{"provider":r[0],"store_id":r[1],"name":r[2],"brand":r[3],"total_dishes":r[4],"available_dishes":r[5],"promos":r[6],"last_obs":r[7]} for r in rows]
 
 def get_restaurant_detail(db_path, provider, store_id):
     conn = sqlite3.connect(db_path)

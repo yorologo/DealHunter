@@ -3,6 +3,8 @@ import os
 import datetime
 import shutil
 import sys
+from contextlib import contextmanager
+from urllib.parse import quote
 
 from .errors import DealHunterError
 
@@ -35,6 +37,39 @@ _TRUSTED_VIEW_MARKERS = (
     "O.PROVIDER IN ('RAPPI', 'UBER_EATS')",
     "R.STATUS IN ('SUCCESS', 'PARTIAL', 'COMPLETED', 'COMPLETE')",
 )
+
+@contextmanager
+def read_connection(db_path):
+    """Open a short-lived SQLite read connection; use filesystem read-only mode when possible."""
+    if db_path == ":memory:":
+        conn = sqlite3.connect(db_path, timeout=SQLITE_BUSY_TIMEOUT_MS / 1000)
+    else:
+        path = os.path.abspath(os.path.expanduser(db_path))
+        uri = f"file:{quote(path, safe='/')}?mode=ro"
+        conn = sqlite3.connect(uri, uri=True, timeout=SQLITE_BUSY_TIMEOUT_MS / 1000)
+    try:
+        conn.execute(f"PRAGMA busy_timeout = {SQLITE_BUSY_TIMEOUT_MS}")
+        conn.execute("PRAGMA foreign_keys = ON")
+        yield conn
+    finally:
+        conn.close()
+
+
+@contextmanager
+def write_connection(db_path):
+    """Open a short-lived transactional SQLite write connection."""
+    conn = sqlite3.connect(db_path, timeout=SQLITE_BUSY_TIMEOUT_MS / 1000)
+    try:
+        conn.execute(f"PRAGMA busy_timeout = {SQLITE_BUSY_TIMEOUT_MS}")
+        conn.execute("PRAGMA foreign_keys = ON")
+        yield conn
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
 
 def get_default_db_path():
     override = os.environ.get("RAPPI_DB_PATH")

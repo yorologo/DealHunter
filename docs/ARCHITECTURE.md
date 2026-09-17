@@ -50,3 +50,9 @@ graph LR
 5. **Product canonical identity:** separate shadow/experimental system; automatic canonicalization stays OFF.
 
 Catalog ordering is also authoritative: Web exposes only sort modes implemented by the Query Layer. `savings` and `recent` use persisted price/timestamp evidence; unsupported catalog `opportunity` is not advertised.
+
+## SQLite connection boundary
+
+New Web paths should reuse `dealhunter.db.read_connection` / `write_connection` instead of opening ad-hoc SQLite handles. `read_connection` uses SQLite `mode=ro` for filesystem databases, so a read cannot silently create or mutate the DB; `write_connection` commits on success and rolls back on failure. Migration is progressive rather than a repository-wide refactor.
+
+Read surfaces must distinguish an empty result from a storage/query failure. In particular, Watchlist propagates DB failures, while Admin Home and Catalog Sync surface a visible database error instead of reporting `{}` or `0` as if that were authoritative data.
