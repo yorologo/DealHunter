@@ -318,6 +318,13 @@ def _ordering_spec(filters: dict, config: dict):
         primary_expr = "COALESCE(o.timestamp, '')"
         secondary_expr = "o.id"
         primary_dir, secondary_dir = direction, direction
+    elif sort == "score":
+        # Legacy internal callers used ``score`` only as a stable catalog order.
+        # It is not exposed as a catalog scoring claim; keep deterministic
+        # compatibility while real Deal Score ranking remains in web.best.
+        primary_expr = "COALESCE(p.product_id, '')"
+        secondary_expr = "''"
+        primary_dir, secondary_dir = direction, "ASC"
     else:
         raise ValueError(f"unsupported catalog sort: {sort}")
 
