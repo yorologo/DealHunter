@@ -7,7 +7,7 @@ DealHunter está diseñado primariamente como una herramienta read-only que rast
 rappi-ofertas account status
 ```
 
-El diagnóstico validará la cuenta usando el token provisto (`RAPPI_BEARER_TOKEN`) y retornará el contexto básico (ej. si está configurado, expirado, mercado asociado).
+El diagnóstico valida la cuenta usando la sesión efectiva resuelta por `SessionService`: primero `RAPPI_BEARER_TOKEN` (efímero), luego una sesión temporal y finalmente SecretStore persistente si el usuario la configuró explícitamente. Retorna sólo contexto seguro (por ejemplo, estado, mercado y membresía).
 
 ## ¿Qué consulta?
 Exclusivamente el estado actual de la sesión.
@@ -24,9 +24,10 @@ El sistema **no implementa** ni implementará operaciones de escritura en la cue
 Para extraer el token de sesión dinámicamente de la app móvil en tu dispositivo, haría falta acceso `root` o inyección de código. Dado que nuestro principio fundacional dicta cero invasividad:
 * La extracción automática de credenciales está marcada como **`NOT_SAFE_TO_IMPLEMENT`**.
 * No se provee ningún bypass de autenticación.
-* El sistema **requiere** que el usuario provea manualmente su `RAPPI_BEARER_TOKEN` si desea habilitar funcionalidades que requieran autenticación.
+* DealHunter no extrae automáticamente credenciales desde la app. El usuario debe autorizar/proveer la sesión mediante los flujos soportados.
+* La persistencia es opcional: `RAPPI_BEARER_TOKEN` permanece efímero; el modo persistente usa SecretStore cifrado y puede eliminarse desde los controles de sesión.
 
-> Authentication tokens are ephemeral and are never persisted by DealHunter.
+> Las sesiones persistentes son opt-in y permanecen sólo en el dispositivo local, cifradas por SecretStore; no se guardan en SQLite ni en `config.toml`.
 
 ## Sanitización y Seguridad
 Si el sistema utiliza tu token para consultar el estatus de la cuenta, respeta la siguiente regla dura:

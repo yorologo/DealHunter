@@ -1,0 +1,102 @@
+[
+  {
+    "name": "no_history",
+    "metrics": null,
+    "current_price": 100,
+    "original_price": null,
+    "market_prices": [],
+    "expected": {
+      "algorithm_version": "deal-score-v1",
+      "score": 0,
+      "label": "Sin historial",
+      "confidence": "baja",
+      "reasons": [{"type": "missing", "text": "Sin datos suficientes para evaluar"}],
+      "breakdown": {}
+    }
+  },
+  {
+    "name": "historical_new_low",
+    "metrics": {"observations_count": 12, "history_days": 10, "discount_vs_median_30d": 20, "status": "NEW_LOW"},
+    "current_price": 80,
+    "original_price": 100,
+    "market_prices": [],
+    "expected": {
+      "algorithm_version": "deal-score-v1",
+      "score": 50,
+      "label": "Normal",
+      "confidence": "alta",
+      "reasons": [
+        {"type": "history", "text": "↓ 20% vs mediana 30d"},
+        {"type": "event", "text": "🔥 Nuevo mínimo histórico"}
+      ],
+      "breakdown": {"discount": "40/60", "market_available": false, "market": "0/30", "event": "10/10"}
+    }
+  },
+  {
+    "name": "market_leader",
+    "metrics": {"observations_count": 5, "history_days": 2, "discount_vs_median_30d": 10, "status": "NORMAL"},
+    "current_price": 60,
+    "original_price": null,
+    "market_prices": [60, 100],
+    "expected": {
+      "algorithm_version": "deal-score-v1",
+      "score": 50,
+      "label": "Normal",
+      "confidence": "media",
+      "reasons": [
+        {"type": "history", "text": "↓ 10% vs mediana 30d"},
+        {"type": "market", "text": "🏆 40% más barato que la competencia"}
+      ],
+      "breakdown": {"discount": "20/60", "market_available": true, "market": "30/30", "event": "0/10"}
+    }
+  },
+  {
+    "name": "shared_market_lead",
+    "metrics": {"observations_count": 5, "history_days": 2, "discount_vs_median_30d": 0, "status": "NORMAL"},
+    "current_price": 80,
+    "original_price": null,
+    "market_prices": [80, 80],
+    "expected": {
+      "algorithm_version": "deal-score-v1",
+      "score": 5,
+      "label": "Normal",
+      "confidence": "media",
+      "reasons": [{"type": "market", "text": "⚖ Mejor precio compartido (2 tiendas)"}],
+      "breakdown": {"discount": "0/60", "market_available": true, "market": "5/30", "event": "0/10"}
+    }
+  },
+  {
+    "name": "suspicious_reference_ignored",
+    "metrics": {"observations_count": 10, "history_days": 7, "discount_vs_median_30d": 0, "is_suspicious_reference": true},
+    "current_price": 50,
+    "original_price": 500,
+    "market_prices": [],
+    "expected": {
+      "algorithm_version": "deal-score-v1",
+      "score": 0,
+      "label": "Normal",
+      "confidence": "alta",
+      "reasons": [{"type": "suspicious", "text": "⚠ Referencia promocional sospechosa (descartada)"}],
+      "breakdown": {"discount": "0/60", "market_available": false, "market": "0/30", "event": "0/10"}
+    }
+  },
+  {
+    "name": "maximum_score",
+    "metrics": {"observations_count": 20, "history_days": 20, "discount_vs_median_30d": 50, "status": "NEW_LOW"},
+    "current_price": 50,
+    "original_price": null,
+    "market_prices": [50, 100],
+    "expected": {
+      "algorithm_version": "deal-score-v1",
+      "score": 100,
+      "label": "🔥 Excepcional",
+      "confidence": "alta",
+      "reasons": [
+        {"type": "history", "text": "↓ 50% vs mediana 30d"},
+        {"type": "market", "text": "🏆 50% más barato que la competencia"},
+        {"type": "event", "text": "🔥 Nuevo mínimo histórico"}
+      ],
+      "breakdown": {"discount": "60/60", "market_available": true, "market": "30/30", "event": "10/10"}
+    }
+  }
+]

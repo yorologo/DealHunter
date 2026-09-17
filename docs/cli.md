@@ -35,6 +35,22 @@ bin/rappi-ofertas db status
 Utilice `--help` para consultar los comandos que expone el HEAD instalado. La
 descripción de la CLI obtiene su versión de `dealhunter.metadata.VERSION`.
 
+### Salida machine-readable
+
+`rappi-historico deals --format json` y `--format csv` son interfaces CLI
+públicas para automatización local. El contrato deliberadamente pequeño es:
+
+- JSON: un array de objetos, preservando los nombres y valores entregados por la
+  consulta de `deals`; sin resultados produce `[]`.
+- CSV: encabezados en el mismo orden de campos de la consulta y una fila por
+  resultado; sin resultados produce salida vacía.
+- UTF-8: los nombres y valores Unicode se conservan.
+
+Los campos de negocio pertenecen a la versión de DealHunter que ejecuta la
+consulta; no existe un segundo versionado de schema de salida mientras no haya
+un API externo independiente que lo requiera. `table` y `markdown` son formatos
+humanos y no se tratan como contratos machine-readable.
+
 La sincronización Uber normal usa Chromium headless en Termux. Carbonyl se usa
 únicamente para setup o renovación del perfil; un PC no es requisito de los
 runs normales.

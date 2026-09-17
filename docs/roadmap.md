@@ -13,10 +13,12 @@
 - **KISS Iterations**: Deal Score V1, Taxonomy, Price Integrity, Multiselect Filters, safe zone realignment.
 - **v3.3.x**: Schema v17, keyset pagination, Watchlist Web de solo lectura y hardening de primer arranque/packaging Termux.
 - **Develop post-v3.3.1 / A01–A10**: workflows explícitos de merchant/location y browse mapping, sorts/recency autoritativos, SecretStore atómico fail-closed y validación Admin/redirects locales.
+- **Develop post-v3.3.1 / A11–A27**: queries/UX escalables, búsqueda y alertas Web, HTTP/auth reuse, retención operacional, packaging real 3.11/3.14, dependency bounds y protección mínima de ramas.
+- **Develop post-v3.3.1 / A28–A32**: Bootstrap se conserva (sin migración Tailwind), `deal-score-v1` tiene corpus de regresión, contratos machine-readable CLI acotados, inventario de assets vendorizados y política de seguridad alineada con SecretStore.
 
 ## Próximo (Follow Experience)
-- Panel visual de Alertas web
-- Emisión de notificaciones push de Android nativas (Termux:API)
+- Mejoras incrementales de UX sobre Alertas/Watchlist existentes.
+- PWA / Saved Views / Since Last Visit sólo cuando exista una necesidad demostrada.
 
 ## Futuro (Planned & Experimental)
 *(Sólo funciones contempladas orgánicamente por diseño, no disponibles todavía)*

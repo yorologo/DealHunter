@@ -5,9 +5,18 @@
 Post-v3.3.1 work on `develop`; no next release version has been selected yet.
 
 ### Added
+- Web `/alerts` read-only view over the existing AlertEngine, local search coverage for products/merchants/branches/categories, cursor-based `Cargar más`, and visible IA/filter UX without a frontend framework rewrite.
+- Bounded operational maintenance for scheduler logs/diagnostics while preserving commercial observation history.
+- Installed-package CI on Python 3.11 and 3.14, explicit dependency bounds, packaged `dealwatcher`, and reproducible third-party Web asset inventory.
+- `deal-score-v1` machine-readable algorithm identifier plus a fixed regression corpus.
+
 - Explicit reviewed CLI workflows for `Provider Listing → Merchant → Location` and raw taxonomy/path → DealHunter browse node. Unknown/ambiguous evidence remains `UNRESOLVED` / `UNCLASSIFIED`; no name-based automatic merge was introduced.
 
 ### Fixed
+- Catalog Sync reuses the common authenticated HTTP client where auth/timeout/error contracts are equivalent.
+- Installed scheduler commands resolve correctly from checkout or installed console scripts instead of deriving an invalid repo root from `site-packages`.
+- Root security/account documentation now reflects opt-in encrypted persistent sessions instead of claiming DealHunter never handles authentication.
+
 - Catalog `savings` and `recent` ordering now use persisted price/timestamp evidence and keyset/OFFSET share the same order; unsupported catalog `opportunity` is no longer advertised.
 - Deal recency now propagates the actual latest observation timestamp; restaurant latest rows use `timestamp DESC, id DESC`.
 - SecretStore salt/ciphertext persistence is atomic and fail-closed, preserving an existing secret on partial writes and distinguishing corruption from storage I/O.

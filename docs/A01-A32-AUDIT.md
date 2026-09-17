@@ -46,3 +46,28 @@ Authority for the current post-`v3.3.1` work on `develop`. These identifiers and
 ## Global invariants
 
 SQLite stays authoritative; no cloud or automatic product canonicalization is introduced. Merchant identity, location identity, product canonical identity and browse classification remain separate authorities. Product canonical matching remains SHADOW / EXPERIMENTAL with automatic membership writes OFF.
+
+## Closure status
+
+All A01–A32 items are closed on `develop` as of the post-v3.3.1 audit cycle.
+Closure does **not** imply a release/tag; runtime version remains 3.3.1 until a
+separate release decision is made. Deferred/negative decisions are explicit,
+not silently treated as implementation.
+
+| IDs | Status | Closure evidence |
+|---|---|---|
+| A01–A10 | CLOSED | Explicit merchant/location + browse mapping, authoritative sorts/recency, fail-closed SecretStore, Admin validation/redirects, current-doc cleanup. |
+| A11–A22 | CLOSED | Aggregated/query-layer performance work, connection/error truth, visible IA/filter/keyset UX, translations/Home/search/alerts and modern commerce authority. |
+| A23 | CLOSED | Catalog Sync equivalent authenticated HTTP behavior reuses `AuthenticatedHttpClient`; focused regressions cover optional auth. |
+| A24 | CLOSED | `maintenance run` rotates only managed runtime logs/diagnostics; SQLite/commercial observation history is preserved. |
+| A25 | CLOSED | CI installs the real package on Python 3.11 + 3.14, runs `pip check`, package-data/CLI smoke and full pytest without `PYTHONPATH`. |
+| A26 | CLOSED (REMOTE) | Active GitHub rulesets: `develop` prevents delete/force-push; `main` also requires `Python 3.11` + `Python 3.14` checks. No mandatory PR/review bureaucracy added. |
+| A27 | CLOSED | Explicit major-version dependency bounds; Android keeps native `python-cryptography` behavior. |
+| A28 | CLOSED — NO MIGRATION | Bootstrap 5 + HTMX satisfied A15–A17; no demonstrated blocker justifies Tailwind churn. |
+| A29 | CLOSED | `deal-score-v1` constant/result field + `tests/corpus/deal_score_v1.json`; deterministic regression gate; no ML. |
+| A30 | CLOSED — BOUNDED | Public `deals --format json|csv` format contracts are tested/documented; business fields remain release-versioned, no artificial secondary schema version. |
+| A31 | CLOSED | `docs/third-party-assets.md` records Bootstrap/HTMX/Chart.js versions, upstreams, licenses and exact SHA-256; tests pin hashes. |
+| A32 | CLOSED | `SECURITY.md` and account diagnostics document ephemeral + opt-in Fernet SecretStore persistence and explicitly reject weak fallbacks/secrets in DB/config/logs. |
+
+A28/A30 are intentionally minimal KISS decisions: they avoid adding a new CSS
+stack or independent output-versioning system without demonstrated need.

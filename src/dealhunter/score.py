@@ -1,3 +1,5 @@
+DEAL_SCORE_ALGORITHM_VERSION = "deal-score-v1"
+
 def calculate_deal_score(metrics, current_price, original_price=None, market_prices=None):
     """
     Calculates Deal Score (0-100) separating Deal Quality from Evidence Confidence.
@@ -16,6 +18,7 @@ def calculate_deal_score(metrics, current_price, original_price=None, market_pri
     """
     if not metrics:
         return {
+            "algorithm_version": DEAL_SCORE_ALGORITHM_VERSION,
             "score": 0, "label": "Sin historial", "confidence": "baja",
             "reasons": [{"type": "missing", "text": "Sin datos suficientes para evaluar"}],
             "breakdown": {}
@@ -112,6 +115,7 @@ def calculate_deal_score(metrics, current_price, original_price=None, market_pri
         label = "Normal"
         
     return {
+        "algorithm_version": DEAL_SCORE_ALGORITHM_VERSION,
         "score": score,
         "label": label,
         "confidence": confidence,

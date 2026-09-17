@@ -48,7 +48,10 @@ DealHunter almacena estrictamente lo que Rappi cobra. Si existe un precio final 
 
 ## Deal Score y Confidence
 
-Para ordenar las oportunidades globales sin depender solo del porcentaje de descuento, DealHunter implementa **Deal Score V1**:
-- **Deal Quality**: Evalúa el impacto económico (descuento base, promociones NxM), la ventaja de mercado (comparación entre tiendas) y bonos por eventos (NEW_LOW).
-- **Confidence**: Mide la fiabilidad del histórico (número de observaciones y antigüedad).
-- **Deal Score Total**: Pondera el *Deal Quality* según la *Confidence*. Un puntaje alto garantiza que el descuento es sobresaliente y el histórico lo respalda sólidamente.
+Para ordenar las oportunidades globales sin depender solo del porcentaje de descuento, DealHunter implementa **Deal Score V1**, identificado en código como `deal-score-v1`:
+- **Economic Discount (0–60)**: usa el mejor descuento demostrable entre histórico y referencia promocional no sospechosa.
+- **Market Bonus (0–30)**: recompensa ventaja contra equivalentes comparables; mercado ausente no infla otros componentes.
+- **Timing/Event (0–10)**: `NEW_LOW` suma 10 y `REAL_DEAL` suma 5.
+- **Confidence**: se calcula aparte con observaciones y días de histórico. No multiplica ni altera el número del score; sólo limita etiquetas de alta valoración cuando la evidencia es baja.
+
+El algoritmo es determinista y está congelado por un corpus de regresión en `tests/corpus/deal_score_v1.json`. Cualquier cambio de pesos, thresholds o semántica requiere una nueva versión explícita del algoritmo y actualizar ese corpus; no se usa ML.

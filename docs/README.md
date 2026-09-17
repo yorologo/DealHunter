@@ -39,6 +39,7 @@ La última release pública verificada es `v3.3.1`, tag/GitHub Release sobre `9f
 
 ## Operations
 - [Security](security.md)
+- [Third-party Web Assets](third-party-assets.md)
 - [Doctor](doctor.md)
 - [Testing](testing.md)
 

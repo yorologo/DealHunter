@@ -82,7 +82,7 @@ DealHunter incluye una Interfaz Web responsiva (UI/UX) para navegar ofertas sin 
 
 #### SEGUIR
 - Watchlist core/CLI + vista Web de solo lectura operativa.
-- *Alerts Engine existente, vista UI web Parcial (Placeholder).*
+- Alerts Engine existente + vista Web `/alerts` de solo lectura operativa.
 
 #### ADMINISTRAR
 - Admin Home
