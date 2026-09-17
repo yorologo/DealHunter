@@ -88,6 +88,53 @@ def test_old_database_migrates_without_losing_data(tmp_path):
     conn.close()
 
 
+def test_wal_transition_retries_only_lock_contention(monkeypatch):
+    class FakeConnection:
+        def __init__(self):
+            self.set_attempts = 0
+            self.mode = "delete"
+
+        def execute(self, statement):
+            if statement == "PRAGMA journal_mode":
+                return self
+            if statement == "PRAGMA journal_mode = WAL":
+                self.set_attempts += 1
+                if self.set_attempts < 3:
+                    raise sqlite3.OperationalError("database is locked")
+                self.mode = "wal"
+                return self
+            raise AssertionError(statement)
+
+        def fetchone(self):
+            return (self.mode,)
+
+    fake = FakeConnection()
+    sleeps = []
+    monkeypatch.setattr(db_module.time, "sleep", sleeps.append)
+
+    db_module._ensure_wal_mode(fake, attempts=4)
+
+    assert fake.set_attempts == 3
+    assert sleeps == [0.05, 0.1]
+
+
+def test_wal_transition_does_not_hide_non_lock_errors():
+    class FakeConnection:
+        def execute(self, statement):
+            if statement == "PRAGMA journal_mode":
+                return self
+            raise sqlite3.OperationalError("disk I/O error")
+
+        def fetchone(self):
+            return ("delete",)
+
+    try:
+        db_module._ensure_wal_mode(FakeConnection())
+    except sqlite3.OperationalError as exc:
+        assert "disk I/O error" in str(exc)
+    else:
+        raise AssertionError("non-lock SQLite errors must fail closed")
+
 def test_concurrent_fresh_initialization_is_serialized(tmp_path):
     db_path = tmp_path / "concurrent-fresh.db"
     start = threading.Barrier(8)

@@ -3,6 +3,7 @@ import os
 import datetime
 import shutil
 import sys
+import time
 from contextlib import contextmanager
 from urllib.parse import quote
 
@@ -161,6 +162,25 @@ def _create_base_tables(cursor):
                   UNIQUE(run_id, provider, store_id, product_id))''')
 
 
+def _ensure_wal_mode(conn, *, attempts=20):
+    """Ensure persistent WAL mode, retrying only SQLite lock contention."""
+    if attempts < 1:
+        raise ValueError("attempts must be positive")
+    for attempt in range(attempts):
+        try:
+            current = conn.execute("PRAGMA journal_mode").fetchone()[0]
+            if str(current).lower() == "wal":
+                return
+            mode = conn.execute("PRAGMA journal_mode = WAL").fetchone()[0]
+            if str(mode).lower() == "wal":
+                return
+            raise sqlite3.OperationalError(f"could not enable WAL mode: {mode}")
+        except sqlite3.OperationalError as exc:
+            if "locked" not in str(exc).lower() or attempt == attempts - 1:
+                raise
+            time.sleep(min(0.05 * (attempt + 1), 0.25))
+
+
 def setup_db(db_path=None):
     if not db_path:
         db_path = get_default_db_path()
@@ -174,7 +194,7 @@ def setup_db(db_path=None):
     conn.execute(f"PRAGMA busy_timeout = {SQLITE_BUSY_TIMEOUT_MS}")
     conn.execute("PRAGMA foreign_keys = ON")
     if db_path != ":memory:":
-        conn.execute("PRAGMA journal_mode = WAL")
+        _ensure_wal_mode(conn)
 
     if _schema_contract_is_current(conn):
         return conn

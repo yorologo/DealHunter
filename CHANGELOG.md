@@ -13,6 +13,7 @@ Post-v3.3.1 work on `develop`; no next release version has been selected yet.
 - Explicit reviewed CLI workflows for `Provider Listing → Merchant → Location` and raw taxonomy/path → DealHunter browse node. Unknown/ambiguous evidence remains `UNRESOLVED` / `UNCLASSIFIED`; no name-based automatic merge was introduced.
 
 ### Fixed
+- Concurrent fresh SQLite initialization now retries only transient WAL-mode lock contention instead of failing before the migration lock can serialize setup.
 - Catalog Sync reuses the common authenticated HTTP client where auth/timeout/error contracts are equivalent.
 - Installed scheduler commands resolve correctly from checkout or installed console scripts instead of deriving an invalid repo root from `site-packages`.
 - Root security/account documentation now reflects opt-in encrypted persistent sessions instead of claiming DealHunter never handles authentication.
