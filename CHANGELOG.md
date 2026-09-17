@@ -16,6 +16,7 @@ Minor release focused on reviewed data workflows, Web/operations UX, packaging, 
 - Explicit reviewed CLI workflows for `Provider Listing → Merchant → Location` and raw taxonomy/path → DealHunter browse node. Unknown/ambiguous evidence remains `UNRESOLVED` / `UNCLASSIFIED`; no name-based automatic merge was introduced.
 
 ### Fixed
+- Packaging build artifacts are ignored so a normal `./install.sh` does not make a release checkout fail the clean-worktree gate on the next `./update.sh`.
 - Schema-v17 repair is idempotent: if a current-version database is missing a required table/index/column, DealHunter creates a verified `pre_repair` backup and restores the contract without overwriting reviewed classifications.
 - Fresh-install diagnostics and DB maintenance are side-effect free: Doctor reports an uninitialized DB as healthy, while integrity/backup/vacuum no longer create an empty SQLite file.
 - Concurrent fresh SQLite initialization now retries only transient WAL-mode lock contention instead of failing before the migration lock can serialize setup.

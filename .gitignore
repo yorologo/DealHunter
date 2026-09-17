@@ -34,3 +34,5 @@ htmlcov/
 audit_results.txt
 tec_log.txt
 research/
+build/
+*.egg-info/

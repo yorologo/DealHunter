@@ -59,6 +59,9 @@ def test_install_and_update_scripts_have_safe_kiss_contract():
     assert "git switch main" in update_text
     assert "dealhunter db backup" in update_text
     assert "dealhunter db integrity" in update_text
+    ignore_text = (ROOT / ".gitignore").read_text().splitlines()
+    assert "build/" in ignore_text
+    assert "*.egg-info/" in ignore_text
 
 
 def test_integrity_and_backup_do_not_create_missing_database(tmp_path, capsys, monkeypatch):
