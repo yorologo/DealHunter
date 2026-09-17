@@ -36,4 +36,4 @@ La evidencia profunda de providers se conserva en `archive/provider-evidence/`; 
 
 Los archivos históricos se conservan para trazabilidad y contexto. **No se actualizan para reflejar el HEAD actual y no deben citarse como fuente de verdad para instalación, configuración o releases.**
 
-Última release pública documentada: **v3.3.1** (`9f5f3c3c12f084190d0aea8f28e4950afb51bca8`).
+Versión de código preparada para release: **v3.4.0**. Baseline pública anterior: **v3.3.1** (`9f5f3c3c12f084190d0aea8f28e4950afb51bca8`).

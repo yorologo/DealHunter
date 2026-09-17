@@ -2,7 +2,9 @@
 
 ## [Unreleased]
 
-Post-v3.3.1 work on `develop`; no next release version has been selected yet.
+## [v3.4.0] - 2026-09-17
+
+Minor release focused on reviewed data workflows, Web/operations UX, packaging, and safer local maintenance; schema remains v17.
 
 ### Added
 - KISS onboarding/operations path: `install.sh`, `update.sh`, installed `dealhunter web` / `dealhunter scheduler` commands, and one canonical operations guide.
@@ -14,6 +16,7 @@ Post-v3.3.1 work on `develop`; no next release version has been selected yet.
 - Explicit reviewed CLI workflows for `Provider Listing → Merchant → Location` and raw taxonomy/path → DealHunter browse node. Unknown/ambiguous evidence remains `UNRESOLVED` / `UNCLASSIFIED`; no name-based automatic merge was introduced.
 
 ### Fixed
+- Schema-v17 repair is idempotent: if a current-version database is missing a required table/index/column, DealHunter creates a verified `pre_repair` backup and restores the contract without overwriting reviewed classifications.
 - Fresh-install diagnostics and DB maintenance are side-effect free: Doctor reports an uninitialized DB as healthy, while integrity/backup/vacuum no longer create an empty SQLite file.
 - Concurrent fresh SQLite initialization now retries only transient WAL-mode lock contention instead of failing before the migration lock can serialize setup.
 - Catalog Sync reuses the common authenticated HTTP client where auth/timeout/error contracts are equivalent.

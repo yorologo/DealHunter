@@ -62,11 +62,12 @@ def test_install_and_update_scripts_have_safe_kiss_contract():
 
 
 def test_integrity_and_backup_do_not_create_missing_database(tmp_path, capsys, monkeypatch):
-    from dealhunter.db import backup_db, db_integrity
+    from dealhunter.db import backup_db, db_integrity, db_vacuum
 
     db_path = tmp_path / "fresh" / "dealhunter.db"
     assert db_integrity(str(db_path)) == "not_initialized"
     assert backup_db(str(db_path)) is None
+    assert db_vacuum(str(db_path)) is False
     assert not db_path.exists()
 
     monkeypatch.setenv("RAPPI_DB_PATH", str(db_path))
@@ -75,3 +76,15 @@ def test_integrity_and_backup_do_not_create_missing_database(tmp_path, capsys, m
     assert captured.out == ""
     assert "nothing to back up" in captured.err.lower()
     assert not db_path.exists()
+
+
+def test_v331_upgrade_bootstrap_is_documented_before_update_sh():
+    readme = (ROOT / "README.md").read_text()
+    operations = (ROOT / "docs" / "operations.md").read_text()
+    for text in (readme, operations):
+        assert "v3.3.1" in text
+        assert "v3.4.0" in text
+        assert "dealhunter db backup" in text
+        assert "git merge --ff-only origin/main" in text
+        assert "./install.sh" in text
+        assert "./update.sh" in text

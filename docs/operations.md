@@ -111,6 +111,24 @@ Tras reiniciar Android, `crond` puede requerir inicio manual. DealHunter no inst
 
 Para instalaciones de release, `main` es la rama soportada. Antes de actualizar no debe haber cambios locales sin guardar.
 
+### Transición única desde v3.3.1
+
+El tag `v3.3.1` es anterior a `update.sh`, por lo que esa release necesita una sola actualización manual equivalente al updater:
+
+```bash
+cd DealHunter
+dealhunter db backup
+git fetch --tags origin main
+git merge --ff-only origin/main
+./install.sh
+dealhunter db integrity
+dealhunter doctor
+```
+
+No uses `git pull` sin política ni `reset --hard`: el `merge --ff-only` debe rechazar cualquier divergencia.
+
+### Desde v3.4.0 en adelante
+
 ```bash
 cd DealHunter
 ./update.sh

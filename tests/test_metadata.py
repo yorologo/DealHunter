@@ -5,7 +5,7 @@ from dealhunter.web.app import create_app
 
 
 def test_runtime_metadata_has_one_version_source():
-    assert VERSION == "3.3.1"
+    assert VERSION == "3.4.0"
     assert CURRENT_SCHEMA_VERSION == 17
     assert f"v{VERSION}" in build_parser().description
 

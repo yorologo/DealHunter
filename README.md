@@ -2,7 +2,7 @@
 
 DealHunter es un motor **local-first** de inteligencia de precios para Rappi y Uber Eats. Guarda el histórico en SQLite, compara precios reales y expone una Web local para explorar oportunidades sin depender de un backend de DealHunter.
 
-Última release pública: **v3.3.1**. La rama `develop` contiene trabajo posterior aún no publicado como una nueva versión.
+Versión del código: **v3.4.0**. La release pública anterior es **v3.3.1**; GitHub Releases es la autoridad sobre qué tags ya fueron publicados.
 
 ## Instalación rápida — Android / Termux
 
@@ -70,13 +70,28 @@ El scheduler exige `lat/lng` válidos y usa una sola política administrada: Rap
 
 ## Actualizar una instalación de release
 
+### Transición única desde v3.3.1
+
+`v3.3.1` todavía no contiene `update.sh`. Para pasar de esa release a v3.4.0 de forma segura:
+
+```bash
+dealhunter db backup
+git fetch --tags origin main
+git merge --ff-only origin/main
+./install.sh
+dealhunter db integrity
+dealhunter doctor
+```
+
+### Desde v3.4.0 en adelante
+
 Con un checkout limpio en `main`:
 
 ```bash
 ./update.sh
 ```
 
-`update.sh` crea un backup SQLite cuando DealHunter ya está instalado, exige actualización Git **fast-forward**, reinstala el paquete y termina con `db integrity` + `doctor`. Nunca hace `reset --hard`, merge forzado ni borra la configuración.
+`update.sh` crea un backup SQLite cuando existe DB, exige actualización Git **fast-forward**, reinstala el paquete y termina con `db integrity` + `doctor`. Nunca hace `reset --hard`, merge forzado ni borra la configuración.
 
 Consulta [docs/operations.md](docs/operations.md) para instalación detallada, configuración, scheduler, mantenimiento, backups y recuperación.
 
