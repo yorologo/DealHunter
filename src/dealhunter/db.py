@@ -162,6 +162,97 @@ def _create_base_tables(cursor):
                   UNIQUE(run_id, provider, store_id, product_id))''')
 
 
+def _ensure_v17_contract(cursor):
+    """Idempotently ensure schema-v17 objects without rewriting reviewed data."""
+    for definition in (
+        "merchant_id TEXT",
+        "location_id TEXT",
+        "commerce_type TEXT NOT NULL DEFAULT 'UNKNOWN'",
+        "catalog_domain TEXT NOT NULL DEFAULT 'UNKNOWN'",
+    ):
+        try:
+            cursor.execute(f"ALTER TABLE stores ADD COLUMN {definition}")
+        except sqlite3.OperationalError as exc:
+            if "duplicate column" not in str(exc).lower():
+                raise
+
+    cursor.execute("""CREATE TABLE IF NOT EXISTS merchants (
+        merchant_id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        source TEXT NOT NULL,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )""")
+    cursor.execute("""CREATE TABLE IF NOT EXISTS merchant_locations (
+        location_id TEXT PRIMARY KEY,
+        merchant_id TEXT NOT NULL REFERENCES merchants(merchant_id),
+        name TEXT NOT NULL,
+        source TEXT NOT NULL,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )""")
+    cursor.execute("""CREATE TABLE IF NOT EXISTS browse_nodes (
+        browse_node_id TEXT PRIMARY KEY,
+        parent_id TEXT REFERENCES browse_nodes(browse_node_id),
+        level TEXT NOT NULL CHECK(level IN ('DEPARTMENT','SECTION','CATEGORY','SUBCATEGORY')),
+        name TEXT NOT NULL,
+        active INTEGER NOT NULL DEFAULT 1 CHECK(active IN (0,1)),
+        sort_order INTEGER NOT NULL DEFAULT 0
+    )""")
+    cursor.execute("""CREATE TABLE IF NOT EXISTS browse_mappings (
+        provider TEXT NOT NULL,
+        raw_type TEXT NOT NULL,
+        raw_name TEXT NOT NULL,
+        raw_path TEXT NOT NULL DEFAULT '',
+        browse_node_id TEXT NOT NULL REFERENCES browse_nodes(browse_node_id),
+        source TEXT NOT NULL,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        PRIMARY KEY (provider, raw_type, raw_name, raw_path, browse_node_id)
+    )""")
+
+    # Fill only UNKNOWN values from structured provider type evidence. Existing
+    # reviewed/structured classifications are never overwritten during repair.
+    cursor.execute("""UPDATE stores SET commerce_type = CASE LOWER(TRIM(COALESCE(type, '')))
+        WHEN 'restaurant' THEN 'RESTAURANT'
+        WHEN 'restaurants' THEN 'RESTAURANT'
+        WHEN 'grocery' THEN 'SUPERMARKET'
+        WHEN 'market' THEN 'SUPERMARKET'
+        WHEN 'super' THEN 'SUPERMARKET'
+        WHEN 'supermarket' THEN 'SUPERMARKET'
+        WHEN 'chiper_home' THEN 'SUPERMARKET'
+        WHEN 'chiper_extended' THEN 'SUPERMARKET'
+        WHEN 'chiper_express' THEN 'SUPERMARKET'
+        WHEN 'farmatodo' THEN 'PHARMACY'
+        WHEN 'pharmacy' THEN 'PHARMACY'
+        WHEN 'farmacia' THEN 'PHARMACY'
+        WHEN 'express_parent' THEN 'SPECIALTY_RETAIL'
+        WHEN 'pets_cpgs' THEN 'SPECIALTY_RETAIL'
+        ELSE 'UNKNOWN' END
+        WHERE commerce_type = 'UNKNOWN'""")
+    cursor.execute("""UPDATE stores SET catalog_domain = CASE LOWER(TRIM(COALESCE(type, '')))
+        WHEN 'restaurant' THEN 'MENU'
+        WHEN 'restaurants' THEN 'MENU'
+        WHEN 'grocery' THEN 'RETAIL'
+        WHEN 'market' THEN 'RETAIL'
+        WHEN 'super' THEN 'RETAIL'
+        WHEN 'supermarket' THEN 'RETAIL'
+        WHEN 'chiper_home' THEN 'RETAIL'
+        WHEN 'chiper_extended' THEN 'RETAIL'
+        WHEN 'chiper_express' THEN 'RETAIL'
+        WHEN 'farmatodo' THEN 'RETAIL'
+        WHEN 'pharmacy' THEN 'RETAIL'
+        WHEN 'farmacia' THEN 'RETAIL'
+        WHEN 'express_parent' THEN 'RETAIL'
+        WHEN 'pets_cpgs' THEN 'RETAIL'
+        ELSE 'UNKNOWN' END
+        WHERE catalog_domain = 'UNKNOWN'""")
+
+    observation_columns = {row[1] for row in cursor.execute("PRAGMA table_info(observations)")}
+    if {"provider", "store_id", "product_id", "timestamp", "id"} <= observation_columns:
+        cursor.execute("""CREATE INDEX IF NOT EXISTS idx_obs_provider_history
+                        ON observations(provider, store_id, product_id, timestamp DESC, id DESC)""")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_stores_merchant ON stores(merchant_id, location_id)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_stores_commerce ON stores(commerce_type, catalog_domain)")
+
+
 def _ensure_wal_mode(conn, *, attempts=20):
     """Ensure persistent WAL mode, retrying only SQLite lock contention."""
     if attempts < 1:
@@ -236,10 +327,11 @@ def _migrate_locked(conn, db_path):
         version = row[0]
         
     
+    contract_repair = version == CURRENT_SCHEMA_VERSION and not _schema_contract_is_current(conn)
+    if version < CURRENT_SCHEMA_VERSION or contract_repair:
+        backup_db(db_path, tag="pre_migration" if version < CURRENT_SCHEMA_VERSION else "pre_repair")
+
     if version < CURRENT_SCHEMA_VERSION:
-        # Create a backup before migration
-        backup_db(db_path, tag="pre_migration")
-        
         # apply migrations
         if version < 1:
             c.execute('''CREATE TABLE IF NOT EXISTS watchlist (
@@ -539,99 +631,11 @@ def _migrate_locked(conn, db_path):
                 source TEXT
             )''')
 
-        if version < 17:
-            # Schema v17: explicit commercial identity boundaries and browse taxonomy.
-            for definition in (
-                "merchant_id TEXT",
-                "location_id TEXT",
-                "commerce_type TEXT NOT NULL DEFAULT 'UNKNOWN'",
-                "catalog_domain TEXT NOT NULL DEFAULT 'UNKNOWN'",
-            ):
-                try:
-                    c.execute(f"ALTER TABLE stores ADD COLUMN {definition}")
-                except sqlite3.OperationalError as exc:
-                    if "duplicate column" not in str(exc).lower():
-                        raise
-
-            c.execute('''CREATE TABLE IF NOT EXISTS merchants (
-                merchant_id TEXT PRIMARY KEY,
-                name TEXT NOT NULL,
-                source TEXT NOT NULL,
-                created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-            )''')
-            c.execute('''CREATE TABLE IF NOT EXISTS merchant_locations (
-                location_id TEXT PRIMARY KEY,
-                merchant_id TEXT NOT NULL REFERENCES merchants(merchant_id),
-                name TEXT NOT NULL,
-                source TEXT NOT NULL,
-                created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-            )''')
-            c.execute('''CREATE TABLE IF NOT EXISTS browse_nodes (
-                browse_node_id TEXT PRIMARY KEY,
-                parent_id TEXT REFERENCES browse_nodes(browse_node_id),
-                level TEXT NOT NULL CHECK(level IN ('DEPARTMENT','SECTION','CATEGORY','SUBCATEGORY')),
-                name TEXT NOT NULL,
-                active INTEGER NOT NULL DEFAULT 1 CHECK(active IN (0,1)),
-                sort_order INTEGER NOT NULL DEFAULT 0
-            )''')
-            c.execute('''CREATE TABLE IF NOT EXISTS browse_mappings (
-                provider TEXT NOT NULL,
-                raw_type TEXT NOT NULL,
-                raw_name TEXT NOT NULL,
-                raw_path TEXT NOT NULL DEFAULT '',
-                browse_node_id TEXT NOT NULL REFERENCES browse_nodes(browse_node_id),
-                source TEXT NOT NULL,
-                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-                PRIMARY KEY (provider, raw_type, raw_name, raw_path, browse_node_id)
-            )''')
-
-            # Backfill only from structured provider type evidence. Display names and
-            # free-text product/category data are intentionally not consulted.
-            c.execute('''UPDATE stores SET
-                commerce_type = CASE LOWER(TRIM(COALESCE(type, '')))
-                    WHEN 'restaurant' THEN 'RESTAURANT'
-                    WHEN 'restaurants' THEN 'RESTAURANT'
-                    WHEN 'grocery' THEN 'SUPERMARKET'
-                    WHEN 'market' THEN 'SUPERMARKET'
-                    WHEN 'super' THEN 'SUPERMARKET'
-                    WHEN 'supermarket' THEN 'SUPERMARKET'
-                    WHEN 'chiper_home' THEN 'SUPERMARKET'
-                    WHEN 'chiper_extended' THEN 'SUPERMARKET'
-                    WHEN 'chiper_express' THEN 'SUPERMARKET'
-                    WHEN 'farmatodo' THEN 'PHARMACY'
-                    WHEN 'pharmacy' THEN 'PHARMACY'
-                    WHEN 'farmacia' THEN 'PHARMACY'
-                    WHEN 'express_parent' THEN 'SPECIALTY_RETAIL'
-                    WHEN 'pets_cpgs' THEN 'SPECIALTY_RETAIL'
-                    ELSE 'UNKNOWN'
-                END,
-                catalog_domain = CASE LOWER(TRIM(COALESCE(type, '')))
-                    WHEN 'restaurant' THEN 'MENU'
-                    WHEN 'restaurants' THEN 'MENU'
-                    WHEN 'grocery' THEN 'RETAIL'
-                    WHEN 'market' THEN 'RETAIL'
-                    WHEN 'super' THEN 'RETAIL'
-                    WHEN 'supermarket' THEN 'RETAIL'
-                    WHEN 'chiper_home' THEN 'RETAIL'
-                    WHEN 'chiper_extended' THEN 'RETAIL'
-                    WHEN 'chiper_express' THEN 'RETAIL'
-                    WHEN 'farmatodo' THEN 'RETAIL'
-                    WHEN 'pharmacy' THEN 'RETAIL'
-                    WHEN 'farmacia' THEN 'RETAIL'
-                    WHEN 'express_parent' THEN 'RETAIL'
-                    WHEN 'pets_cpgs' THEN 'RETAIL'
-                    ELSE 'UNKNOWN'
-                END
-            ''')
-            observation_columns = {row[1] for row in c.execute("PRAGMA table_info(observations)")}
-            if {"provider", "store_id", "product_id", "timestamp", "id"} <= observation_columns:
-                c.execute('''CREATE INDEX IF NOT EXISTS idx_obs_provider_history
-                             ON observations(provider, store_id, product_id, timestamp DESC, id DESC)''')
-            c.execute('CREATE INDEX IF NOT EXISTS idx_stores_merchant ON stores(merchant_id, location_id)')
-            c.execute('CREATE INDEX IF NOT EXISTS idx_stores_commerce ON stores(commerce_type, catalog_domain)')
-
         c.execute('UPDATE schema_version SET version = ?', (CURRENT_SCHEMA_VERSION,))
-        
+
+    if version <= 17:
+        _ensure_v17_contract(c)
+
     c.execute('DROP VIEW IF EXISTS trusted_observations')
     c.execute('''
         CREATE VIEW trusted_observations AS
@@ -731,8 +735,8 @@ def db_integrity(db_path):
         return row[0]
 
 def db_vacuum(db_path):
-    conn = sqlite3.connect(db_path)
-    c = conn.cursor()
-    c.execute("VACUUM;")
-    conn.commit()
+    if not os.path.exists(db_path):
+        return False
+    with sqlite3.connect(db_path) as conn:
+        conn.execute("VACUUM;")
     return True

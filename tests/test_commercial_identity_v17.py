@@ -227,3 +227,29 @@ def test_browse_facets_return_only_mapped_nodes_in_scope(current_schema_db):
     assert facets['browse_nodes'] == [
         {'id': 'keyboards', 'parent_id': 'electronics', 'level': 'CATEGORY', 'name': 'Teclados'}
     ]
+
+
+def test_schema17_repairs_missing_required_objects_with_backup(tmp_path):
+    from dealhunter.db import setup_db
+
+    db_path = tmp_path / "repair-v17.db"
+    conn = setup_db(str(db_path))
+    conn.execute("DROP INDEX idx_obs_provider_history")
+    conn.execute("DROP TABLE browse_mappings")
+    conn.commit()
+    conn.close()
+
+    repaired = setup_db(str(db_path))
+    try:
+        assert repaired.execute("SELECT version FROM schema_version").fetchone()[0] == 17
+        assert repaired.execute("PRAGMA integrity_check").fetchone()[0] == "ok"
+        assert repaired.execute("PRAGMA foreign_key_check").fetchall() == []
+        indexes = {row[1] for row in repaired.execute("PRAGMA index_list(observations)")}
+        assert "idx_obs_provider_history" in indexes
+        tables = {row[0] for row in repaired.execute("SELECT name FROM sqlite_master WHERE type='table'")}
+        assert "browse_mappings" in tables
+    finally:
+        repaired.close()
+
+    backups = list(tmp_path.glob("repair-v17.db.*.pre_repair.bak"))
+    assert len(backups) == 1
