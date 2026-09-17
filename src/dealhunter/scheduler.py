@@ -20,7 +20,10 @@ RUN_TIMES = tuple((hour, minute) for hour in RUN_HOURS for minute in (0, 30))
 def _provider_command(provider):
     runner = shlex.quote(str(REPO_ROOT / "bin" / "rappi-ofertas"))
     watcher = shlex.quote(str(REPO_ROOT / "bin" / "dealwatcher"))
-    inner = f"{runner} sync --provider {shlex.quote(provider)} && {watcher}"
+    inner = (
+        f"{runner} maintenance run >/dev/null 2>&1 || true; "
+        f"{runner} sync --provider {shlex.quote(provider)} && {watcher}"
+    )
     return (
         f"cd {shlex.quote(str(REPO_ROOT))} && DEALHUNTER_SOURCE=SCHEDULED "
         f"{shlex.quote(FLOCK)} -n {shlex.quote(str(LOCK_FILE))} "

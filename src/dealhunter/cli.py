@@ -180,6 +180,9 @@ def build_parser():
     doctor_p = subparsers.add_parser("doctor", help="Run system diagnostics")
     doctor_p.add_argument("--network", action='store_true', help="Include network checks (not yet implemented)")
 
+    maintenance_p = subparsers.add_parser("maintenance", help="Rotate DealHunter logs and temporary diagnostics")
+    maintenance_p.add_argument("action", choices=["run"])
+
     # Phase 5E settings
     providers_p = subparsers.add_parser("providers", help="List configured providers")
 
@@ -517,6 +520,12 @@ def main(args_list=None):
                     importer.server.shutdown()
                     importer.server.server_close()
                     print("\nCancelled.")
+        return
+
+    if args.command == "maintenance":
+        import json
+        from .maintenance import run_maintenance
+        print(json.dumps(run_maintenance(), indent=2))
         return
 
     if args.command in crawler_commands:
