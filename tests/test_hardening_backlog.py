@@ -154,7 +154,9 @@ def test_scheduler_repairs_legacy_entry_and_installs_both_providers(monkeypatch)
     assert "sync --provider rappi" in content
     assert "sync --provider uber_eats" in content
     assert "dealwatcher" in content
-    assert str(Path(__file__).resolve().parents[1]) in content
+    assert "rappi-ofertas" in content
+    assert "dealwatcher" in content
+    assert str(scheduler.LOG_FILE) in content
     assert "rappi-deal-hunter" not in content
     assert scheduler.is_scheduler_enabled()
 

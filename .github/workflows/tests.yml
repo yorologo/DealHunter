@@ -8,21 +8,42 @@ on:
 
 jobs:
   test:
+    name: Python ${{ matrix.python-version }}
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.14"]
     steps:
     - uses: actions/checkout@v4
       with:
         fetch-depth: 0
-    - name: Set up Python 3.11
+    - name: Set up Python ${{ matrix.python-version }}
       uses: actions/setup-python@v5
       with:
-        python-version: "3.11"
-    - name: Install dependencies
+        python-version: ${{ matrix.python-version }}
+    - name: Install DealHunter package
       run: |
         python -m pip install --upgrade pip
-        pip install -r requirements.txt -r requirements-test.txt
+        python -m pip install ".[test]"
+        python -m pip check
+    - name: Smoke installed package
+      run: |
+        python - <<'PY'
+        from importlib.resources import files
+        from dealhunter.metadata import VERSION
+        from dealhunter import scheduler
+        assert VERSION
+        assert (files("dealhunter.web") / "templates" / "base.html").is_file()
+        assert "site-packages" not in scheduler.RAPPI_JOB
+        assert "rappi-ofertas" in scheduler.RAPPI_JOB
+        assert "dealwatcher" in scheduler.RAPPI_JOB
+        print(f"DealHunter {VERSION} installed package smoke: PASS")
+        PY
+        dealhunter --help >/dev/null
+        dealwatcher --help >/dev/null
     - name: Run offline tests
       run: |
         python -m compileall -q src tests
-        PYTHONPATH=src python scripts/check_release_trace.py
-        PYTHONPATH=src pytest
+        python scripts/check_release_trace.py
+        python -m pytest

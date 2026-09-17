@@ -2,30 +2,43 @@ import datetime
 import shlex
 import shutil
 import subprocess
+import sys
 import tempfile
 from pathlib import Path
+
+from .paths import get_scheduler_log_path
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 FLOCK = shutil.which("flock") or "flock"
 SHELL = shutil.which("bash") or "bash"
 LOCK_FILE = Path(tempfile.gettempdir()).resolve() / "dealhunter.lock"
-LOG_FILE = REPO_ROOT / "logs" / "crawler-cron.log"
+LOG_FILE = get_scheduler_log_path()
 CRON_COMMENT = "# DealHunter Scheduler (managed)"
 LEGACY_COMMENT = "# DealHunter Daily Sweep"
 RUN_HOURS = (7, 10, 13, 19)
 RUN_TIMES = tuple((hour, minute) for hour in RUN_HOURS for minute in (0, 30))
 
 
+def _resolve_command(name):
+    checkout = REPO_ROOT / "bin" / name
+    if checkout.is_file():
+        return str(checkout)
+    sibling = Path(sys.executable).resolve().parent / name
+    if sibling.is_file():
+        return str(sibling)
+    return shutil.which(name) or name
+
+
 def _provider_command(provider):
-    runner = shlex.quote(str(REPO_ROOT / "bin" / "rappi-ofertas"))
-    watcher = shlex.quote(str(REPO_ROOT / "bin" / "dealwatcher"))
+    runner = shlex.quote(_resolve_command("rappi-ofertas"))
+    watcher = shlex.quote(_resolve_command("dealwatcher"))
     inner = (
         f"{runner} maintenance run >/dev/null 2>&1 || true; "
         f"{runner} sync --provider {shlex.quote(provider)} && {watcher}"
     )
     return (
-        f"cd {shlex.quote(str(REPO_ROOT))} && DEALHUNTER_SOURCE=SCHEDULED "
+        f"DEALHUNTER_SOURCE=SCHEDULED "
         f"{shlex.quote(FLOCK)} -n {shlex.quote(str(LOCK_FILE))} "
         f"{shlex.quote(SHELL)} -c {shlex.quote(inner)} "
         f">> {shlex.quote(str(LOG_FILE))} 2>&1"

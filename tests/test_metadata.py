@@ -23,6 +23,35 @@ def test_android_packaging_uses_native_cryptography():
     root = Path(__file__).resolve().parents[1]
     project = tomllib.loads((root / "pyproject.toml").read_text())
     crypto_deps = [d for d in project["project"]["dependencies"] if d.startswith("cryptography")]
-    assert crypto_deps == ["cryptography; sys_platform != 'android'"]
+    assert crypto_deps == ["cryptography>=44,<51; sys_platform != 'android'"]
     requirements = (root / "requirements.txt").read_text()
-    assert 'cryptography; sys_platform != "android"' in requirements
+    assert 'cryptography>=44,<51; sys_platform != "android"' in requirements
+
+
+def test_dependency_bounds_are_explicit_and_kiss():
+    import tomllib
+    from pathlib import Path
+
+    root = Path(__file__).resolve().parents[1]
+    project = tomllib.loads((root / "pyproject.toml").read_text())
+    assert project["project"]["dependencies"] == [
+        "flask>=3.0,<4",
+        "cryptography>=44,<51; sys_platform != 'android'",
+        "websockets>=14,<18",
+        "aiohttp>=3.10,<4",
+    ]
+    assert project["project"]["optional-dependencies"]["test"] == [
+        "pytest>=8,<10",
+        "pytest-asyncio>=0.24,<2",
+    ]
+    assert project["project"]["scripts"]["dealwatcher"] == "dealhunter.dealwatcher:main"
+    assert (root / "requirements.txt").read_text().splitlines() == [
+        "flask>=3.0,<4",
+        'cryptography>=44,<51; sys_platform != "android"',
+        "websockets>=14,<18",
+        "aiohttp>=3.10,<4",
+    ]
+    assert (root / "requirements-test.txt").read_text().splitlines() == [
+        "pytest>=8,<10",
+        "pytest-asyncio>=0.24,<2",
+    ]

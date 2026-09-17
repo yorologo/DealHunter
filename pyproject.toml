@@ -10,21 +10,22 @@ readme = "README.md"
 requires-python = ">=3.11"
 license = { file = "LICENSE" }
 dependencies = [
-  "flask",
-  "cryptography; sys_platform != 'android'",
-  "websockets",
-  "aiohttp",
+  "flask>=3.0,<4",
+  "cryptography>=44,<51; sys_platform != 'android'",
+  "websockets>=14,<18",
+  "aiohttp>=3.10,<4",
 ]
 
 [project.optional-dependencies]
 test = [
-  "pytest",
-  "pytest-asyncio",
+  "pytest>=8,<10",
+  "pytest-asyncio>=0.24,<2",
 ]
 
 [project.scripts]
 dealhunter = "dealhunter.cli:main"
 rappi-ofertas = "dealhunter.cli:main"
+dealwatcher = "dealhunter.dealwatcher:main"
 
 [tool.setuptools]
 package-dir = {"" = "src"}

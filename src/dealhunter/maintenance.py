@@ -8,18 +8,12 @@ import os
 import time
 from pathlib import Path
 
-from .scheduler import LOG_FILE
+from .paths import get_scheduler_log_path, get_state_dir
 
 DEFAULT_LOG_MAX_BYTES = 5 * 1024 * 1024
 DEFAULT_LOG_BACKUPS = 3
 DEFAULT_DIAGNOSTIC_DAYS = 14
 
-
-def get_state_dir() -> Path:
-    root = os.environ.get("XDG_STATE_HOME")
-    if root:
-        return Path(root).expanduser() / "dealhunter"
-    return Path(os.path.expanduser("~/.local/state")) / "dealhunter"
 
 
 def get_diagnostics_dir() -> Path:
@@ -68,7 +62,7 @@ def cleanup_diagnostics(directory=None, *, max_age_days=DEFAULT_DIAGNOSTIC_DAYS,
 
 
 def run_maintenance(*, log_file=None, diagnostics_dir=None, max_log_bytes=DEFAULT_LOG_MAX_BYTES, keep_logs=DEFAULT_LOG_BACKUPS, diagnostic_days=DEFAULT_DIAGNOSTIC_DAYS):
-    target_log = Path(log_file) if log_file is not None else LOG_FILE
+    target_log = Path(log_file) if log_file is not None else get_scheduler_log_path()
     return {
         "log_rotated": rotate_file(target_log, max_bytes=max_log_bytes, keep=keep_logs),
         "diagnostics_removed": cleanup_diagnostics(diagnostics_dir, max_age_days=diagnostic_days),
