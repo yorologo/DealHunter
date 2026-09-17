@@ -81,39 +81,84 @@ def admin_home():
 
 
 
+def _rappi_account_status(check_network=False):
+    """Resolve Rappi independently so provider failures stay isolated."""
+    try:
+        from dealhunter.account import get_account_status as resolve_rappi_status
+        return resolve_rappi_status(load_config(), check_network=check_network)
+    except Exception:
+        current_app.logger.exception("Rappi account status failed")
+        return {
+            "configured": False,
+            "status": "ERROR",
+            "source": "ERROR",
+            "last_validated_at": None,
+            "action_required": None,
+            "market": "UNKNOWN",
+            "region": "UNKNOWN",
+            "has_prime": False,
+            "prime_type": "NONE",
+            "effective": False,
+        }
+
+
+def _uber_account_status(check_network=False):
+    """Resolve Uber through its provider-owned status authority."""
+    try:
+        from dealhunter.providers.uber_eats.status import get_status as resolve_uber_status
+        return resolve_uber_status(
+            check_network=check_network,
+            db_path=current_app.config.get("DATABASE"),
+        )
+    except Exception:
+        current_app.logger.exception("Uber Eats account status failed")
+        return {
+            "provider": "Uber Eats",
+            "profile": "UNKNOWN",
+            "runtime": "RUNTIME_ERROR",
+            "session": "UNVERIFIED",
+            "last_sync": "Never",
+            "last_sync_age_hours": None,
+            "data_status": "UNKNOWN",
+            "status": "RUNTIME_ERROR",
+            "checked_network": bool(check_network),
+        }
+
+
+def _render_account(*, rappi_network=False, uber_network=False):
+    return render_template(
+        'admin/account.html',
+        current_path='/admin/account',
+        rappi=_rappi_account_status(check_network=rappi_network),
+        uber=_uber_account_status(check_network=uber_network),
+    )
+
+
 @admin_bp.route('/account')
 def account():
-    """Account management and diagnostics."""
-    cfg = load_config()
-    db_path = current_app.config.get('DATABASE')
-    from dealhunter.account import get_account_status
-    # Do NOT hit network on load
-    status = get_account_status(cfg, check_network=False)
+    """Local-only status for all account-backed providers."""
+    return _render_account()
 
-    return render_template('admin/account.html',
-                           current_path='/admin/account',
-                           **status)
 
 @admin_bp.route('/account/check', methods=['POST'])
 def account_check():
-    """Explicit account check - hits network."""
-    cfg = load_config()
-    db_path = current_app.config.get('DATABASE')
-    from dealhunter.account import get_account_status
-    status = get_account_status(cfg, check_network=True)
+    """Explicit Rappi network validation."""
+    return _render_account(rappi_network=True)
 
-    return render_template('admin/account.html',
-                           current_path='/admin/account',
-                           **status)
+
+@admin_bp.route('/account/uber/check', methods=['POST'])
+def account_uber_check():
+    """Explicit Uber Eats session validation through provider status authority."""
+    return _render_account(uber_network=True)
+
 
 @admin_bp.route('/account/delete', methods=['POST'])
 def account_delete():
+    """Invalidate only the Rappi session; Uber profile lifecycle stays isolated."""
     from dealhunter.secret_store import SessionService
-    svc = SessionService()
-    svc.invalidate()
-    # Redirect to account page
-    from flask import redirect
+    SessionService().invalidate()
     return redirect('/admin/account')
+
 
 @admin_bp.route('/runs')
 def runs():

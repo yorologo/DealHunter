@@ -40,6 +40,8 @@ dealhunter maintenance run
 
 # Cuenta/membresías
 dealhunter account status
+dealhunter uber status       # diagnóstico local; no valida sesión por red
+dealhunter uber setup        # setup/renovación interactiva del profile
 dealhunter memberships
 dealhunter membership uber_one active
 ```

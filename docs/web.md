@@ -18,7 +18,7 @@ La interfaz agrupa las funciones en cuatro áreas:
 - **Comprar**: oportunidades, supermercados, Turbo, restaurantes y categorías.
 - **Investigar**: productos, tiendas, detalle, histórico, búsqueda y comparación.
 - **Seguir**: Watchlist y Alertas de sólo lectura sobre los motores existentes.
-- **Administrar**: cuenta, runs/eventos, Doctor, DB/backup, Settings y Catalog Sync.
+- **Administrar**: Cuentas / Proveedores, runs/eventos, Doctor, DB/backup, Settings y Catalog Sync.
 
 El mapa exacto de rutas es código (`src/dealhunter/web/routes.py` y `admin.py`), no una tabla duplicada que deba sincronizarse manualmente con cada cambio.
 
@@ -28,9 +28,18 @@ El mapa exacto de rutas es código (`src/dealhunter/web/routes.py` y `admin.py`)
 - GET de navegación no debe ejecutar adquisición remota ni mutar estado.
 - Acciones mutables usan POST + CSRF.
 - Secrets nunca se renderizan; la UI sólo muestra estado/configuración segura.
-- Account/Doctor de red requieren acción explícita.
+- Cuentas / Proveedores y Doctor separan diagnóstico local de validación de red; cualquier comprobación remota requiere una acción POST explícita.
 - Backup/integrity usan funciones internas; no existe SQL arbitrario en la UI.
 - `/api/open-rappi` construye únicamente deep links soportados desde IDs/tipos resueltos en SQLite y falla cerrado si Shizuku/Intent/tipo no son válidos.
+
+## Cuentas / Proveedores
+
+`/admin/account` presenta Rappi y Uber Eats en una sola superficie, pero conserva sus mecanismos aislados:
+
+- **Rappi** → `SessionService` / SecretStore / validación de cuenta existente.
+- **Uber Eats** → profile Chromium / runtime CDP / autoridad `providers/uber_eats/status.py`.
+
+El GET es diagnóstico local: no navega a Uber ni valida Rappi por red. Los botones **Comprobar sesión** ejecutan únicamente la validación explícita del provider correspondiente. La existencia del profile Uber se muestra como `UNVERIFIED`, nunca como prueba de sesión válida. Si Uber necesita login o renovación, la Web indica `dealhunter uber setup`; no ejecuta Carbonyl ni expone controles Start/Stop Chromium.
 
 ## Catalog Sync
 

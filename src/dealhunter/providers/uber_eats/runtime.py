@@ -82,6 +82,31 @@ class ChromiumRuntime:
             except Exception:
                 pass
 
+    def is_running_local(self) -> bool:
+        """Detect this dedicated Chromium process without HTTP/CDP traffic."""
+        if self._process is not None and self._process.poll() is None:
+            return True
+
+        profile_arg = f"--user-data-dir={self.profile_path}"
+        try:
+            for entry in os.scandir("/proc"):
+                if not entry.name.isdigit():
+                    continue
+                try:
+                    with open(os.path.join(entry.path, "cmdline"), "rb") as handle:
+                        raw = handle.read()
+                    args = [part.decode("utf-8", "ignore") for part in raw.split(b"\0") if part]
+                except (OSError, PermissionError):
+                    continue
+                if not args:
+                    continue
+                executable = os.path.basename(args[0])
+                if executable in ("chromium-browser", "chromium") and profile_arg in args:
+                    return True
+        except OSError:
+            pass
+        return False
+
     def is_healthy(self) -> bool:
         """Returns True if the CDP endpoint is reachable."""
         url = f"http://{CDP_HOST}:{self.port}/json/version"

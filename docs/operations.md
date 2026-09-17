@@ -60,7 +60,7 @@ La configuración vive fuera del repositorio, bajo `XDG_CONFIG_HOME` o `~/.confi
 ### Configuración opcional
 
 - **Rappi session**: mejora cobertura mediante Zone Inventory; persistencia sólo opt-in con SecretStore.
-- **Uber Eats**: `dealhunter uber setup` para preparar el perfil cuando sea necesario.
+- **Uber Eats**: Admin → **Cuentas / Proveedores** muestra estado local del profile/runtime. Si indica `NEEDS_LOGIN`, ejecuta `dealhunter uber setup` en Termux y luego usa **Comprobar sesión** en la Web. El profile por sí solo permanece `UNVERIFIED` hasta esa comprobación.
 - **Membresías**: `dealhunter membership rappi_pro ...` / `uber_one ...` sólo afectan elegibilidad/comparación.
 - **Providers**: pueden habilitarse/deshabilitarse por separado.
 

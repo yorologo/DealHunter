@@ -4,124 +4,174 @@
     <nav aria-label="breadcrumb" class="mb-3">
         <ol class="breadcrumb">
             <li class="breadcrumb-item"><a href="/admin">Administración</a></li>
-            <li class="breadcrumb-item active">Cuenta</li>
+            <li class="breadcrumb-item active">Cuentas / Proveedores</li>
         </ol>
     </nav>
 
-    <h2 class="mb-1">👤 Sesión Rappi</h2>
-    <p class="text-muted mb-4">Gestión de sesión para sincronización de catálogo e inventario de zona.</p>
+    <h2 class="mb-1">👥 Cuentas / Proveedores</h2>
+    <p class="text-muted mb-4">Estado independiente de las sesiones usadas por cada proveedor. Cargar esta página sólo realiza diagnóstico local.</p>
 
-    <!-- Session Status Card -->
-    <div class="card shadow-sm mb-4" id="account-status-card">
+    <div class="card shadow-sm mb-4" id="rappi-account-card">
+        <div class="card-header bg-body-tertiary d-flex justify-content-between align-items-center">
+            <strong>Rappi</strong>
+            {% if rappi.status == 'VALID' %}
+                <span class="badge bg-success">VALID</span>
+            {% elif rappi.status in ('EXPIRED', 'ERROR') %}
+                <span class="badge bg-danger">{{ rappi.status }}</span>
+            {% elif rappi.status in ('UNVERIFIED', 'INVALID') %}
+                <span class="badge bg-warning text-dark">{{ rappi.status }}</span>
+            {% elif rappi.status == 'CONFIGURED' %}
+                <span class="badge bg-info text-dark">CONFIGURED</span>
+            {% else %}
+                <span class="badge bg-secondary">NOT_CONFIGURED</span>
+            {% endif %}
+        </div>
         <div class="card-body">
-            <div class="row">
+            <div class="row g-3">
                 <div class="col-md-7">
-                    <h5 class="card-title mb-3">Estado de la Sesión</h5>
                     <dl class="row mb-0">
-                        <dt class="col-sm-4 text-muted fw-normal">Estado:</dt>
+                        <dt class="col-sm-4 text-muted fw-normal">Estado</dt>
+                        <dd class="col-sm-8">{{ rappi.status }}</dd>
+
+                        <dt class="col-sm-4 text-muted fw-normal">Sesión</dt>
+                        <dd class="col-sm-8">{{ 'Configurada' if rappi.configured else 'No configurada' }}</dd>
+
+                        <dt class="col-sm-4 text-muted fw-normal">Origen</dt>
                         <dd class="col-sm-8">
-                            {% if status == 'VALID' %}
-                                <span class="badge bg-success fs-6"><i class="bi bi-check-circle"></i> Válida</span>
-                            {% elif status == 'EXPIRED' %}
-                                <span class="badge bg-danger fs-6"><i class="bi bi-x-circle"></i> Expirada</span>
-                                                        {% elif status == 'UNVERIFIED' %}
-                                <span class="badge bg-warning text-dark fs-6"><i class="bi bi-exclamation-triangle"></i> No fue posible verificar la sesión</span>
-                            {% elif status == 'CONFIGURED' %}
-                                <span class="badge bg-info text-dark fs-6"><i class="bi bi-info-circle"></i> Configurada, sin comprobar</span>
-                            {% elif status == 'INVALID' %}
-                                <span class="badge bg-warning text-dark fs-6"><i class="bi bi-exclamation-triangle"></i> Inválida (Corrupta)</span>
-                            {% else %}
-                                <span class="badge bg-secondary fs-6">No configurada</span>
-                            {% endif %}
+                            {% if rappi.source == 'PERSISTENT' %}Almacenamiento local cifrado
+                            {% elif rappi.source == 'EPHEMERAL' %}Variable de entorno temporal
+                            {% elif rappi.source == 'TEMPORARY' %}Memoria RAM temporal
+                            {% elif rappi.source == 'ERROR' %}No disponible
+                            {% else %}-{% endif %}
                         </dd>
 
-                        <dt class="col-sm-4 text-muted fw-normal">Origen:</dt>
+                        <dt class="col-sm-4 text-muted fw-normal">Mercado</dt>
                         <dd class="col-sm-8">
-                            {% if source == 'PERSISTENT' %}
-                                <i class="bi bi-shield-lock text-success"></i> Almacenamiento local cifrado
-                            {% elif source == 'EPHEMERAL' %}
-                                <i class="bi bi-terminal"></i> Variable de entorno <code>RAPPI_BEARER_TOKEN</code> (Temporal)
-                            {% elif source == 'TEMPORARY' %}
-                                <i class="bi bi-clock-history"></i> Memoria RAM (Temporal)
-                            {% else %}
-                                -
-                            {% endif %}
+                            {% if rappi.market and rappi.market != 'UNKNOWN' %}{{ rappi.region }} ({{ rappi.market }}){% else %}-{% endif %}
                         </dd>
-                        <dt class="col-sm-4 text-muted fw-normal mt-2">Último intento:</dt>
-                        <dd class="col-sm-8 mt-2">
-                            {% if last_validated_at %}
-                                <span class="local-time" data-iso="{{ last_validated_at }}">{{ last_validated_at }}</span>
-                            {% else %}
-                                -
-                            {% endif %}
+
+                        <dt class="col-sm-4 text-muted fw-normal">Última comprobación</dt>
+                        <dd class="col-sm-8">
+                            {% if rappi.last_validated_at %}<span class="local-time" data-iso="{{ rappi.last_validated_at }}">{{ rappi.last_validated_at }}</span>{% else %}-{% endif %}
                         </dd>
-                        
-                        <dt class="col-sm-4 text-muted fw-normal">Detalles:</dt>
-                        <dd class="col-sm-8 text-muted small mb-0">
-                            {% if status == 'UNVERIFIED' %}
-                                Rappi no permitió confirmar la sesión en este momento (WAF o Rate Limit). Tu sesión fue conservada, inténtalo más tarde.
-                            {% elif status == 'CONFIGURED' %}
-                                No verificada recientemente
-                            {% elif status == 'VALID' %}
-                                {% if action_required == 'NETWORK_UNVERIFIED_WARNING' %}
-                                    <span class="text-warning"><i class="bi bi-exclamation-triangle"></i> Falló comprobación temporal (WAF/Rate Limit), pero se mantiene válida por historial.</span><br>
-                                {% endif %}
-                                {% if market and market != 'UNKNOWN' %}
-                                {{ region }} ({{ market }})
-                                {% if has_prime %}<br><i class="bi bi-star-fill text-warning"></i> Prime ({{ prime_type }}){% endif %}
-                            {% else %}
-                                No verificada recientemente
-                            {% endif %}
-                            {% elif status == 'EXPIRED' %}
-                                La sesión ha expirado y debe ser reemplazada
-                            {% else %}
-                                {% if market and market != 'UNKNOWN' %}
-                                {{ region }} ({{ market }})
-                                {% if has_prime %}<br><i class="bi bi-star-fill text-warning"></i> Prime ({{ prime_type }}){% endif %}
-                            {% else %}
-                                No verificada recientemente
-                            {% endif %}
-                            {% endif %}
-                        </dd>
+
+                        <dt class="col-sm-4 text-muted fw-normal">Rappi Pro</dt>
+                        <dd class="col-sm-8">{% if rappi.has_prime %}Activo{% if rappi.prime_type and rappi.prime_type != 'NONE' %} ({{ rappi.prime_type }}){% endif %}{% else %}-{% endif %}</dd>
                     </dl>
+                    {% if rappi.action_required == 'NETWORK_UNVERIFIED_WARNING' %}
+                    <p class="small text-warning mb-0 mt-2">La comprobación remota fue ambigua; se conserva la última sesión válida conocida.</p>
+                    {% endif %}
+                    {% if rappi.status == 'UNVERIFIED' %}
+                    <p class="small text-muted mb-0 mt-2">No fue posible verificar Rappi en este momento; una sesión previamente válida no se invalida por un resultado ambiguo.</p>
+                    {% elif rappi.status == 'ERROR' %}
+                    <p class="small text-danger mb-0 mt-2">No se pudo leer el estado local de Rappi. Uber Eats permanece independiente.</p>
+                    {% endif %}
                 </div>
-                <div class="col-md-5 d-flex flex-column justify-content-center align-items-end border-start">
-                    <div class="d-grid gap-2 w-100 px-3">
-                        {% if configured %}
-                            <button class="btn {% if status == 'UNVERIFIED' %}btn-primary{% else %}btn-outline-primary{% endif %}"
-                                    hx-post="/admin/account/check"
-                                    hx-target="#account-status-card"
-                                    hx-swap="outerHTML" hx-select="#account-status-card"
-                                    hx-headers='{"X-CSRF-Token": "{{ csrf_token }}"}'
-                                    hx-indicator="#account-spinner">
-                                <span id="account-spinner" class="htmx-indicator spinner-border spinner-border-sm me-2" role="status"></span>
-                                Comprobar sesión
-                            </button>
-                            <a href="/admin/catalog-sync/wizard" class="btn btn-outline-secondary">
-                                Reemplazar sesión
-                            </a>
-                            {% if source == 'PERSISTENT' or source == 'TEMPORARY' %}
-                            <button class="btn btn-outline-danger"
-                                    hx-post="/admin/account/delete"
-                                    hx-confirm="¿Seguro que deseas eliminar la sesión actual?"
-                                    hx-headers='{"X-CSRF-Token": "{{ csrf_token }}"}'>
-                                Eliminar sesión
-                            </button>
-                            {% endif %}
+                <div class="col-md-5 d-flex flex-column justify-content-center border-start">
+                    <div class="d-grid gap-2 px-3">
+                        {% if rappi.configured %}
+                        <button class="btn btn-outline-primary"
+                                hx-post="/admin/account/check"
+                                hx-target="#rappi-account-card"
+                                hx-swap="outerHTML" hx-select="#rappi-account-card"
+                                hx-headers='{"X-CSRF-Token": "{{ csrf_token }}"}'
+                                hx-indicator="#rappi-account-spinner">
+                            <span id="rappi-account-spinner" class="htmx-indicator spinner-border spinner-border-sm me-2" role="status"></span>
+                            Comprobar sesión
+                        </button>
+                        <a href="/admin/catalog-sync/wizard" class="btn btn-outline-secondary">Reemplazar sesión</a>
+                        {% if rappi.source in ('PERSISTENT', 'TEMPORARY') %}
+                        <button class="btn btn-outline-danger"
+                                hx-post="/admin/account/delete"
+                                hx-confirm="¿Seguro que deseas eliminar la sesión Rappi actual?"
+                                hx-headers='{"X-CSRF-Token": "{{ csrf_token }}"}'>
+                            Invalidar sesión
+                        </button>
+                        {% endif %}
                         {% else %}
-                            <a href="/admin/catalog-sync/wizard" class="btn btn-primary">
-                                Configurar sesión
-                            </a>
+                        <a href="/admin/catalog-sync/wizard" class="btn btn-primary">Configurar sesión Rappi</a>
                         {% endif %}
                     </div>
                 </div>
             </div>
         </div>
     </div>
-    
-    <div class="alert alert-info mt-3 small" role="alert">
-        <strong>Privacidad:</strong> DealHunter nunca guarda emails, teléfonos, direcciones ni datos de pago. La sesión se utiliza estrictamente para consultar catálogos de tiendas e inventario de zona en nombre del usuario local.
+
+    <div class="card shadow-sm mb-4" id="uber-account-card">
+        <div class="card-header bg-body-tertiary d-flex justify-content-between align-items-center">
+            <strong>Uber Eats</strong>
+            {% if uber.status == 'READY' %}
+                <span class="badge bg-success">READY</span>
+            {% elif uber.status == 'NEEDS_LOGIN' %}
+                <span class="badge bg-warning text-dark">NEEDS_LOGIN</span>
+            {% elif uber.status == 'RUNTIME_ERROR' %}
+                <span class="badge bg-danger">RUNTIME_ERROR</span>
+            {% else %}
+                <span class="badge bg-info text-dark">{{ uber.status }}</span>
+            {% endif %}
+        </div>
+        <div class="card-body">
+            <div class="row g-3">
+                <div class="col-md-7">
+                    <dl class="row mb-0">
+                        <dt class="col-sm-4 text-muted fw-normal">Estado</dt>
+                        <dd class="col-sm-8">{{ uber.status }}</dd>
+
+                        <dt class="col-sm-4 text-muted fw-normal">Sesión</dt>
+                        <dd class="col-sm-8">{{ uber.session }}</dd>
+
+                        <dt class="col-sm-4 text-muted fw-normal">Runtime</dt>
+                        <dd class="col-sm-8">{{ uber.runtime }}</dd>
+
+                        <dt class="col-sm-4 text-muted fw-normal">Perfil</dt>
+                        <dd class="col-sm-8">{{ uber.profile }}</dd>
+
+                        <dt class="col-sm-4 text-muted fw-normal">Datos</dt>
+                        <dd class="col-sm-8">{{ uber.data_status }}</dd>
+
+                        <dt class="col-sm-4 text-muted fw-normal">Última sync</dt>
+                        <dd class="col-sm-8">
+                            {% if uber.last_sync and uber.last_sync != 'Never' %}
+                                <span class="local-time" data-iso="{{ uber.last_sync }}">{{ uber.last_sync }}</span>
+                                {% if uber.last_sync_age_hours is not none %}<span class="text-muted small"> ({{ '%.1f'|format(uber.last_sync_age_hours) }} h)</span>{% endif %}
+                            {% else %}Nunca{% endif %}
+                        </dd>
+                    </dl>
+
+                    {% if uber.status == 'NEEDS_LOGIN' %}
+                    <div class="alert alert-warning py-2 mt-3 mb-0 small">
+                        Configura o renueva Uber Eats desde Termux y vuelve a comprobar la sesión:<br>
+                        <code>dealhunter uber setup</code>
+                    </div>
+                    {% elif uber.status == 'UNVERIFIED' %}
+                    <p class="small text-muted mb-0 mt-2">El perfil existe, pero su sesión no se considera válida hasta una comprobación explícita.</p>
+                    {% elif uber.status == 'RUNTIME_ERROR' %}
+                    <p class="small text-danger mb-0 mt-2">No se pudo iniciar o comprobar el runtime de Uber Eats.</p>
+                    {% endif %}
+                </div>
+                <div class="col-md-5 d-flex flex-column justify-content-center border-start">
+                    <div class="d-grid gap-2 px-3">
+                        {% if uber.profile == 'CONFIGURED' %}
+                        <button class="btn btn-outline-primary"
+                                hx-post="/admin/account/uber/check"
+                                hx-target="#uber-account-card"
+                                hx-swap="outerHTML" hx-select="#uber-account-card"
+                                hx-headers='{"X-CSRF-Token": "{{ csrf_token }}"}'
+                                hx-indicator="#uber-account-spinner">
+                            <span id="uber-account-spinner" class="htmx-indicator spinner-border spinner-border-sm me-2" role="status"></span>
+                            Comprobar sesión
+                        </button>
+                        {% else %}
+                        <div class="small text-muted">El setup de Uber es interactivo y se realiza en Termux, no desde la Web.</div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 
+    <div class="alert alert-info small" role="alert">
+        <strong>Privacidad:</strong> DealHunter no muestra tokens, cookies ni contenido del perfil Chromium. Rappi y Uber Eats mantienen mecanismos de sesión independientes.
+    </div>
 </div>
 {% endblock %}

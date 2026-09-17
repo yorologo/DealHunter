@@ -62,7 +62,11 @@ provider y la elegibilidad de Rappi Pro/Uber One se aplican después de identida
 el matcher canónico continúa en shadow y no escribe memberships automáticamente.
 
 Los runs normales de Uber usan Chromium headless nativo de Termux y CDP, sin PC
-ni servidor X. Carbonyl se usa sólo para setup o renovación del perfil.
+ni servidor X. Carbonyl se usa sólo para setup o renovación del perfil. El estado
+de Uber tiene una única autoridad en `providers/uber_eats/status.py`: el diagnóstico
+local no usa red y un profile existente permanece `UNVERIFIED`; la validación real
+reutiliza el mismo `UberBrowserTransport.ensure_ready()` que consume el crawler.
+Rappi mantiene de forma independiente `SessionService` / SecretStore.
 
 ### Crawler Architecture & Session Flow
 

@@ -6,6 +6,7 @@ from .browser_transport import UberBrowserTransport
 from .feed_v1 import parse_feed_v1
 from .parser import UberEatsParser
 from .normalizer import UberEatsNormalizer
+from .status import VALID, session_status_from_transport
 from dealhunter.commerce import classify_store
 
 logger = logging.getLogger(__name__)
@@ -21,9 +22,19 @@ async def _run_uber_sync_async(config, lat, lng, conn, run_id):
 
     transport = UberBrowserTransport()
     try:
-        await transport.ensure_ready()
+        transport_state = await transport.ensure_ready()
+        session_state = session_status_from_transport(transport_state)
+        if session_state != VALID:
+            logger.warning("Uber session is not ready: %s", session_state)
+            await transport.close()
+            rt.stop()
+            return "FAILED_RETRYABLE", 0
     except Exception as e:
         logger.error(f"Failed to connect transport: {e}")
+        try:
+            await transport.close()
+        except Exception:
+            pass
         rt.stop()
         return "FAILED_RETRYABLE", 0
 

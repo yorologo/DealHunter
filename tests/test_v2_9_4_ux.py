@@ -40,9 +40,9 @@ def test_unverified_account_can_replace_session(app_client):
         }
         res = client.get('/admin/account')
         html = res.data.decode('utf-8')
-        assert 'btn-primary' in html
         assert 'Reemplazar sesión' in html
-        assert 'disabled' not in html[html.find('Reemplazar sesión') - 100:html.find('Reemplazar sesión')]
+        snippet = html[html.find('Reemplazar sesión') - 140:html.find('Reemplazar sesión')]
+        assert 'disabled' not in snippet
 
 def test_restaurant_empty_state_filtered(app_client):
     client, db_path = app_client

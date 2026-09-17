@@ -259,61 +259,35 @@ class TestUberProviderStatus:
         assert types["groc-url"] == "grocery"
 
 
-    def test_status_combinations(self, monkeypatch):
-        """Test status transitions based on runtime, profile, db."""
+    def test_status_combinations(self, monkeypatch, tmp_path):
+        """Local Uber status never equates profile presence with a valid session."""
         import dealhunter.providers.uber_eats.status as st_mod
-        from dealhunter.providers.uber_eats.runtime import ChromiumRuntime
-        
-        # Mock DB
-        class MockCursor:
-            def __init__(self, count):
-                self.count = count
-            def execute(self, q, p=None):
-                pass
-            def fetchone(self):
-                if self.count > 0:
-                    return ("2030-01-01 00:00:00",)
-                return None
-            def close(self):
-                pass
-                
-        class MockConn:
-            def __init__(self, count):
-                self.count = count
-            def cursor(self):
-                return MockCursor(self.count)
-            def close(self):
-                pass
-                
-        monkeypatch.setattr(st_mod, "setup_db", lambda: MockConn(1))
-        
-        # Test 1: Stopped runtime
-        monkeypatch.setattr("os.path.isdir", lambda p: False)
-        monkeypatch.setattr(ChromiumRuntime, "is_healthy", lambda self: False)
-        
-        st = st_mod.get_status()
-        assert st["status"] == "DISABLED"
-        assert st["runtime"] == "RUNTIME_STOPPED"
-        
-        # Test 2: Running but no profile
-        monkeypatch.setattr("os.path.isdir", lambda p: False)
-        monkeypatch.setattr(ChromiumRuntime, "is_healthy", lambda self: True)
-        
-        st = st_mod.get_status()
-        assert st["status"] == "NEEDS_LOGIN"
-        assert st["session"] == "NEEDS_LOGIN"
-        
-        # Test 3: Running and has profile
-        monkeypatch.setattr("os.path.isdir", lambda p: True)
-        monkeypatch.setattr(ChromiumRuntime, "is_healthy", lambda self: True)
-        st = st_mod.get_status()
-        assert st["status"] == "READY"
-        assert st["session"] == "CONFIGURED"
-        
-        # Test 4: Stale DB
-        monkeypatch.setattr(st_mod, "setup_db", lambda: MockConn(0))
-        st = st_mod.get_status()
-        assert st["data_status"] == "NO_DATA"
+
+        class MockRuntime:
+            profile_path = str(tmp_path / "uber-profile")
+            running = False
+
+            def is_running_local(self):
+                return self.running
+
+        monkeypatch.setattr(st_mod, "ChromiumRuntime", MockRuntime)
+        monkeypatch.setattr(st_mod, "_last_sync_status", lambda _: ("Never", None, st_mod.NO_DATA))
+
+        st = st_mod.get_status(db_path=str(tmp_path / "missing.db"))
+        assert st["status"] == st_mod.NEEDS_LOGIN
+        assert st["session"] == st_mod.NEEDS_LOGIN
+        assert st["runtime"] == st_mod.RUNTIME_STOPPED
+
+        (tmp_path / "uber-profile").mkdir()
+        st = st_mod.get_status(db_path=str(tmp_path / "missing.db"))
+        assert st["status"] == st_mod.UNVERIFIED
+        assert st["session"] == st_mod.UNVERIFIED
+
+        MockRuntime.running = True
+        st = st_mod.get_status(db_path=str(tmp_path / "missing.db"))
+        assert st["runtime"] == st_mod.READY
+        assert st["session"] == st_mod.UNVERIFIED
+        assert st["data_status"] == st_mod.NO_DATA
 
 
     def test_rerun_same_run_id_dedup(self, current_schema_db):
@@ -346,7 +320,9 @@ class TestUberProviderStatus:
             def stop(self): pass
         
         class MockTransport:
-            async def ensure_ready(self): pass
+            async def ensure_ready(self):
+                from dealhunter.providers.uber_eats.browser_transport import READY
+                return READY
             async def fetch_feed_v1(self, lat, lng, query=None):
                 if query == "supermercado":
                     return {"data": {"feedItems": [{"store": {"storeUuid": "fail-store", "title": {"text": "Fail Store"}, "storeType": "RESTAURANT"}}]}}
@@ -386,6 +362,37 @@ class TestUberProviderStatus:
         c = current_schema_db.cursor()
         c.execute("SELECT COUNT(*) FROM observations WHERE run_id = 'run-tx-test'")
         assert c.fetchone()[0] == 0
+
+
+    def test_crawler_rejects_login_required_before_fetch(self, current_schema_db, monkeypatch):
+        import asyncio
+        from dealhunter.providers.uber_eats.browser_transport import LOGIN_REQUIRED
+        from dealhunter.providers.uber_eats.crawler import _run_uber_sync_async
+
+        state = {"stopped": False, "fetched": False, "closed": False}
+
+        class MockRuntime:
+            def start(self):
+                return None
+            def stop(self):
+                state["stopped"] = True
+
+        class MockTransport:
+            async def ensure_ready(self):
+                return LOGIN_REQUIRED
+            async def close(self):
+                state["closed"] = True
+            async def fetch_feed_v1(self, *args, **kwargs):
+                state["fetched"] = True
+                raise AssertionError("feed must not run without a valid Uber session")
+
+        monkeypatch.setattr("dealhunter.providers.uber_eats.crawler.ChromiumRuntime", MockRuntime)
+        monkeypatch.setattr("dealhunter.providers.uber_eats.crawler.UberBrowserTransport", MockTransport)
+
+        result, requests = asyncio.run(_run_uber_sync_async({}, 20.0, -103.0, current_schema_db, "login-required"))
+        assert result == "FAILED_RETRYABLE"
+        assert requests == 0
+        assert state == {"stopped": True, "fetched": False, "closed": True}
 
 
     def test_null_timestamp_tolerance(self, current_schema_db, monkeypatch):

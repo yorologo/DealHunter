@@ -369,6 +369,7 @@ class TestCSRF:
         """All POST endpoints must reject requests without CSRF."""
         post_endpoints = [
             '/admin/account/check',
+            '/admin/account/uber/check',
             '/admin/doctor/check',
             '/admin/database/backup',
             '/admin/database/integrity',
