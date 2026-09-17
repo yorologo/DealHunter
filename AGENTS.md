@@ -28,9 +28,9 @@ The project must prioritize demonstrable value, not the largest advertised disco
 
 ## CURRENT DEVELOPMENT / RC
 
-- **Runtime version**: v3.3.1 until the next release decision is validated.
-- **Public baseline**: v3.3.1 (`9f5f3c3c12f084190d0aea8f28e4950afb51bca8`).
-- **Integration branch**: `develop`, currently carrying post-v3.3.1 A01–A32 audit work.
+- **Runtime version**: v3.4.0.
+- **Public baseline**: v3.4.0 (`b6058d338de9dec9083389ff05f459c71ed2c4d8`).
+- **Integration branch**: `develop`, currently carrying post-v3.4.0 work; do not infer that unreleased develop commits are public.
 - **Schema**: 17
 - **Release status**: Publication determined by Git tag and GitHub Releases.
 - **Version source of truth**: `src/dealhunter/metadata.py`.

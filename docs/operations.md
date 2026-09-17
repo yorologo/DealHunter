@@ -59,7 +59,7 @@ La configuración vive fuera del repositorio, bajo `XDG_CONFIG_HOME` o `~/.confi
 
 ### Configuración opcional
 
-- **Rappi session**: mejora cobertura mediante Zone Inventory; persistencia sólo opt-in con SecretStore.
+- **Rappi session**: Admin → **Cuentas / Proveedores** es la autoridad UX. En Android/Termux, **Configurar desde este teléfono** genera por POST un bookmarklet efímero (5 min) que captura voluntariamente el `Authorization` de la sesión Rappi y vuelve únicamente por loopback al Flask local; la credencial se guarda cifrada mediante SecretStore y se valida con `get_account_status()`. El método **PC / navegador** existente permanece disponible desde la misma tarjeta.
 - **Uber Eats**: Admin → **Cuentas / Proveedores** muestra estado local del profile/runtime. Si indica `NEEDS_LOGIN`, ejecuta `dealhunter uber setup` en Termux y luego usa **Comprobar sesión** en la Web. El profile por sí solo permanece `UNVERIFIED` hasta esa comprobación.
 - **Membresías**: `dealhunter membership rappi_pro ...` / `uber_one ...` sólo afectan elegibilidad/comparación.
 - **Providers**: pueden habilitarse/deshabilitarse por separado.

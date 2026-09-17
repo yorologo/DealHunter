@@ -2,7 +2,13 @@
 
 import os
 import sqlite3
-from flask import Blueprint, render_template, request, current_app, redirect, url_for, abort
+import secrets
+import time
+from urllib.parse import urlsplit
+from flask import (
+    Blueprint, render_template, request, current_app, redirect, url_for, abort,
+    session, jsonify, flash, make_response,
+)
 from markupsafe import escape
 from dealhunter.doctor import run_doctor
 from dealhunter.account import get_account_status, get_account_token
@@ -20,6 +26,11 @@ from dealhunter.web.admin_queries import (
 )
 
 admin_bp = Blueprint('admin_bp', __name__, url_prefix='/admin')
+
+RAPPI_MOBILE_AUTH_SESSION_KEY = 'rappi_mobile_auth'
+RAPPI_MOBILE_AUTH_TTL_SECONDS = 300
+RAPPI_MOBILE_AUTH_MAX_PAYLOAD_BYTES = 64 * 1024
+
 
 # Settings classification
 SAFE_EDITABLE = {
@@ -125,13 +136,32 @@ def _uber_account_status(check_network=False):
         }
 
 
-def _render_account(*, rappi_network=False, uber_network=False):
+def _render_account(*, rappi_network=False, uber_network=False, mobile_auth=None):
     return render_template(
         'admin/account.html',
         current_path='/admin/account',
         rappi=_rappi_account_status(check_network=rappi_network),
         uber=_uber_account_status(check_network=uber_network),
+        mobile_auth=mobile_auth,
     )
+
+
+def _rappi_mobile_callback_url():
+    """Build a loopback-only callback while preserving the Flask session host."""
+    parsed = urlsplit(f'//{request.host}')
+    host = parsed.hostname if parsed.hostname in ('127.0.0.1', 'localhost') else '127.0.0.1'
+    try:
+        port = parsed.port or int(request.environ.get('SERVER_PORT', 8765))
+    except (TypeError, ValueError):
+        port = 8765
+    if not 1 <= port <= 65535:
+        port = 8765
+    return f'http://{host}:{port}/admin/account/rappi/mobile/import'
+
+
+def _safe_mobile_import_error(code, http_status=400):
+    """Return a fixed error contract that never reflects credential material."""
+    return jsonify({'ok': False, 'status': 'ERROR', 'error': code}), http_status
 
 
 @admin_bp.route('/account')
@@ -152,11 +182,119 @@ def account_uber_check():
     return _render_account(uber_network=True)
 
 
+@admin_bp.route('/account/rappi/mobile/start', methods=['POST'])
+def account_rappi_mobile_start():
+    """Start an ephemeral mobile Rappi import flow on the existing Flask server."""
+    from dealhunter.auth import build_mobile_bookmarklet
+
+    nonce = secrets.token_hex(16)
+    expires_at = int(time.time()) + RAPPI_MOBILE_AUTH_TTL_SECONDS
+    session[RAPPI_MOBILE_AUTH_SESSION_KEY] = {
+        'nonce': nonce,
+        'expires_at': expires_at,
+    }
+    callback_url = _rappi_mobile_callback_url()
+    bookmarklet = build_mobile_bookmarklet(callback_url, nonce)
+    return _render_account(mobile_auth={
+        'bookmarklet': bookmarklet,
+        'expires_seconds': RAPPI_MOBILE_AUTH_TTL_SECONDS,
+    })
+
+
+@admin_bp.route('/account/rappi/mobile/import')
+def account_rappi_mobile_import():
+    """Serve the fragment reader; credential material is never rendered by Jinja."""
+    state = session.get(RAPPI_MOBILE_AUTH_SESSION_KEY) or {}
+    flow_active = bool(
+        state.get('nonce') and
+        isinstance(state.get('expires_at'), (int, float)) and
+        state['expires_at'] >= time.time()
+    )
+    response = make_response(render_template(
+        'admin/rappi_mobile_import.html',
+        flow_active=flow_active,
+    ))
+    response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate'
+    response.headers['Pragma'] = 'no-cache'
+    response.headers['Referrer-Policy'] = 'no-referrer'
+    response.headers['X-Content-Type-Options'] = 'nosniff'
+    return response
+
+
+@admin_bp.route('/account/rappi/mobile/commit', methods=['POST'])
+def account_rappi_mobile_commit():
+    """Persist one mobile Rappi credential, then validate through account.py."""
+    content_length = request.content_length
+    if content_length is not None and content_length > RAPPI_MOBILE_AUTH_MAX_PAYLOAD_BYTES:
+        return _safe_mobile_import_error('PAYLOAD_TOO_LARGE', 413)
+
+    state = session.get(RAPPI_MOBILE_AUTH_SESSION_KEY) or {}
+    nonce = state.get('nonce')
+    expires_at = state.get('expires_at')
+    if not nonce or not isinstance(expires_at, (int, float)):
+        return _safe_mobile_import_error('FLOW_NOT_STARTED')
+    if expires_at < time.time():
+        session.pop(RAPPI_MOBILE_AUTH_SESSION_KEY, None)
+        return _safe_mobile_import_error('NONCE_EXPIRED')
+
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict):
+        return _safe_mobile_import_error('MALFORMED_PAYLOAD')
+    received_nonce = data.get('nonce')
+    if not isinstance(received_nonce, str) or not secrets.compare_digest(nonce, received_nonce):
+        return _safe_mobile_import_error('INVALID_NONCE')
+
+    token = data.get('token')
+    if not isinstance(token, str):
+        return _safe_mobile_import_error('TOKEN_MISSING')
+    token = token.strip()
+    if token.startswith('Bearer '):
+        token = token[7:].strip()
+    if (
+        not token
+        or len(token.encode('utf-8')) > RAPPI_MOBILE_AUTH_MAX_PAYLOAD_BYTES
+        or any(ch.isspace() for ch in token)
+    ):
+        return _safe_mobile_import_error('TOKEN_INVALID')
+
+    try:
+        from dealhunter.secret_store import SessionService
+        stored = SessionService().store_persistent(token)
+        if not stored:
+            return _safe_mobile_import_error('SECRET_STORE_ERROR', 500)
+    except Exception:
+        current_app.logger.error('Rappi mobile session persistence failed')
+        return _safe_mobile_import_error('SECRET_STORE_ERROR', 500)
+
+    # Persistence succeeded: consume the nonce before any network validation.
+    session.pop(RAPPI_MOBILE_AUTH_SESSION_KEY, None)
+    token = None  # noqa: F841 - discard the request-local reference promptly
+
+    try:
+        status_result = get_account_status(load_config(), check_network=True)
+        status = status_result.get('status', 'ERROR')
+    except Exception:
+        current_app.logger.error('Rappi mobile post-import validation failed')
+        status = 'ERROR'
+
+    if status == 'VALID':
+        flash('Sesión Rappi guardada y verificada.', 'success')
+    elif status == 'UNVERIFIED':
+        flash('Sesión Rappi guardada; la validación remota fue inconclusa y la credencial se conserva.', 'warning')
+    elif status == 'EXPIRED':
+        flash('La credencial Rappi fue guardada pero el servidor la rechazó como expirada.', 'error')
+    else:
+        flash('La sesión Rappi fue guardada, pero no pudo validarse de forma segura.', 'error')
+        status = 'ERROR'
+
+    return jsonify({'ok': status in ('VALID', 'UNVERIFIED'), 'stored': True, 'status': status})
+
+
 @admin_bp.route('/account/delete', methods=['POST'])
 def account_delete():
     """Invalidate only the Rappi session; Uber profile lifecycle stays isolated."""
     from dealhunter.secret_store import SessionService
-    SessionService().invalidate()
+    SessionService().delete()
     return redirect('/admin/account')
 
 
@@ -557,13 +695,18 @@ def settings_update():
 
 @admin_bp.route('/catalog-sync/wizard')
 def catalog_sync_wizard():
-    """Wizard to import a Rappi session."""
+    """PC/browser wizard for Rappi; preserve a safe local return target."""
     from dealhunter.account import get_account_status
     cfg = load_config()
     acc = get_account_status(cfg, check_network=False)
+    return_path = local_redirect_target(
+        request.args.get('return_path', '/admin/catalog-sync'),
+        host=request.host, default='/admin/catalog-sync',
+    )
 
     return render_template('admin/wizard.html',
-                           current_path='/admin/catalog-sync',
+                           current_path=return_path,
+                           return_path=return_path,
                            status=acc['status'],
                            mode=acc['mode'])
 

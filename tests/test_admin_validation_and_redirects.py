@@ -113,3 +113,20 @@ def test_open_rappi_never_redirects_external_referrer(tmp_path, monkeypatch):
     }, headers={'Referer': 'https://evil.example/phish'})
     assert rv.status_code == 302
     assert 'evil.example' not in rv.headers['Location']
+
+
+
+def test_wizard_from_account_preserves_account_return_path(tmp_path, monkeypatch):
+    client = _client(tmp_path, monkeypatch)
+    rv = client.get('/admin/catalog-sync/wizard?return_path=/admin/account')
+    assert rv.status_code == 200
+    assert b'name="return_path" value="/admin/account"' in rv.data
+    assert b'M\xc3\xa9todo PC / navegador' in rv.data
+
+
+def test_wizard_external_get_return_path_falls_back_local(tmp_path, monkeypatch):
+    client = _client(tmp_path, monkeypatch)
+    rv = client.get('/admin/catalog-sync/wizard?return_path=https://evil.example/x')
+    assert rv.status_code == 200
+    assert b'evil.example' not in rv.data
+    assert b'name="return_path" value="/admin/catalog-sync"' in rv.data

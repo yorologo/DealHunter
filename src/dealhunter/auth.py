@@ -42,13 +42,12 @@ class RappiSessionProvider:
             pass
 
     def save(self, context: AccessContext):
+        """Persist first, then expose the context; storage failures fail closed."""
+        from .secret_store import SecretStore
+        store = SecretStore(config_dir=os.path.dirname(self.storage_path))
+        store.store(context._access_token)
         self.context = context
-        try:
-            from .secret_store import SecretStore
-            store = SecretStore(config_dir=os.path.dirname(self.storage_path))
-            store.store(context._access_token)
-        except Exception:
-            pass
+        return True
 
     async def is_authenticated(self) -> bool:
         return self.context is not None and bool(self.context._access_token)
@@ -120,6 +119,53 @@ import threading
 import json
 import urllib.parse
 import secrets
+
+def build_mobile_bookmarklet(callback_url: str, nonce: str) -> str:
+    """Build the shared Rappi mobile bookmarklet for a loopback callback."""
+    parsed = urllib.parse.urlsplit(callback_url)
+    if parsed.scheme != "http" or parsed.hostname not in ("127.0.0.1", "localhost"):
+        raise ValueError("Mobile auth callback must use loopback HTTP")
+    if parsed.query or parsed.fragment:
+        raise ValueError("Mobile auth callback must not contain query or fragment")
+    if not nonce:
+        raise ValueError("Mobile auth nonce is required")
+
+    callback_js = json.dumps(callback_url)
+    nonce_js = json.dumps(str(nonce))
+    script = f"""javascript:(function(){{
+  if (window.location.hostname !== 'www.rappi.com.mx' && window.location.hostname !== 'rappi.com.mx') {{ alert('DealHunter: Solo en rappi.com.mx'); return; }}
+  if (window.__dh_active) {{ alert('DealHunter: Interceptor activo. Busca algo (ej: coca cola).'); return; }}
+  window.__dh_active = true;
+  function onToken(t) {{
+    if (typeof t !== 'string' || !t.startsWith('Bearer ')) return;
+    const val = t.replace('Bearer ', '').trim();
+    if (!val || window.__dh_found === val) return;
+    window.__dh_found = val;
+    const pay = JSON.stringify({{nonce: {nonce_js}, token: val}});
+    window.location.href = {callback_js} + '#' + btoa(unescape(encodeURIComponent(pay)));
+  }}
+  const oF = window.fetch;
+  window.fetch = async function(...args) {{
+    try {{
+      const opts = args[1] || {{}};
+      if (opts.headers) {{
+        let a = null;
+        if (opts.headers instanceof Headers) a = opts.headers.get('Authorization');
+        else if (Array.isArray(opts.headers)) {{ const h = opts.headers.find(x => x[0].toLowerCase() === 'authorization'); if (h) a = h[1]; }}
+        else if (typeof opts.headers === 'object') {{ const k = Object.keys(opts.headers).find(k => k.toLowerCase() === 'authorization'); if (k) a = opts.headers[k]; }}
+        if (a) onToken(a);
+      }}
+    }} catch(e) {{}}
+    return oF.apply(this, args);
+  }};
+  const oO = XMLHttpRequest.prototype.open;
+  const oS = XMLHttpRequest.prototype.setRequestHeader;
+  XMLHttpRequest.prototype.open = function() {{ return oO.apply(this, arguments); }};
+  XMLHttpRequest.prototype.setRequestHeader = function(h, v) {{ if (h.toLowerCase() === 'authorization') onToken(v); return oS.apply(this, arguments); }};
+  alert('DealHunter Interceptor activo. Haz una búsqueda en la página (ej: "coca cola") para capturar la sesión.');
+}})();"""
+    return script.replace("\\n", "")
+
 
 class LocalAuthImporter:
     def __init__(self, provider: RappiSessionProvider, host="127.0.0.1", port=0, is_mobile=False, diagnose=False):

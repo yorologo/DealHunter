@@ -36,10 +36,10 @@ El mapa exacto de rutas es código (`src/dealhunter/web/routes.py` y `admin.py`)
 
 `/admin/account` presenta Rappi y Uber Eats en una sola superficie, pero conserva sus mecanismos aislados:
 
-- **Rappi** → `SessionService` / SecretStore / validación de cuenta existente.
+- **Rappi** → `SessionService` / SecretStore / `get_account_status()`. En Android/Termux, **Configurar desde este teléfono** reutiliza el mismo bookmarklet que `dealhunter auth rappi --mobile`: un POST explícito crea un nonce efímero, el bookmarklet vuelve a un endpoint loopback mediante `#fragment`, la página local elimina inmediatamente el fragmento y hace un POST same-origin + CSRF para persistir y validar. El wizard PC/navegador existente sigue disponible.
 - **Uber Eats** → profile Chromium / runtime CDP / autoridad `providers/uber_eats/status.py`.
 
-El GET es diagnóstico local: no navega a Uber ni valida Rappi por red. Los botones **Comprobar sesión** ejecutan únicamente la validación explícita del provider correspondiente. La existencia del profile Uber se muestra como `UNVERIFIED`, nunca como prueba de sesión válida. Si Uber necesita login o renovación, la Web indica `dealhunter uber setup`; no ejecuta Carbonyl ni expone controles Start/Stop Chromium.
+El GET es diagnóstico local: no genera nonce, no navega a Uber y no valida Rappi por red. Los botones **Comprobar sesión** ejecutan únicamente la validación explícita del provider correspondiente. Catalog Sync consume la sesión Rappi existente y remite a Account para gestionarla; no mantiene otra UX de autenticación. La existencia del profile Uber se muestra como `UNVERIFIED`, nunca como prueba de sesión válida. Si Uber necesita login o renovación, la Web indica `dealhunter uber setup`; no ejecuta Carbonyl ni expone controles Start/Stop Chromium.
 
 ## Catalog Sync
 

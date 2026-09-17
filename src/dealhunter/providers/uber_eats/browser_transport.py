@@ -7,8 +7,8 @@ the browser handles all authentication internally.
 
 Architecture:
     DealHunter (Termux)
-        → CDP WebSocket (127.0.0.1:9222 via SSH tunnel)
-            → Chrome (Windows, dedicated profile)
+        → CDP WebSocket (127.0.0.1:9222)
+            → Chromium (Termux, dedicated profile)
                 → ubereats.com (user's real session)
 
 The transport:

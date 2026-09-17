@@ -17,7 +17,7 @@ def client(tmp_path):
 def test_wizard_route(client):
     response = client.get('/admin/catalog-sync/wizard')
     assert response.status_code == 200
-    assert b'ASISTENTE DE SESI' in response.data
+    assert 'MÉTODO PC / NAVEGADOR'.encode('utf-8') in response.data
     # Helper copy present
     assert b'Copiar herramienta' in response.data
     assert b'javascript:(function' in response.data

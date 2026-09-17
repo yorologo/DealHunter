@@ -40,7 +40,9 @@ def test_unverified_account_can_replace_session(app_client):
         }
         res = client.get('/admin/account')
         html = res.data.decode('utf-8')
-        assert 'Reemplazar sesión' in html
+        assert 'Configurar / renovar sesión' in html
+        assert 'Configurar desde este teléfono' in html
+        assert 'Usar asistente de navegador' in html
         snippet = html[html.find('Reemplazar sesión') - 140:html.find('Reemplazar sesión')]
         assert 'disabled' not in snippet
 

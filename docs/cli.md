@@ -38,10 +38,12 @@ dealhunter db backup
 dealhunter db integrity
 dealhunter maintenance run
 
-# Cuenta/membresías
+# Cuenta/autenticación/membresías
 dealhunter account status
-dealhunter uber status       # diagnóstico local; no valida sesión por red
-dealhunter uber setup        # setup/renovación interactiva del profile
+dealhunter auth rappi --mobile  # importador móvil loopback; alternativa CLI al flujo Web
+dealhunter auth rappi           # método PC/terminal compatible
+dealhunter uber status          # diagnóstico local; no valida sesión por red
+dealhunter uber setup           # setup/renovación interactiva del profile
 dealhunter memberships
 dealhunter membership uber_one active
 ```

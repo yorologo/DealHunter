@@ -45,7 +45,7 @@
                     {% elif status == 'EXPIRED' %}
                     <div class="alert alert-danger">
                         <h4 class="alert-heading mb-2">❌ Sesión expirada o inválida</h4>
-                        <p class="mb-0">El token actual ha sido rechazado por el servidor. Por favor, <a href="/admin/catalog-sync/wizard" class="alert-link">importa uno nuevo</a>.</p>
+                        <p class="mb-0">La sesión actual fue rechazada por el servidor. <a href="/admin/account" class="alert-link">Configúrala o renuévala en Cuentas / Proveedores</a>.</p>
                     </div>
                                         {% elif status == 'UNVERIFIED' %}
                         <div class="alert alert-warning">
@@ -57,7 +57,7 @@
                     {% elif status == 'CONFIGURED' %}
                     <div class="alert alert-info">
                         <h4 class="alert-heading mb-2">ℹ️ Sesión configurada pero no comprobada</h4>
-                        <p class="mb-0">Tienes una sesión configurada, pero necesitas comprobarla en la sección Cuenta & Sesión antes de asegurar que Catalog Sync funcione correctamente.</p>
+                        <p class="mb-0">Tienes una sesión configurada, pero debes comprobarla en Cuentas / Proveedores antes de asegurar que Catalog Sync funcione correctamente.</p>
                     </div>
                     {% else %}
 
@@ -66,13 +66,7 @@
                         <h4 class="alert-heading mb-2">⚠ Cobertura limitada (Search Discovery)</h4>
                         <p>DealHunter funciona sin sesión mediante "descubrimiento por búsquedas", pero la cobertura es parcial y la disponibilidad no se reconcilia completamente.</p>
                         <hr>
-                        <p class="mb-2"><strong>Ruta sugerida:</strong></p>
-                        <ol class="mb-3">
-                            <li><a href="/admin/catalog-sync/wizard">Configurar sesión persistente</a></li>
-                            <li>Comprobar sesión</li>
-                            <li>Activar Catalog Sync en Configuración</li>
-                            <li>Sincronizar zona</li>
-                        </ol>
+                        <p class="mb-2"><a href="/admin/account" class="alert-link">Configura o comprueba Rappi en Cuentas / Proveedores</a>; después vuelve aquí para sincronizar la zona.</p>
                     </div>
                     {% endif %}
 
@@ -162,10 +156,7 @@
 
                     <div class="d-grid gap-3 mt-3">
                         <a href="/admin/account" class="btn btn-outline-primary text-start">
-                            <i class="bi bi-person-badge me-2"></i> Ir a Cuenta & Sesión
-                        </a>
-                        <a href="/admin/catalog-sync/wizard" class="btn btn-outline-secondary text-start">
-                            <i class="bi bi-magic me-2"></i> Asistente de importación
+                            <i class="bi bi-person-badge me-2"></i> Cuentas / Proveedores
                         </a>
                         <a href="/admin/settings" class="btn btn-outline-secondary text-start">
                             <i class="bi bi-gear me-2"></i> Habilitar/Deshabilitar Catalog Sync

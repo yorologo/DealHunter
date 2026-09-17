@@ -67,7 +67,7 @@
                     <p class="small text-danger mb-0 mt-2">No se pudo leer el estado local de Rappi. Uber Eats permanece independiente.</p>
                     {% endif %}
                 </div>
-                <div class="col-md-5 d-flex flex-column justify-content-center border-start">
+                <div class="col-md-5 border-start">
                     <div class="d-grid gap-2 px-3">
                         {% if rappi.configured %}
                         <button class="btn btn-outline-primary"
@@ -79,7 +79,6 @@
                             <span id="rappi-account-spinner" class="htmx-indicator spinner-border spinner-border-sm me-2" role="status"></span>
                             Comprobar sesión
                         </button>
-                        <a href="/admin/catalog-sync/wizard" class="btn btn-outline-secondary">Reemplazar sesión</a>
                         {% if rappi.source in ('PERSISTENT', 'TEMPORARY') %}
                         <button class="btn btn-outline-danger"
                                 hx-post="/admin/account/delete"
@@ -88,9 +87,40 @@
                             Invalidar sesión
                         </button>
                         {% endif %}
-                        {% else %}
-                        <a href="/admin/catalog-sync/wizard" class="btn btn-primary">Configurar sesión Rappi</a>
                         {% endif %}
+
+                        <hr class="my-2">
+                        <div class="fw-semibold">Configurar / renovar sesión</div>
+
+                        <div class="small fw-semibold mt-1">📱 En este teléfono</div>
+                        <p class="small text-muted mb-1">
+                            DealHunter guardará localmente una credencial de sesión Rappi cifrada para reutilizarla en futuras sincronizaciones.
+                            No se envía a servidores de DealHunter y puedes eliminarla desde esta página.
+                        </p>
+                        <button class="btn btn-primary"
+                                hx-post="/admin/account/rappi/mobile/start"
+                                hx-target="#rappi-account-card"
+                                hx-swap="outerHTML" hx-select="#rappi-account-card"
+                                hx-headers='{"X-CSRF-Token": "{{ csrf_token }}"}'>
+                            Configurar desde este teléfono
+                        </button>
+
+                        {% if mobile_auth %}
+                        <div class="alert alert-light border small mt-1 mb-2">
+                            <strong>Bookmarklet móvil listo por {{ mobile_auth.expires_seconds // 60 }} min.</strong>
+                            <ol class="ps-3 mt-2 mb-2">
+                                <li>Crea o edita un marcador del navegador y pega el contenido de abajo como URL.</li>
+                                <li>Abre <strong>rappi.com.mx</strong> e inicia sesión normalmente.</li>
+                                <li>Ejecuta el marcador y realiza una búsqueda, por ejemplo <em>coca cola</em>.</li>
+                                <li>Rappi volverá a DealHunter por loopback para guardar y comprobar la sesión.</li>
+                            </ol>
+                            <textarea id="rappi-mobile-bookmarklet" class="form-control form-control-sm font-monospace mb-2" rows="3" readonly>{{ mobile_auth.bookmarklet }}</textarea>
+                            <button type="button" class="btn btn-sm btn-outline-secondary" onclick="navigator.clipboard.writeText(document.getElementById('rappi-mobile-bookmarklet').value)">Copiar bookmarklet</button>
+                        </div>
+                        {% endif %}
+
+                        <div class="small fw-semibold mt-2">💻 Desde una computadora</div>
+                        <a href="/admin/catalog-sync/wizard?return_path=/admin/account" class="btn btn-outline-secondary">Usar asistente de navegador</a>
                     </div>
                 </div>
             </div>

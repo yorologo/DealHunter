@@ -10,6 +10,7 @@ DealHunter mantiene un modelo local-first y aplica fallos cerrados en los límit
 - **Sin fallback débil**: no se permite plaintext, base64, firma sin cifrado ni criptografía casera como sustituto del SecretStore.
 - **Flask session key**: `SECRET_KEY` de entorno tiene prioridad. Sin override, DealHunter crea una clave aleatoria persistente en `~/.config/dealhunter/flask_secret.key` (o `XDG_CONFIG_HOME`) y fuerza permisos `0600`; no existe fallback `dev`.
 - **Aislamiento**: tokens de sesión no entran en SQLite, `config.toml`, templates, logs ni backups generales.
+- **Rappi móvil Web**: el inicio requiere POST + CSRF; el nonce vive sólo en la sesión Flask, expira a los 5 minutos y se consume tras una persistencia correcta. La credencial viaja de Rappi al Flask local únicamente en el fragmento `#...` del callback loopback (no query string); la página de importación elimina el fragmento antes de hacer POST same-origin + CSRF. La escritura usa exclusivamente `SessionService`/SecretStore y falla cerrada.
 - **Filesystem**: `.db`, `.bak` e historial personal no se sirven desde estáticos públicos.
 - **Backups SQLite**: un backup sólo se acepta después de reabrirlo, ejecutar `PRAGMA integrity_check` y comprobar que su versión de schema coincide con la fuente. Un resultado inválido se elimina y se reporta como error.
 - **Sin ejecución arbitraria**: la web no expone SQL arbitrario ni construcción de shell desde input del usuario.

@@ -1,4 +1,6 @@
 from unittest.mock import patch
+import json
+import time
 
 import pytest
 
@@ -134,8 +136,9 @@ def test_rappi_invalidate_still_uses_session_service(client, monkeypatch):
     state = {"invalidated": False}
 
     class FakeSessionService:
-        def invalidate(self):
+        def delete(self):
             state["invalidated"] = True
+            return True
 
     monkeypatch.setattr("dealhunter.secret_store.SessionService", FakeSessionService)
     token = csrf_token(client)
@@ -196,3 +199,263 @@ def test_uber_needs_login_shows_terminal_setup_instruction(client, monkeypatch):
     assert b"dealhunter uber setup" in rv.data
     assert b"Start Chromium" not in rv.data
     assert b"Stop Chromium" not in rv.data
+
+
+
+def _start_rappi_mobile(client):
+    token = csrf_token(client)
+    rv = client.post(
+        "/admin/account/rappi/mobile/start",
+        headers={"X-CSRF-Token": token},
+    )
+    assert rv.status_code == 200
+    with client.session_transaction() as flask_session:
+        state = dict(flask_session["rappi_mobile_auth"])
+    return token, state, rv
+
+
+def _commit_mobile(client, csrf, nonce, token="MOBILE_RAPPI_TOKEN_123456789"):
+    return client.post(
+        "/admin/account/rappi/mobile/commit",
+        json={"nonce": nonce, "token": token},
+        headers={"X-CSRF-Token": csrf},
+    )
+
+
+def test_account_get_does_not_create_mobile_nonce(client, monkeypatch):
+    monkeypatch.setattr("dealhunter.account.get_account_status", lambda *a, **k: RAPPI_LOCAL)
+    monkeypatch.setattr("dealhunter.providers.uber_eats.status.get_status", lambda *a, **k: UBER_LOCAL)
+    rv = client.get("/admin/account")
+    assert rv.status_code == 200
+    with client.session_transaction() as flask_session:
+        assert "rappi_mobile_auth" not in flask_session
+
+
+def test_mobile_start_requires_csrf(client):
+    assert client.post("/admin/account/rappi/mobile/start").status_code == 400
+
+
+def test_mobile_start_generates_loopback_fragment_bookmarklet(client):
+    _, state, rv = _start_rappi_mobile(client)
+    assert state["nonce"]
+    assert state["expires_at"] > time.time()
+    assert b"Configurar desde este tel" in rv.data
+    assert (b"http://localhost" in rv.data or b"http://127.0.0.1" in rv.data)
+    assert b"/admin/account/rappi/mobile/import" in rv.data
+    assert b"#" in rv.data
+    assert b"?token=" not in rv.data
+
+
+def test_mobile_import_page_uses_fragment_and_clears_it(client):
+    _start_rappi_mobile(client)
+    rv = client.get("/admin/account/rappi/mobile/import")
+    assert rv.status_code == 200
+    assert b"location.hash" in rv.data
+    assert b"history.replaceState" in rv.data
+    assert b"/admin/account/rappi/mobile/commit" in rv.data
+    assert rv.headers["Referrer-Policy"] == "no-referrer"
+
+
+def test_mobile_commit_requires_csrf(client):
+    _, state, _ = _start_rappi_mobile(client)
+    rv = client.post(
+        "/admin/account/rappi/mobile/commit",
+        json={"nonce": state["nonce"], "token": "MOBILE_RAPPI_TOKEN_123456789"},
+    )
+    assert rv.status_code == 400
+
+
+def test_mobile_commit_rejects_missing_flow(client):
+    csrf = csrf_token(client)
+    rv = _commit_mobile(client, csrf, "missing")
+    assert rv.status_code == 400
+    assert rv.get_json()["error"] == "FLOW_NOT_STARTED"
+
+
+def test_mobile_commit_rejects_invalid_nonce(client):
+    csrf, _, _ = _start_rappi_mobile(client)
+    rv = _commit_mobile(client, csrf, "wrong-nonce")
+    assert rv.status_code == 400
+    assert rv.get_json()["error"] == "INVALID_NONCE"
+
+
+def test_mobile_commit_rejects_expired_nonce(client):
+    csrf, state, _ = _start_rappi_mobile(client)
+    with client.session_transaction() as flask_session:
+        flask_session["rappi_mobile_auth"] = {**state, "expires_at": time.time() - 1}
+    rv = _commit_mobile(client, csrf, state["nonce"])
+    assert rv.status_code == 400
+    assert rv.get_json()["error"] == "NONCE_EXPIRED"
+    with client.session_transaction() as flask_session:
+        assert "rappi_mobile_auth" not in flask_session
+
+
+def test_mobile_commit_rejects_malformed_payload(client):
+    csrf, _, _ = _start_rappi_mobile(client)
+    rv = client.post(
+        "/admin/account/rappi/mobile/commit",
+        data=b"{malformed",
+        content_type="application/json",
+        headers={"X-CSRF-Token": csrf},
+    )
+    assert rv.status_code == 400
+    assert rv.get_json()["error"] == "MALFORMED_PAYLOAD"
+
+
+def test_mobile_commit_rejects_oversized_payload(client):
+    csrf, state, _ = _start_rappi_mobile(client)
+    rv = client.post(
+        "/admin/account/rappi/mobile/commit",
+        data=json.dumps({"nonce": state["nonce"], "token": "x" * (70 * 1024)}),
+        content_type="application/json",
+        headers={"X-CSRF-Token": csrf},
+    )
+    assert rv.status_code == 413
+    assert rv.get_json()["error"] == "PAYLOAD_TOO_LARGE"
+
+
+def test_mobile_commit_rejects_missing_token(client):
+    csrf, state, _ = _start_rappi_mobile(client)
+    rv = client.post(
+        "/admin/account/rappi/mobile/commit",
+        json={"nonce": state["nonce"]},
+        headers={"X-CSRF-Token": csrf},
+    )
+    assert rv.status_code == 400
+    assert rv.get_json()["error"] == "TOKEN_MISSING"
+
+
+def test_mobile_commit_secret_store_failure_is_not_success(client, monkeypatch, caplog):
+    class FailingService:
+        def store_persistent(self, token):
+            raise RuntimeError("storage unavailable")
+
+    monkeypatch.setattr("dealhunter.secret_store.SessionService", FailingService)
+    csrf, state, _ = _start_rappi_mobile(client)
+    secret = "MOBILE_SECRET_MUST_NOT_LEAK_123456"
+    rv = _commit_mobile(client, csrf, state["nonce"], secret)
+    assert rv.status_code == 500
+    assert rv.get_json()["error"] == "SECRET_STORE_ERROR"
+    assert secret not in rv.get_data(as_text=True)
+    assert secret not in caplog.text
+    with client.session_transaction() as flask_session:
+        assert flask_session["rappi_mobile_auth"]["nonce"] == state["nonce"]
+
+
+@pytest.mark.parametrize("status", ["VALID", "UNVERIFIED", "EXPIRED", "ERROR"])
+def test_mobile_post_import_uses_canonical_account_status(client, monkeypatch, status):
+    stored = []
+
+    class FakeService:
+        def store_persistent(self, token):
+            stored.append(token)
+            return True
+
+    monkeypatch.setattr("dealhunter.secret_store.SessionService", FakeService)
+    monkeypatch.setattr(
+        "dealhunter.web.admin.get_account_status",
+        lambda *a, **k: {"status": status},
+    )
+    csrf, state, _ = _start_rappi_mobile(client)
+    rv = _commit_mobile(client, csrf, state["nonce"])
+    assert rv.status_code == 200
+    assert stored == ["MOBILE_RAPPI_TOKEN_123456789"]
+    assert rv.get_json()["status"] == status
+    with client.session_transaction() as flask_session:
+        assert "rappi_mobile_auth" not in flask_session
+
+
+def test_mobile_nonce_is_single_use_and_replay_rejected(client, monkeypatch):
+    class FakeService:
+        def store_persistent(self, token):
+            return True
+
+    monkeypatch.setattr("dealhunter.secret_store.SessionService", FakeService)
+    monkeypatch.setattr(
+        "dealhunter.web.admin.get_account_status",
+        lambda *a, **k: {"status": "VALID"},
+    )
+    csrf, state, _ = _start_rappi_mobile(client)
+    first = _commit_mobile(client, csrf, state["nonce"])
+    second = _commit_mobile(client, csrf, state["nonce"])
+    assert first.status_code == 200
+    assert second.status_code == 400
+    assert second.get_json()["error"] == "FLOW_NOT_STARTED"
+
+
+def test_mobile_persistent_storage_is_encrypted(client, monkeypatch):
+    from dealhunter.secret_store import SessionService, SESSION_PERSISTENT
+
+    monkeypatch.setattr(
+        "dealhunter.web.admin.get_account_status",
+        lambda *a, **k: {"status": "UNVERIFIED"},
+    )
+    csrf, state, _ = _start_rappi_mobile(client)
+    secret = "ENCRYPTED_MOBILE_RAPPI_TOKEN_123456789"
+    rv = _commit_mobile(client, csrf, state["nonce"], secret)
+    assert rv.status_code == 200
+    svc = SessionService()
+    assert svc.get_mode() == SESSION_PERSISTENT
+    encrypted = open(svc.store.session_file, "rb").read()
+    assert secret.encode() not in encrypted
+
+
+def test_mobile_token_never_appears_in_response_redirect_or_log(client, monkeypatch, caplog):
+    class FakeService:
+        def store_persistent(self, token):
+            return True
+
+    monkeypatch.setattr("dealhunter.secret_store.SessionService", FakeService)
+    monkeypatch.setattr(
+        "dealhunter.web.admin.get_account_status",
+        lambda *a, **k: {"status": "VALID"},
+    )
+    csrf, state, _ = _start_rappi_mobile(client)
+    secret = "NO_RENDER_NO_LOG_MOBILE_TOKEN_123456789"
+    rv = _commit_mobile(client, csrf, state["nonce"], secret)
+    assert secret not in rv.get_data(as_text=True)
+    assert secret not in str(rv.headers)
+    assert secret not in caplog.text
+
+
+def test_account_exposes_mobile_and_pc_rappi_methods_without_changing_uber(client):
+    rv = client.get("/admin/account")
+    assert rv.status_code == 200
+    assert b"Configurar desde este tel" in rv.data
+    assert b"Usar asistente de navegador" in rv.data
+    assert b"/admin/catalog-sync/wizard?return_path=/admin/account" in rv.data
+    assert b"Uber Eats" in rv.data
+    assert b"dealhunter uber setup" in rv.data or b"Comprobar sesi" in rv.data
+
+
+
+def test_mobile_start_preserves_loopback_host_for_session_cookie(client):
+    token = csrf_token(client)
+    rv = client.post(
+        "/admin/account/rappi/mobile/start",
+        base_url="http://localhost:8765",
+        headers={"X-CSRF-Token": token},
+    )
+    assert rv.status_code == 200
+    assert b"http://localhost:8765/admin/account/rappi/mobile/import" in rv.data
+
+
+def test_mobile_start_cross_host_is_rejected_by_csrf_session_boundary(client):
+    token = csrf_token(client)
+    rv = client.post(
+        "/admin/account/rappi/mobile/start",
+        base_url="http://evil.example:8765",
+        headers={"X-CSRF-Token": token},
+    )
+    assert rv.status_code == 400
+    assert b"evil.example" not in rv.data
+
+
+
+def test_mobile_fragment_secret_is_never_rendered_server_side(client):
+    _start_rappi_mobile(client)
+    secret = "FRAGMENT_SECRET_MUST_STAY_CLIENT_SIDE"
+    rv = client.get(f"/admin/account/rappi/mobile/import#{secret}")
+    assert rv.status_code == 200
+    assert secret.encode() not in rv.data
+    assert b"location.hash" in rv.data

@@ -113,19 +113,61 @@ def test_importer_payload_validation(temp_session_file):
     importer.server.shutdown()
     importer.server.server_close()
 
-def test_bookmarklet_generation():
-    # Simple check that the bookmarklet string is well-formed and uses btoa
-    from dealhunter.auth import LocalAuthImporter
-    importer = LocalAuthImporter(None, host="127.0.0.1", port=12345)
-    
-    bookmarklet = f"javascript:(function(){{\n  if (window.location.hostname !== 'www.rappi.com.mx' && window.location.hostname !== 'rappi.com.mx') {{\n    alert('DealHunter: this bookmarklet must be executed on rappi.com.mx');\n    return;\n  }}\n  var c = [];\n  for(var i=0; i<localStorage.length; i++){{\n    var k=localStorage.key(i), v=localStorage.getItem(k);\n    if(v && v.startsWith('eyJ') && v.split('.').length===3) {{\n      if(k.includes('token') || k.includes('session') || k.includes('auth')) c.push(v);\n    }}\n  }}\n  var t = localStorage.getItem('access_token');\n  if(t && t.startsWith('eyJ')) c.push(t);\n  c = Array.from(new Set(c));\n  if (c.length !== 1) {{\n    alert('DealHunter could not identify a unique authenticated session.');\n    return;\n  }}\n  var p = JSON.stringify({{nonce: '{importer.nonce}', token: c[0]}});\n  window.location.href = 'http://127.0.0.1:{importer.port}/import#' + btoa(p);\n}})();"
-    
+def test_bookmarklet_generation_uses_production_builder():
+    from dealhunter.auth import build_mobile_bookmarklet
+
+    nonce = "0123456789abcdef0123456789abcdef"
+    callback = "http://127.0.0.1:12345/import"
+    bookmarklet = build_mobile_bookmarklet(callback, nonce)
+
+    assert bookmarklet.startswith("javascript:")
     assert "www.rappi.com.mx" in bookmarklet
     assert "rappi.com.mx" in bookmarklet
-    assert "btoa(p)" in bookmarklet
-    assert importer.nonce in bookmarklet
-    assert str(importer.port) in bookmarklet
-    assert "?token" not in bookmarklet
+    assert nonce in bookmarklet
+    assert callback in bookmarklet
+    assert "#" in bookmarklet
+    assert "btoa" in bookmarklet
+    assert "?token=" not in bookmarklet
+    assert "?session=" not in bookmarklet
+    assert "?auth=" not in bookmarklet
+
+
+def test_bookmarklet_rejects_non_loopback_callback():
+    from dealhunter.auth import build_mobile_bookmarklet
+    with pytest.raises(ValueError):
+        build_mobile_bookmarklet("https://evil.example/import", "nonce")
+
+
+def test_cli_mobile_uses_shared_bookmarklet_builder():
+    with patch("socketserver.TCPServer") as mock_tcpserver, \
+         patch("dealhunter.auth.build_mobile_bookmarklet", return_value="javascript:SHARED_BUILDER") as builder, \
+         patch("threading.Event.wait", return_value=False), \
+         patch("builtins.print") as mock_print:
+        instance = MagicMock()
+        instance.server_address = ("127.0.0.1", 12345)
+        mock_tcpserver.return_value = instance
+        main(["auth", "rappi", "--mobile"])
+
+    builder.assert_called_once()
+    output = " ".join(str(c.args[0]) for c in mock_print.call_args_list if c.args)
+    assert "javascript:SHARED_BUILDER" in output
+
+
+def test_rappi_session_provider_save_fails_closed(temp_session_file, monkeypatch):
+    from dealhunter.auth import AccessContext, RappiSessionProvider
+    from dealhunter.errors import DealHunterError
+    from dealhunter.secret_store import SecretStore
+
+    provider = RappiSessionProvider(storage_path=temp_session_file)
+    provider.context = None
+
+    def fail_store(self, token, *args, **kwargs):
+        raise DealHunterError("SECRET_STORE_IO", message="simulated")
+
+    monkeypatch.setattr(SecretStore, "store", fail_store)
+    with pytest.raises(DealHunterError):
+        provider.save(AccessContext("SENSITIVE_SAVE_FAILURE_TOKEN"))
+    assert provider.context is None
 
 def test_diagnose_endpoint(temp_session_file):
     from dealhunter.auth import RappiSessionProvider, LocalAuthImporter
@@ -178,3 +220,37 @@ def test_diagnose_cli_mock(temp_session_file):
         assert "isJWT" in full_output
         assert "classifyValue" in full_output
         assert "indexedDB" in full_output
+
+
+
+def test_cli_mobile_importer_storage_failure_is_fail_closed(tmp_path):
+    from dealhunter.auth import LocalAuthImporter
+    import threading
+    import urllib.request
+    import urllib.error
+
+    class FailingProvider:
+        def save(self, context):
+            raise RuntimeError("simulated secure storage failure")
+
+    importer = LocalAuthImporter(FailingProvider(), host="127.0.0.1", port=0, is_mobile=True)
+    importer.start()
+    thread = threading.Thread(target=importer.server.serve_forever, daemon=True)
+    thread.start()
+    payload = json.dumps({"nonce": importer.nonce, "token": "CLI_FAIL_CLOSED_TOKEN_123456"}).encode()
+    req = urllib.request.Request(
+        f"http://127.0.0.1:{importer.port}/commit",
+        data=payload,
+        headers={"Content-Type": "application/json"},
+        method="POST",
+    )
+    try:
+        with pytest.raises(urllib.error.HTTPError) as exc:
+            urllib.request.urlopen(req, timeout=2)
+        assert exc.value.code == 400
+        body = exc.value.read().decode()
+        assert "CLI_FAIL_CLOSED_TOKEN_123456" not in body
+        assert importer.nonce is not None
+    finally:
+        importer.server.shutdown()
+        importer.server.server_close()
