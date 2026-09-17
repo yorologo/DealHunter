@@ -97,3 +97,48 @@ def test_restaurant_latest_observation_tie_breaks_by_id(current_schema_db_path):
     dish = detail['categories']['Main'][0]
     assert dish['price'] == 20
     assert detail['last_obs'] == '2026-09-15T12:00:00Z'
+
+
+def test_home_deals_runs_history_once(monkeypatch):
+    from dealhunter.web import queries as web_queries
+    calls = []
+    rows = [
+        {'deal_status': 'NEW_LOW', 'product_id': 'a'},
+        {'deal_status': 'REAL_DEAL', 'product_id': 'b'},
+        {'deal_status': 'GOOD_PRICE', 'product_id': 'c'},
+        {'deal_status': 'NORMAL', 'product_id': 'd'},
+    ]
+    def fake_analyze(db_path, filters):
+        calls.append((db_path, filters))
+        return rows
+    monkeypatch.setattr(web_queries, 'analyze_history', fake_analyze)
+    out = web_queries.get_home_deals('db.sqlite', {'providers': ['rappi']})
+    assert len(calls) == 1
+    assert calls[0][1]['providers'] == ['rappi']
+    assert [x['product_id'] for x in out['new_lows']] == ['a']
+    assert [x['product_id'] for x in out['real_deals']] == ['b']
+    assert [x['product_id'] for x in out['good_prices']] == ['c']
+
+
+def test_restaurants_home_uses_single_select_and_latest_tie(current_schema_db_path, monkeypatch):
+    import sqlite3 as sqlite3_module
+    from dealhunter.web import queries as web_queries
+    from tests.helpers.db import insert_store, insert_product, insert_observation
+    with sqlite3_module.connect(current_schema_db_path) as conn:
+        insert_store(conn, 'r1', name='Rest', type='restaurant', provider='rappi')
+        insert_product(conn, 'p1', 'r1', name='Dish', provider='rappi')
+        insert_observation(conn, 'old', 'r1', 'p1', 10, timestamp='2026-09-15T00:00:00Z', availability='AVAILABLE', discount_effective=10)
+        insert_observation(conn, 'tie', 'r1', 'p1', 12, timestamp='2026-09-15T00:00:00Z', availability='UNAVAILABLE', discount_effective=0)
+        conn.commit()
+    real_connect = sqlite3_module.connect
+    selects = []
+    def traced_connect(*args, **kwargs):
+        conn = real_connect(*args, **kwargs)
+        conn.set_trace_callback(lambda sql: selects.append(sql) if sql.lstrip().upper().startswith(('SELECT','WITH')) else None)
+        return conn
+    monkeypatch.setattr(web_queries.sqlite3, 'connect', traced_connect)
+    rows = web_queries.get_restaurants_home(current_schema_db_path)
+    assert len(selects) == 1
+    assert rows[0]['available_dishes'] == 0
+    assert rows[0]['promos'] == 0
+    assert rows[0]['last_obs'] == '2026-09-15T00:00:00Z'

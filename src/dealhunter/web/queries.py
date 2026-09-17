@@ -25,18 +25,15 @@ def get_home_metrics(db_path):
     }
 
 def get_home_deals(db_path, filters=None):
-    if filters is None: filters = {}
-    # Using analyze_history from historico
-    new_lows = analyze_history(db_path, {**filters, "status": ["NEW_LOW"], "sort": "discount"})
-    real_deals = analyze_history(db_path, {**filters, "status": ["REAL_DEAL"], "sort": "discount"})
-    good_prices = analyze_history(db_path, {**filters, "status": ["GOOD_PRICE"], "sort": "discount"})
-    
-    # Top 5 for each category to show on home
-    return {
-        "new_lows": new_lows[:5],
-        "real_deals": real_deals[:5],
-        "good_prices": good_prices[:5],
-    }
+    """Return Home deal buckets from one historical-analysis pass."""
+    filters = filters or {}
+    rows = analyze_history(db_path, {**filters, "sort": "discount"})
+    buckets = {"NEW_LOW": [], "REAL_DEAL": [], "GOOD_PRICE": []}
+    for row in rows:
+        bucket = buckets.get(row.get("deal_status"))
+        if bucket is not None and len(bucket) < 5:
+            bucket.append(row)
+    return {"new_lows": buckets["NEW_LOW"], "real_deals": buckets["REAL_DEAL"], "good_prices": buckets["GOOD_PRICE"]}
 
 def get_watchlist(db_path, filters=None):
     conn = sqlite3.connect(db_path)
@@ -741,73 +738,48 @@ def get_store_detail(db_path, provider, store_id):
 
 
 def get_restaurants_home(db_path, filters=None):
+    """Return restaurant cards with latest-observation metrics in one SELECT."""
     conn = sqlite3.connect(db_path)
-    c = conn.cursor()
-    
     providers = (filters or {}).get("providers") or []
     provider_sql = ""
     params = []
     if providers:
         provider_sql = f" AND s.provider IN ({','.join('?' for _ in providers)})"
         params.extend(providers)
-
-    c.execute(f'''
-        SELECT s.provider, s.store_id, s.name, s.brand,
-               COUNT(DISTINCT p.product_id) as total_dishes,
-               MAX(o.timestamp) as last_obs
+    query = f"""
+        WITH latest AS (
+            SELECT o.provider, o.store_id, o.product_id, o.timestamp,
+                   o.availability, o.discount_effective
+            FROM trusted_observations o
+            WHERE o.id = (
+                SELECT o2.id FROM trusted_observations o2
+                WHERE o2.provider=o.provider AND o2.store_id=o.store_id AND o2.product_id=o.product_id
+                ORDER BY o2.timestamp DESC, o2.id DESC LIMIT 1
+            )
+        ), product_counts AS (
+            SELECT provider, store_id, COUNT(*) AS total_dishes
+            FROM products GROUP BY provider, store_id
+        ), latest_stats AS (
+            SELECT provider, store_id,
+                   COUNT(DISTINCT CASE WHEN availability='AVAILABLE' THEN product_id END) AS available_dishes,
+                   COUNT(DISTINCT CASE WHEN discount_effective > 0 THEN product_id END) AS promos,
+                   MAX(timestamp) AS last_obs
+            FROM latest GROUP BY provider, store_id
+        )
+        SELECT s.provider, s.store_id, s.name, s.brand, pc.total_dishes,
+               COALESCE(ls.available_dishes,0), COALESCE(ls.promos,0), ls.last_obs
         FROM stores s
-        LEFT JOIN products p ON s.provider = p.provider AND s.store_id = p.store_id
-        LEFT JOIN trusted_observations o ON p.provider = o.provider AND p.product_id = o.product_id AND p.store_id = o.store_id
-        WHERE (LOWER(s.type) IN ('restaurant', 'restaurants') OR LOWER(s.vertical) IN ('restaurant', 'restaurants'))
-        {provider_sql}
-        GROUP BY s.provider, s.store_id
-        HAVING COUNT(DISTINCT p.product_id) > 0
-        ORDER BY s.name ASC
-    ''', params)
-    
-    stores = []
-    for r in c.fetchall():
-        provider = r[0]
-        store_id = r[1]
-        # Count available dishes
-        c.execute('''
-            SELECT COUNT(DISTINCT o.product_id)
-            FROM trusted_observations o
-            WHERE o.provider = ? AND o.store_id = ? AND o.availability = 'AVAILABLE'
-            AND o.id = (
-                SELECT o2.id FROM trusted_observations o2
-                WHERE o2.provider=o.provider AND o2.product_id=o.product_id AND o2.store_id=o.store_id
-                ORDER BY o2.timestamp DESC, o2.id DESC LIMIT 1
-            )
-        ''', (provider, store_id))
-        available = c.fetchone()[0]
-        
-        # Count promotions
-        c.execute('''
-            SELECT COUNT(DISTINCT o.product_id)
-            FROM trusted_observations o
-            WHERE o.provider = ? AND o.store_id = ? AND o.discount_effective > 0
-            AND o.id = (
-                SELECT o2.id FROM trusted_observations o2
-                WHERE o2.provider=o.provider AND o2.product_id=o.product_id AND o2.store_id=o.store_id
-                ORDER BY o2.timestamp DESC, o2.id DESC LIMIT 1
-            )
-        ''', (provider, store_id))
-        promos = c.fetchone()[0]
-        
-        stores.append({
-            "provider": provider,
-            "store_id": store_id,
-            "name": r[2],
-            "brand": r[3],
-            "total_dishes": r[4],
-            "available_dishes": available,
-            "promos": promos,
-            "last_obs": r[5]
-        })
-        
-    conn.close()
-    return stores
+        JOIN product_counts pc ON pc.provider=s.provider AND pc.store_id=s.store_id
+        LEFT JOIN latest_stats ls ON ls.provider=s.provider AND ls.store_id=s.store_id
+        WHERE (LOWER(s.type) IN ('restaurant','restaurants') OR LOWER(s.vertical) IN ('restaurant','restaurants'))
+          {provider_sql} AND pc.total_dishes > 0
+        ORDER BY s.name ASC, s.provider ASC, s.store_id ASC
+    """
+    try:
+        rows = conn.execute(query, params).fetchall()
+        return [{"provider":r[0],"store_id":r[1],"name":r[2],"brand":r[3],"total_dishes":r[4],"available_dishes":r[5],"promos":r[6],"last_obs":r[7]} for r in rows]
+    finally:
+        conn.close()
 
 def get_restaurant_detail(db_path, provider, store_id):
     conn = sqlite3.connect(db_path)
