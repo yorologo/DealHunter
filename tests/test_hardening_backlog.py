@@ -145,7 +145,7 @@ def test_scheduler_repairs_legacy_entry_and_installs_both_providers(monkeypatch)
         "./bin/rappi-ofertas discover --vertical general\n"
     )
     installed = _fake_crontab(monkeypatch, scheduler, legacy)
-    scheduler.enable_scheduler()
+    scheduler.enable_scheduler({"lat": 20.0, "lng": -103.0})
 
     content = installed["content"]
     assert "# existing" in content
@@ -163,10 +163,21 @@ def test_scheduler_disable_removes_only_managed_entries(monkeypatch):
     from dealhunter import scheduler
 
     installed = _fake_crontab(monkeypatch, scheduler, "# existing\n")
-    scheduler.enable_scheduler()
+    scheduler.enable_scheduler({"lat": 20.0, "lng": -103.0})
     scheduler.disable_scheduler()
     assert installed["content"] == "# existing\n"
     assert not scheduler.is_scheduler_enabled()
+
+
+
+def test_scheduler_refuses_enable_without_valid_location(monkeypatch):
+    from dealhunter import scheduler
+
+    installed = _fake_crontab(monkeypatch, scheduler, "# existing\n")
+    for config in ({}, {"lat": 20.0}, {"lat": float("nan"), "lng": -103.0}, {"lat": 91, "lng": 0}):
+        with pytest.raises(RuntimeError, match="Scheduler"):
+            scheduler.enable_scheduler(config)
+    assert installed["content"] == "# existing\n"
 
 
 def test_scheduler_rejects_failed_write_and_readback_mismatch(monkeypatch):

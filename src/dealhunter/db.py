@@ -6,7 +6,7 @@ import sys
 
 from .errors import DealHunterError
 
-CURRENT_SCHEMA_VERSION = 16
+CURRENT_SCHEMA_VERSION = 17
 
 SQLITE_BUSY_TIMEOUT_MS = 30_000
 
@@ -16,7 +16,19 @@ _CORE_TABLES = {
     "runs",
     "observations",
     "schema_version",
+    "merchants",
+    "merchant_locations",
+    "browse_nodes",
+    "browse_mappings",
 }
+
+_REQUIRED_STORE_COLUMNS = {
+    "merchant_id",
+    "location_id",
+    "commerce_type",
+    "catalog_domain",
+}
+_REQUIRED_INDEXES = {"idx_obs_provider_history"}
 
 _TRUSTED_VIEW_MARKERS = (
     "JOIN RUNS R ON O.RUN_ID = R.RUN_ID",
@@ -53,6 +65,22 @@ def _schema_contract_is_current(conn):
         tuple(sorted(_CORE_TABLES)),
     ).fetchall()
     if {row[0] for row in rows} != _CORE_TABLES:
+        return False
+
+    store_columns = {row[1] for row in conn.execute("PRAGMA table_info(stores)").fetchall()}
+    if not _REQUIRED_STORE_COLUMNS.issubset(store_columns):
+        return False
+
+    indexes = {
+        row[0]
+        for row in conn.execute(
+            "SELECT name FROM sqlite_master WHERE type='index' AND name IN ({})".format(
+                ",".join("?" for _ in _REQUIRED_INDEXES)
+            ),
+            tuple(sorted(_REQUIRED_INDEXES)),
+        ).fetchall()
+    }
+    if indexes != _REQUIRED_INDEXES:
         return False
 
     row = conn.execute(
@@ -109,6 +137,9 @@ def setup_db(db_path=None):
 
     conn = sqlite3.connect(db_path, timeout=SQLITE_BUSY_TIMEOUT_MS / 1000)
     conn.execute(f"PRAGMA busy_timeout = {SQLITE_BUSY_TIMEOUT_MS}")
+    conn.execute("PRAGMA foreign_keys = ON")
+    if db_path != ":memory:":
+        conn.execute("PRAGMA journal_mode = WAL")
 
     if _schema_contract_is_current(conn):
         return conn
@@ -452,6 +483,97 @@ def _migrate_locked(conn, db_path):
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 source TEXT
             )''')
+
+        if version < 17:
+            # Schema v17: explicit commercial identity boundaries and browse taxonomy.
+            for definition in (
+                "merchant_id TEXT",
+                "location_id TEXT",
+                "commerce_type TEXT NOT NULL DEFAULT 'UNKNOWN'",
+                "catalog_domain TEXT NOT NULL DEFAULT 'UNKNOWN'",
+            ):
+                try:
+                    c.execute(f"ALTER TABLE stores ADD COLUMN {definition}")
+                except sqlite3.OperationalError as exc:
+                    if "duplicate column" not in str(exc).lower():
+                        raise
+
+            c.execute('''CREATE TABLE IF NOT EXISTS merchants (
+                merchant_id TEXT PRIMARY KEY,
+                name TEXT NOT NULL,
+                source TEXT NOT NULL,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            )''')
+            c.execute('''CREATE TABLE IF NOT EXISTS merchant_locations (
+                location_id TEXT PRIMARY KEY,
+                merchant_id TEXT NOT NULL REFERENCES merchants(merchant_id),
+                name TEXT NOT NULL,
+                source TEXT NOT NULL,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            )''')
+            c.execute('''CREATE TABLE IF NOT EXISTS browse_nodes (
+                browse_node_id TEXT PRIMARY KEY,
+                parent_id TEXT REFERENCES browse_nodes(browse_node_id),
+                level TEXT NOT NULL CHECK(level IN ('DEPARTMENT','SECTION','CATEGORY','SUBCATEGORY')),
+                name TEXT NOT NULL,
+                active INTEGER NOT NULL DEFAULT 1 CHECK(active IN (0,1)),
+                sort_order INTEGER NOT NULL DEFAULT 0
+            )''')
+            c.execute('''CREATE TABLE IF NOT EXISTS browse_mappings (
+                provider TEXT NOT NULL,
+                raw_type TEXT NOT NULL,
+                raw_name TEXT NOT NULL,
+                raw_path TEXT NOT NULL DEFAULT '',
+                browse_node_id TEXT NOT NULL REFERENCES browse_nodes(browse_node_id),
+                source TEXT NOT NULL,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                PRIMARY KEY (provider, raw_type, raw_name, raw_path, browse_node_id)
+            )''')
+
+            # Backfill only from structured provider type evidence. Display names and
+            # free-text product/category data are intentionally not consulted.
+            c.execute('''UPDATE stores SET
+                commerce_type = CASE LOWER(TRIM(COALESCE(type, '')))
+                    WHEN 'restaurant' THEN 'RESTAURANT'
+                    WHEN 'restaurants' THEN 'RESTAURANT'
+                    WHEN 'grocery' THEN 'SUPERMARKET'
+                    WHEN 'market' THEN 'SUPERMARKET'
+                    WHEN 'super' THEN 'SUPERMARKET'
+                    WHEN 'supermarket' THEN 'SUPERMARKET'
+                    WHEN 'chiper_home' THEN 'SUPERMARKET'
+                    WHEN 'chiper_extended' THEN 'SUPERMARKET'
+                    WHEN 'chiper_express' THEN 'SUPERMARKET'
+                    WHEN 'farmatodo' THEN 'PHARMACY'
+                    WHEN 'pharmacy' THEN 'PHARMACY'
+                    WHEN 'farmacia' THEN 'PHARMACY'
+                    WHEN 'express_parent' THEN 'SPECIALTY_RETAIL'
+                    WHEN 'pets_cpgs' THEN 'SPECIALTY_RETAIL'
+                    ELSE 'UNKNOWN'
+                END,
+                catalog_domain = CASE LOWER(TRIM(COALESCE(type, '')))
+                    WHEN 'restaurant' THEN 'MENU'
+                    WHEN 'restaurants' THEN 'MENU'
+                    WHEN 'grocery' THEN 'RETAIL'
+                    WHEN 'market' THEN 'RETAIL'
+                    WHEN 'super' THEN 'RETAIL'
+                    WHEN 'supermarket' THEN 'RETAIL'
+                    WHEN 'chiper_home' THEN 'RETAIL'
+                    WHEN 'chiper_extended' THEN 'RETAIL'
+                    WHEN 'chiper_express' THEN 'RETAIL'
+                    WHEN 'farmatodo' THEN 'RETAIL'
+                    WHEN 'pharmacy' THEN 'RETAIL'
+                    WHEN 'farmacia' THEN 'RETAIL'
+                    WHEN 'express_parent' THEN 'RETAIL'
+                    WHEN 'pets_cpgs' THEN 'RETAIL'
+                    ELSE 'UNKNOWN'
+                END
+            ''')
+            observation_columns = {row[1] for row in c.execute("PRAGMA table_info(observations)")}
+            if {"provider", "store_id", "product_id", "timestamp", "id"} <= observation_columns:
+                c.execute('''CREATE INDEX IF NOT EXISTS idx_obs_provider_history
+                             ON observations(provider, store_id, product_id, timestamp DESC, id DESC)''')
+            c.execute('CREATE INDEX IF NOT EXISTS idx_stores_merchant ON stores(merchant_id, location_id)')
+            c.execute('CREATE INDEX IF NOT EXISTS idx_stores_commerce ON stores(commerce_type, catalog_domain)')
 
         c.execute('UPDATE schema_version SET version = ?', (CURRENT_SCHEMA_VERSION,))
         

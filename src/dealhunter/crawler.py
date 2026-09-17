@@ -4,6 +4,7 @@ from datetime import datetime
 from .api import fetch_unified_search
 from .discounts import calculate_discount
 from .core import process_and_insert_product
+from .commerce import classify_store
 from .errors import DealHunterError, classify_error
 from .checkpoint import RunCheckpoint, save_checkpoint
 
@@ -191,8 +192,17 @@ def run_discover(config, lat, lng, conn, run_id, dry_run=False):
                         s_id = str(s.get("store_id"))
                         s_name = s.get("store_name", s_id)
 
-                        c.execute('INSERT OR IGNORE INTO stores (store_id, name, brand, type) VALUES (?, ?, ?, ?)', 
-                                  (s_id, s_name, s.get("store_brand_name", ""), s.get("parent_store_type", "")))
+                        raw_store_type = s.get("parent_store_type", "")
+                        commerce_type, catalog_domain = classify_store(raw_store_type, display_name=s_name)
+                        c.execute('''INSERT INTO stores (provider, store_id, name, brand, type, commerce_type, catalog_domain)
+                                     VALUES ('rappi', ?, ?, ?, ?, ?, ?)
+                                     ON CONFLICT(provider, store_id) DO UPDATE SET
+                                     name=COALESCE(excluded.name, name),
+                                     brand=COALESCE(NULLIF(excluded.brand, ''), brand),
+                                     type=COALESCE(NULLIF(excluded.type, ''), type),
+                                     commerce_type=CASE WHEN excluded.commerce_type != 'UNKNOWN' THEN excluded.commerce_type ELSE commerce_type END,
+                                     catalog_domain=CASE WHEN excluded.catalog_domain != 'UNKNOWN' THEN excluded.catalog_domain ELSE catalog_domain END''',
+                                  (s_id, s_name, s.get("store_brand_name", ""), raw_store_type, commerce_type, catalog_domain))
 
                         prods = s.get("products", [])
 

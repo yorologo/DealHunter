@@ -2,7 +2,7 @@ import pytest
 import sqlite3
 import os
 import datetime
-from dealhunter.db import setup_db, CURRENT_SCHEMA_VERSION
+from dealhunter.db import CURRENT_SCHEMA_VERSION, setup_db, CURRENT_SCHEMA_VERSION
 from dealhunter.core import process_and_insert_product
 
 def get_now():
@@ -62,7 +62,7 @@ def test_migration_v10_to_v11(tmp_path):
     conn = sqlite3.connect(db_path)
     c = conn.cursor()
     c.execute("SELECT version FROM schema_version")
-    assert c.fetchone()[0] in [11, 12, 13, 14, 15, 16]
+    assert c.fetchone()[0] == CURRENT_SCHEMA_VERSION
     
     # Check legacy data was preserved and got default values
     c.execute("SELECT semantic_type, semantic_reason FROM product_memberships WHERE raw_name='Sushi'")

@@ -157,3 +157,25 @@ def test_missing_price_and_unknown_fields(parser):
     p = result["products"][0]
     assert p["price"] is None
     assert p["reference_price"] is None
+
+
+def test_missing_grid_title_does_not_manufacture_category(parser, normalizer):
+    payload = {
+        "uuid": "store-1",
+        "catalogSectionsMap": {
+            "sec-1": [{
+                "type": "VERTICAL_GRID",
+                "payload": {
+                    "standardItemsPayload": {
+                        "catalogItems": [{"uuid": "prod-no-cat", "title": "Item", "price": 10000}]
+                    }
+                },
+            }],
+        },
+    }
+    parsed = parser.parse_store(payload)["products"][0]
+    assert parsed["category"] is None
+    assert parsed["memberships"] == []
+    normalized = normalizer.normalize_product(parsed)
+    assert normalized["category"] is None
+    assert normalized["memberships"] == []

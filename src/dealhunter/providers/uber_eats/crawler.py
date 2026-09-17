@@ -6,6 +6,7 @@ from .browser_transport import UberBrowserTransport
 from .feed_v1 import parse_feed_v1
 from .parser import UberEatsParser
 from .normalizer import UberEatsNormalizer
+from dealhunter.commerce import classify_store
 
 logger = logging.getLogger(__name__)
 
@@ -64,16 +65,20 @@ async def _run_uber_sync_async(config, lat, lng, conn, run_id):
             try:
                 c = conn.cursor()
                 validate_provider('uber_eats')
-                c.execute('''INSERT INTO stores (provider, store_id, name, brand, type, status, last_seen_at, vertical)
-                             VALUES (?, ?, ?, ?, ?, 'ACTIVE', CURRENT_TIMESTAMP, ?)
+                raw_store_type = "RESTAURANT" if s.get('type') == 'restaurant' else ("GROCERY" if s.get('type') == 'grocery' else "UNKNOWN")
+                commerce_type, catalog_domain = classify_store(raw_store_type, display_name=s['name'])
+                c.execute('''INSERT INTO stores (provider, store_id, name, brand, type, status, last_seen_at, vertical, commerce_type, catalog_domain)
+                             VALUES (?, ?, ?, ?, ?, 'ACTIVE', CURRENT_TIMESTAMP, ?, ?, ?)
                              ON CONFLICT(provider, store_id) DO UPDATE SET 
                              last_seen_at=CURRENT_TIMESTAMP, 
                              name=excluded.name,
                              type = CASE WHEN excluded.type != 'UNKNOWN' THEN excluded.type ELSE type END,
-                             vertical = CASE WHEN excluded.vertical != 'UNKNOWN' THEN excluded.vertical ELSE vertical END''',
-                          ("uber_eats", s['uuid'], s['name'], s['name'], 
-                           "RESTAURANT" if s.get('type') == 'restaurant' else ("GROCERY" if s.get('type') == 'grocery' else "UNKNOWN"), 
-                           "RESTAURANTS" if s.get('type') == 'restaurant' else ("MARKET" if s.get('type') == 'grocery' else "UNKNOWN")))
+                             vertical = CASE WHEN excluded.vertical != 'UNKNOWN' THEN excluded.vertical ELSE vertical END,
+                             commerce_type = CASE WHEN excluded.commerce_type != 'UNKNOWN' THEN excluded.commerce_type ELSE commerce_type END,
+                             catalog_domain = CASE WHEN excluded.catalog_domain != 'UNKNOWN' THEN excluded.catalog_domain ELSE catalog_domain END''',
+                          ("uber_eats", s['uuid'], s['name'], s['name'], raw_store_type,
+                           "RESTAURANTS" if s.get('type') == 'restaurant' else ("MARKET" if s.get('type') == 'grocery' else "UNKNOWN"),
+                           commerce_type, catalog_domain))
                 conn.commit()
 
                 offset = 0
@@ -100,8 +105,17 @@ async def _run_uber_sync_async(config, lat, lng, conn, run_id):
                         c.execute('''INSERT INTO products (provider, store_id, product_id, name, brand, image, category, category_source)
                                      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                                      ON CONFLICT(provider, store_id, product_id) DO UPDATE SET
-                                     name=excluded.name, image=excluded.image, category=excluded.category''',
+                                     name=excluded.name, image=excluded.image, category=COALESCE(excluded.category, category), category_source=COALESCE(excluded.category_source, category_source)''',
                                   ("uber_eats", norm_p['store_id'], norm_p['product_id'], norm_p['name'], norm_p.get('brand', ''), norm_p.get('image', ''), norm_p.get('category', ''), 'uber_eats_grid'))
+
+                        from dealhunter.core import persist_raw_memberships
+                        persist_raw_memberships(
+                            conn, "uber_eats", norm_p["store_id"], norm_p["product_id"],
+                            norm_p.get("memberships"),
+                            category=norm_p.get("category"),
+                            category_source=norm_p.get("category_source", "uber_eats_grid"),
+                            source="uber_eats_grid",
+                        )
 
                         c.execute('''INSERT OR IGNORE INTO observations (run_id, provider, store_id, product_id, timestamp, price, original_price, discount_price, discount_promotion, discount_effective, discount_source, promotion_type, promotion_label, availability, stock)
                                      VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',

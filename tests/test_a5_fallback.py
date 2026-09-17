@@ -15,6 +15,7 @@ def test_a5_failure_triggers_fallback():
             assert mock_unified.call_count > 0
             assert any(str(s["store_id"]) == "999" for s in res)
             assert report.merchants_discovered >= 1
+            assert "DISCOVERY_FALLBACK" in report.incomplete_reasons
 
 def test_a5_success_skips_cpg_bfs():
     class MockClient:

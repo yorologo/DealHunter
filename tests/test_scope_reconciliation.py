@@ -31,26 +31,28 @@ def test_scope_safe_reconciliation(test_db):
         {"store_id": "8", "name": "TurboNew", "type": "chiper_home", "vertical_sub_group": "Turbo"}
     ]
     
-    with patch("dealhunter.crawler_zone.RappiSessionProvider.is_authenticated", return_value=True):
-        with patch("dealhunter.crawler_zone.MerchantDiscovery.discover_merchants", return_value=mock_merchants):
-            config = {"max_runtime": 3600, "discovery_mode": "full"}
-            state, reqs = asyncio.run(_run_zone_inventory_async(config, 0, 0, test_db, "run1"))
+    with patch("dealhunter.crawler_zone.RappiSessionProvider.is_authenticated", return_value=True), \
+         patch("dealhunter.crawler_zone.MerchantDiscovery.discover_merchants", return_value=mock_merchants), \
+         patch("dealhunter.crawler_zone.CPGCatalogAdapter.fetch_full_catalog", return_value=[]), \
+         patch("dealhunter.crawler_zone.time.sleep", return_value=None):
+        config = {"max_runtime": 3600, "discovery_mode": "full"}
+        state, reqs = asyncio.run(_run_zone_inventory_async(config, 0, 0, test_db, "run1"))
             
-            assert state == "COMPLETED"
-            
-            def get_status(sid):
-                c.execute("SELECT status FROM stores WHERE store_id = ?", (sid,))
-                return c.fetchone()[0]
-                
-            assert get_status('1') == 'ACTIVE' 
-            assert get_status('2') == 'ACTIVE' 
-            assert get_status('3') == 'ACTIVE' 
-            assert get_status('4') == 'ACTIVE' 
-            
-            assert get_status('5') == 'STALE'  
-            assert get_status('6') == 'STALE'  
-            assert get_status('7') == 'STALE'  
-            assert get_status('8') == 'ACTIVE' 
+    assert state == "COMPLETED"
+
+    def get_status(sid):
+        c.execute("SELECT status FROM stores WHERE store_id = ?", (sid,))
+        return c.fetchone()[0]
+
+    assert get_status('1') == 'ACTIVE'
+    assert get_status('2') == 'ACTIVE'
+    assert get_status('3') == 'ACTIVE'
+    assert get_status('4') == 'ACTIVE'
+
+    assert get_status('5') == 'STALE'
+    assert get_status('6') == 'STALE'
+    assert get_status('7') == 'STALE'
+    assert get_status('8') == 'ACTIVE'
 
 def test_a5_partial_no_stale(test_db):
     c = test_db.cursor()

@@ -1,3 +1,4 @@
+from dealhunter.time_utils import utc_now_iso
 import sqlite3
 from datetime import datetime
 from .db import setup_db
@@ -9,20 +10,20 @@ class AlertEngine:
         self.config = config or {}
         self.price_drop_percent = self.config.get("price_drop_percent", 10.0)
         self.conn = setup_db(db_path)
-        
+
     def evaluate(self):
         """Evaluate all products and return new alerts."""
         c = self.conn.cursor()
-        
+
         # 1. Fetch watchlist targets
         c.execute("SELECT query, store_filter, target_price FROM watchlist WHERE enabled = 1 AND target_price IS NOT NULL")
         targets = []
         for r in c.fetchall():
             targets.append({"query": r[0], "store": r[1], "target_price": r[2]})
-            
+
         # 2. Get price intelligence metrics for ALL products
         metrics_by_product = analyze_history(self.db_path, {})
-        
+
         # We need historical availability to check BACK_IN_STOCK. We'll fetch the last two observations for each product.
         c.execute('''
             SELECT provider, store_id, product_id, availability
@@ -35,9 +36,9 @@ class AlertEngine:
             if key not in avail_history:
                 avail_history[key] = []
             avail_history[key].append(r[3])
-            
+
         new_alerts = []
-        
+
         for m in metrics_by_product:
             provider = m["provider"]
             store_id = m["store_id"]
@@ -47,7 +48,7 @@ class AlertEngine:
             current_price = m["current_price"]
             prev_price = m["previous_price"]
             status = m["deal_status"]
-            
+
             # Check TARGET_PRICE
             for t in targets:
                 if t["query"].lower() in product_name.lower():
@@ -58,7 +59,7 @@ class AlertEngine:
                                 current_price, prev_price, status,
                                 f"Precio actual ${current_price} <= objetivo ${t['target_price']}"
                             )
-                            
+
             # Check NEW_LOW
             if status == "NEW_LOW":
                 self._try_add_alert(
@@ -66,7 +67,7 @@ class AlertEngine:
                     current_price, prev_price, status,
                     m["reason"]
                 )
-                
+
             # Check REAL_DEAL
             if status == "REAL_DEAL":
                 self._try_add_alert(
@@ -74,7 +75,7 @@ class AlertEngine:
                     current_price, prev_price, status,
                     m["reason"]
                 )
-                
+
             # Check PRICE_DROP
             if prev_price > 0:
                 drop_pct = (1 - (current_price / prev_price)) * 100
@@ -84,7 +85,7 @@ class AlertEngine:
                         current_price, prev_price, status,
                         f"Precio bajó {drop_pct:.1f}% desde ${prev_price} a ${current_price}"
                     )
-                    
+
             # Check BACK_IN_STOCK
             history = avail_history.get((provider, store_id, product_id), [])
             if len(history) >= 2:
@@ -111,7 +112,7 @@ class AlertEngine:
                 ORDER BY triggered_at DESC LIMIT 1
             ''', (a["provider"], a["product_id"], a["store_id"], a["alert_type"]))
             row = c.fetchone()
-            
+
             should_insert = True
             if row:
                 last_price = row[0]
@@ -119,9 +120,9 @@ class AlertEngine:
                     should_insert = False
                 elif a["alert_type"] == "BACK_IN_STOCK":
                     should_insert = False
-                    
+
             if should_insert:
-                now = datetime.now().isoformat()
+                now = utc_now_iso()
                 try:
                     c.execute('''
                         INSERT INTO alerts (provider, product_id, store_id, alert_type, triggered_at, price, previous_price, deal_status, reason, seen)
@@ -132,10 +133,10 @@ class AlertEngine:
                     inserted_alerts.append(a)
                 except sqlite3.IntegrityError:
                     pass # unique constraint hit (same exact everything)
-                    
+
         self.conn.commit()
         return self.get_alerts(new_only=True)
-        
+
     def _try_add_alert(self, alerts_list, provider, store_id, product_id, alert_type, price, previous_price, status, reason):
         alerts_list.append({
             "provider": provider,
@@ -150,7 +151,7 @@ class AlertEngine:
 
     def get_alerts(self, new_only=False, top=50, status=None, store=None, alert_type=None):
         c = self.conn.cursor()
-        
+
         query = '''
             SELECT a.id, a.alert_type, a.product_id, a.store_id, p.name, s.name, a.provider,
                    a.price, a.previous_price, a.deal_status, a.triggered_at, a.reason, a.seen
@@ -160,7 +161,7 @@ class AlertEngine:
             WHERE 1=1
         '''
         params = []
-        
+
         if new_only:
             query += " AND a.seen = 0"
         if status:
@@ -172,13 +173,13 @@ class AlertEngine:
         if alert_type:
             query += " AND a.alert_type = ?"
             params.append(alert_type)
-            
+
         query += " ORDER BY a.triggered_at DESC LIMIT ?"
         params.append(top)
-        
+
         c.execute(query, params)
         rows = c.fetchall()
-        
+
         res = []
         for r in rows:
             res.append({
@@ -197,7 +198,7 @@ class AlertEngine:
                 "seen": bool(r[12])
             })
         return res
-        
+
     def mark_seen(self, alert_id=None, all=False):
         c = self.conn.cursor()
         if all:

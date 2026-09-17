@@ -126,15 +126,24 @@ def _deep_update(d, u):
     return d
 
 
-def get_merged_config(cli_args, profile_name=None):
-    config = {
+def get_default_config():
+    """Return a fresh copy of the canonical DealHunter defaults."""
+    return {
         "lat": None,
         "lng": None,
         "min_discount": 0,
         "max_discount": 100,
+        "min_price": None,
+        "max_price": None,
+        "promo": [],
+        "only_nxm": False,
+        "min_promo_discount": None,
+        "status": [],
+        "discovery_mode": "full",
         "radius": 5.0,
         "top": 50,
         "sort": "discount",
+        "desc": True,
         "output_format": "table",
         "vertical": [],
         "store": [],
@@ -158,6 +167,10 @@ def get_merged_config(cli_args, profile_name=None):
         },
     }
 
+
+def get_merged_config(cli_args, profile_name=None):
+    config = get_default_config()
+
     global_cfg = load_config()
     for k in config.keys():
         if k in global_cfg:
@@ -179,8 +192,6 @@ def get_merged_config(cli_args, profile_name=None):
         for k, v in vars(cli_args).items():
             if v is not None and k in config:
                 if isinstance(v, list) and len(v) == 0:
-                    continue
-                if isinstance(v, bool) and not v:
                     continue
                 config[k] = v
 

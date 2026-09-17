@@ -83,7 +83,24 @@ def is_scheduler_enabled():
     return RAPPI_JOB in lines and UBER_JOB in lines
 
 
-def enable_scheduler():
+def _validated_location(config=None):
+    if config is None:
+        from dealhunter.config import get_merged_config
+        config = get_merged_config(None)
+    lat = config.get("lat")
+    lng = config.get("lng")
+    try:
+        lat = float(lat)
+        lng = float(lng)
+    except (TypeError, ValueError) as exc:
+        raise RuntimeError("Scheduler requires configured lat/lng before it can be enabled") from exc
+    if not (-90 <= lat <= 90 and -180 <= lng <= 180):
+        raise RuntimeError("Scheduler lat/lng are outside valid coordinate ranges")
+    return lat, lng
+
+
+def enable_scheduler(config=None):
+    _validated_location(config)
     LOG_FILE.parent.mkdir(parents=True, exist_ok=True)
     cron = get_crontab()
     desired = _desired_crontab(cron)

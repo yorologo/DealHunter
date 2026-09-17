@@ -6,7 +6,7 @@ to support future resumption.
 """
 
 import json
-from datetime import datetime
+from dealhunter.time_utils import utc_now_iso
 
 
 class RunCheckpoint:
@@ -24,7 +24,7 @@ class RunCheckpoint:
         self.queries_completed = queries_completed
         self.requests_made = requests_made
         self.error_code = error_code
-        self.updated_at = updated_at or datetime.now().isoformat()
+        self.updated_at = updated_at or utc_now_iso()
 
     def to_dict(self):
         return {

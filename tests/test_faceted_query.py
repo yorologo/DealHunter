@@ -210,3 +210,25 @@ def test_provider_collision_isolated_in_queries_and_facets(db_conn):
     assert "Uber Only Facet" not in rappi_facets["store_facets"]
     assert all(store["provider"] == "rappi" for store in rappi_facets["stores"])
     assert all(store["filter_key"].startswith("rappi::") for store in rappi_facets["stores"])
+
+
+def test_latest_observation_uses_timestamp_then_id_tiebreak(current_schema_db):
+    conn = current_schema_db
+    insert_store(conn, 'tie-store', name='Tie Store', type='market', provider='rappi')
+    insert_product(conn, 'tie-product', 'tie-store', name='Tie Product', category='Cat T', provider='rappi')
+    insert_observation(
+        conn, run_id='tie-run-1', store_id='tie-store', product_id='tie-product',
+        price=10, original_price=20, discount_effective=50,
+        availability='AVAILABLE', timestamp='2026-09-16T12:00:00Z', provider='rappi',
+    )
+    insert_observation(
+        conn, run_id='tie-run-2', store_id='tie-store', product_id='tie-product',
+        price=12, original_price=20, discount_effective=40,
+        availability='AVAILABLE', timestamp='2026-09-16T12:00:00Z', provider='rappi',
+    )
+    conn.commit()
+
+    rows, total = execute_filters(conn, {"store_identities": [("rappi", "tie-store")]})
+    assert total == 1
+    assert len(rows) == 1
+    assert rows[0][8] == 12

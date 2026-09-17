@@ -61,7 +61,7 @@ def test_fresh_database_has_current_schema_and_trusted_view(tmp_path):
     db_path = tmp_path / "fresh.db"
     conn = db_module.setup_db(str(db_path))
 
-    assert conn.execute("SELECT version FROM schema_version").fetchone()[0] == 16
+    assert conn.execute("SELECT version FROM schema_version").fetchone()[0] == db_module.CURRENT_SCHEMA_VERSION
     view = conn.execute(
         "SELECT sql FROM sqlite_master WHERE type = 'view' AND name = 'trusted_observations'"
     ).fetchone()
@@ -80,7 +80,7 @@ def test_old_database_migrates_without_losing_data(tmp_path):
     conn.close()
 
     conn = db_module.setup_db(str(db_path))
-    assert conn.execute("SELECT version FROM schema_version").fetchone()[0] == 16
+    assert conn.execute("SELECT version FROM schema_version").fetchone()[0] == db_module.CURRENT_SCHEMA_VERSION
     assert conn.execute("SELECT COUNT(*) FROM stores").fetchone()[0] == 1
     assert conn.execute("SELECT COUNT(*) FROM products").fetchone()[0] == 1
     assert conn.execute("SELECT COUNT(*) FROM observations").fetchone()[0] == 1
@@ -102,7 +102,7 @@ def test_concurrent_fresh_initialization_is_serialized(tmp_path):
     with ThreadPoolExecutor(max_workers=8) as pool:
         versions = list(pool.map(initialize, range(8)))
 
-    assert versions == [16] * 8
+    assert versions == [db_module.CURRENT_SCHEMA_VERSION] * 8
     conn = sqlite3.connect(db_path)
     assert conn.execute(
         "SELECT COUNT(*) FROM sqlite_master "
@@ -226,7 +226,7 @@ def test_web_reads_survive_controlled_writer_without_schema_changes(tmp_path):
         writer.close()
 
     conn = sqlite3.connect(db_path)
-    assert conn.execute("SELECT version FROM schema_version").fetchone()[0] == 16
+    assert conn.execute("SELECT version FROM schema_version").fetchone()[0] == db_module.CURRENT_SCHEMA_VERSION
     assert conn.execute("SELECT COUNT(*) FROM trusted_observations").fetchone()[0] == 1
     assert conn.execute(
         "SELECT name FROM stores WHERE provider = 'rappi' AND store_id = 'store-1'"

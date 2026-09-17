@@ -1,3 +1,4 @@
+from dealhunter.time_utils import utc_now_iso
 import argparse
 import math
 import sys
@@ -98,7 +99,7 @@ def build_parser():
     # Promotions
     group_promo = base_parser.add_argument_group("Promotions")
     group_promo.add_argument('--promo', action='append', help="Filter by promo type (price, bundle, NxM)")
-    group_promo.add_argument('--only-nxm', action='store_true', help="Only show NxM promos")
+    group_promo.add_argument('--only-nxm', action=argparse.BooleanOptionalAction, default=None, help="Only show NxM promos")
     group_promo.add_argument('--min-promo-discount', type=float, help="Min discount only for promos")
 
     # Historical
@@ -114,7 +115,7 @@ def build_parser():
 
     # Crawler Control
     group_crawler = base_parser.add_argument_group("Crawler Control")
-    group_crawler.add_argument('--dry-run', action='store_true', help="Do not execute requests")
+    group_crawler.add_argument('--dry-run', action=argparse.BooleanOptionalAction, default=None, help="Do not execute requests")
     group_crawler.add_argument('--max-requests', type=int, help="Stop after N requests")
     group_crawler.add_argument('--discovery-mode', choices=['normal', 'deep', 'full'], help="Adaptive discovery policy (normal: exploración parcial optimizada, deep: exploración parcial más profunda, full: máxima exploración soportada)")
     group_crawler.add_argument('--max-runtime', type=int, help="Stop after N seconds")
@@ -124,11 +125,12 @@ def build_parser():
     group_out = base_parser.add_argument_group("Output")
     group_out.add_argument('--top', type=int, help="Limit number of results")
     group_out.add_argument('--sort', choices=['discount', 'price', 'store', 'name', 'deal-score', 'historical-discount'], help="Sort order")
-    group_out.add_argument('--desc', action='store_true', default=True, help="Sort descending")
-    group_out.add_argument('--asc', action='store_false', dest='desc', help="Sort ascending")
+    sort_direction = group_out.add_mutually_exclusive_group()
+    sort_direction.add_argument('--desc', dest='desc', action='store_const', const=True, default=None, help="Sort descending")
+    sort_direction.add_argument('--asc', dest='desc', action='store_const', const=False, help="Sort ascending")
     group_out.add_argument('--format', choices=['table', 'json', 'csv', 'markdown'], help="Output format")
     group_out.add_argument('--output', type=str, help="Output file")
-    group_out.add_argument('--compact', action='store_true', help="Compact output format")
+    group_out.add_argument('--compact', action=argparse.BooleanOptionalAction, default=None, help="Compact output format")
 
     parser = argparse.ArgumentParser(description=f"DealHunter CLI v{VERSION}", parents=[base_parser])
     subparsers = parser.add_subparsers(dest="command", title="Subcommands", description="Available commands")
@@ -607,7 +609,7 @@ def main(args_list=None):
         c = conn.cursor()
         if args.action == "add":
             c.execute("INSERT INTO watchlist (query, target_price, created_at) VALUES (?, ?, ?)",
-                      (args.query_or_id, args.below, datetime.now().isoformat()))
+                      (args.query_or_id, args.below, utc_now_iso()))
             conn.commit()
             print("Added to watchlist")
         elif args.action == "list":
@@ -635,11 +637,17 @@ def main(args_list=None):
         _warn_on_location_change(conn, lat, lng)
         run_source = os.environ.get("DEALHUNTER_SOURCE", "CLI")
 
+        from dealhunter.run_lifecycle import ActiveRunError, reserve_run
+        try:
+            reserve_run(
+                conn, run_id, lat=lat, lng=lng, radius=config.get("radius"),
+                vertical=config.get("vertical", "general"), source=run_source,
+                allow_existing=bool(args.run_id),
+            )
+        except ActiveRunError as exc:
+            print(f"Crawler start rejected: {exc}", file=sys.stderr)
+            return 2
         c = conn.cursor()
-        c.execute('''INSERT INTO runs (run_id, started_at, lat, lng, radius, vertical, status, source)
-                     VALUES (?, ?, ?, ?, ?, ?, ?, ?)''',
-                  (run_id, datetime.now().isoformat(), lat, lng, config.get("radius"), str(config.get("vertical", "general")), "RUNNING", run_source))
-        conn.commit()
 
         mode = args.command if args.command else "discover"
         print(f"Running mode: {mode}", file=sys.stderr)
@@ -654,7 +662,7 @@ def main(args_list=None):
             # Still update run to PARTIAL so it doesn't stay RUNNING
             c = conn.cursor()
             c.execute("UPDATE runs SET status='PARTIAL', finished_at=? WHERE run_id=?",
-                     (datetime.now().isoformat(), run_id))
+                     (utc_now_iso(), run_id))
             conn.commit()
             return 0
 

@@ -4,7 +4,7 @@ import os
 from dealhunter.identity.normalization import extract_signature, is_hard_reject, parse_package
 from dealhunter.identity.evaluator import match_products, generate_candidates
 from dealhunter.identity.gold_loader import load_gold_corpus
-from dealhunter.db import setup_db
+from dealhunter.db import CURRENT_SCHEMA_VERSION, setup_db
 from dealhunter.price_intelligence import compare_eligible_offers
 
 # 1. Package Topology
@@ -82,22 +82,19 @@ def test_uber_brand_extraction():
     sig2 = extract_signature("", "No Brand Descriptor · Just Product", None, None)
     assert sig2["brand"] == "no brand descriptor"
 
-# 5. Schema v16 Migration Infrastructure
-def test_schema_v16_migration_creates_canonical_tables():
-    if os.path.exists("test_v16.db"):
-        os.remove("test_v16.db")
+# 5. Canonicalization infrastructure (introduced in schema v16)
+def test_schema_v16_migration_creates_canonical_tables(tmp_path):
+    db_path = tmp_path / "canonical.db"
 
-    # Schema migrates to v16; this test does not claim an automatic write path.
-    conn = setup_db("test_v16.db")
+    # Canonicalization tables were introduced in v16 and remain part of the current schema.
+    conn = setup_db(str(db_path))
     c = conn.cursor()
     c.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='canonical_products'")
     assert c.fetchone() is not None
 
     c.execute("SELECT version FROM schema_version")
-    assert c.fetchone()[0] == 16
+    assert c.fetchone()[0] == CURRENT_SCHEMA_VERSION
     conn.close()
-    if os.path.exists("test_v16.db"):
-        os.remove("test_v16.db")
 
 # 6. Membership Isolation in Cross Provider Score
 def test_membership_isolation_score():

@@ -132,3 +132,59 @@ def test_rappi_reconciliation_does_not_mutate_colliding_uber_rows(db_conn):
     assert uber_observations == 0
     assert uber_facets == [('Uber Keep',)]
     assert uber_status == 'ACTIVE'
+
+
+def test_merchant_failure_forces_partial_and_blocks_stale_reconciliation(db_conn):
+    insert_store(db_conn, 'legacy', name='Legacy Store', status='ACTIVE', type='market')
+    insert_run(db_conn, 'run-partial-failure', started_at='2026-09-16T12:00:00Z', status='RUNNING')
+    db_conn.commit()
+
+    async def failed_catalog(self, store_id, report):
+        report.merchants_attempted += 1
+        report.merchants_failed += 1
+        return []
+
+    config = {"max_runtime": 3600, "discovery_mode": "full"}
+    with patch("dealhunter.crawler_zone.RappiSessionProvider.is_authenticated", return_value=True), \
+         patch("dealhunter.crawler_zone.MerchantDiscovery.discover_merchants", return_value=[{"store_id": "seen", "name": "Seen Store", "type": "market"}]), \
+         patch("dealhunter.crawler_zone.CPGCatalogAdapter.fetch_full_catalog", new=failed_catalog), \
+         patch("dealhunter.crawler_zone.time.sleep", return_value=None):
+        state, _ = asyncio.run(
+            _run_zone_inventory_async(config, 0, 0, db_conn, 'run-partial-failure')
+        )
+
+    assert state == 'PARTIAL'
+    row = db_conn.execute(
+        "SELECT status, coverage_complete FROM runs WHERE run_id='run-partial-failure'"
+    ).fetchone()
+    assert row == ('PARTIAL', 0)
+    assert db_conn.execute(
+        "SELECT status FROM stores WHERE provider='rappi' AND store_id='legacy'"
+    ).fetchone()[0] == 'ACTIVE'
+
+
+def test_structured_catalog_failure_is_partial(db_conn):
+    from dealhunter.catalog_sync import CatalogFetchResult
+
+    insert_run(db_conn, "run-structured-failure", started_at="2026-09-16T12:00:00Z", status="RUNNING")
+    with patch("dealhunter.crawler_zone.RappiSessionProvider.is_authenticated", return_value=True), \
+         patch("dealhunter.crawler_zone.MerchantDiscovery.discover_merchants", return_value=[{"store_id": "1", "name": "Store A", "type": "market"}]), \
+         patch("dealhunter.crawler_zone.CPGCatalogAdapter.fetch_full_catalog", return_value=CatalogFetchResult([], False, "TIMEOUT")), \
+         patch("dealhunter.crawler_zone.time.sleep", return_value=None):
+        state, _ = asyncio.run(_run_zone_inventory_async({"max_runtime": 3600}, 0, 0, db_conn, "run-structured-failure"))
+    assert state == "PARTIAL"
+    assert db_conn.execute("SELECT coverage_complete FROM runs WHERE run_id='run-structured-failure'").fetchone()[0] == 0
+
+
+def test_structured_401_expires_session_without_reconciliation(db_conn):
+    from dealhunter.catalog_sync import CatalogFetchResult
+
+    insert_store(db_conn, "legacy401", status="ACTIVE", type="market")
+    insert_run(db_conn, "run-structured-401", started_at="2026-09-16T12:00:00Z", status="RUNNING")
+    db_conn.commit()
+    with patch("dealhunter.crawler_zone.RappiSessionProvider.is_authenticated", return_value=True), \
+         patch("dealhunter.crawler_zone.MerchantDiscovery.discover_merchants", return_value=[{"store_id": "1", "name": "Store A", "type": "market"}]), \
+         patch("dealhunter.crawler_zone.CPGCatalogAdapter.fetch_full_catalog", return_value=CatalogFetchResult([], False, "ACCOUNT_SESSION_UNAVAILABLE")):
+        state, _ = asyncio.run(_run_zone_inventory_async({"max_runtime": 3600}, 0, 0, db_conn, "run-structured-401"))
+    assert state == "SESSION_EXPIRED"
+    assert db_conn.execute("SELECT status FROM stores WHERE store_id='legacy401'").fetchone()[0] == "ACTIVE"

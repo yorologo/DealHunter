@@ -37,7 +37,7 @@ class UberEatsParser:
                 el_type = el.get("type")
                 if el_type in ("VERTICAL_GRID", "HORIZONTAL_GRID"):
                     standard_payload = el.get("payload", {}).get("standardItemsPayload", {})
-                    category_name = standard_payload.get("title", {}).get("text", "Sin Categoría")
+                    category_name = standard_payload.get("title", {}).get("text") or None
                     
                     items = standard_payload.get("catalogItems", [])
                     for item in items:
@@ -91,11 +91,11 @@ class UberEatsParser:
                                 "promotion_uuid": item.get("promoInfo", {}).get("promotionUUID"),
                                 "availability": availability,
                                 "category": category_name,
-                                "memberships": [{"raw_type": "GRID", "raw_name": category_name}]
+                                "memberships": ([{"raw_type": "GRID", "raw_name": category_name, "source": "uber_eats_grid"}] if category_name else [])
                             }
                         else:
                             # Add membership
-                            products_dict[prod_id]["memberships"].append({"raw_type": "GRID", "raw_name": category_name})
+                            category_name and products_dict[prod_id]["memberships"].append({"raw_type": "GRID", "raw_name": category_name, "source": "uber_eats_grid"})
 
         return {
             "store": store_info,

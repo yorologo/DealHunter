@@ -35,7 +35,7 @@ def run():
     with sqlite3.connect(db_path) as conn:
         row = conn.execute(
             "SELECT run_id FROM runs "
-            "WHERE status IN ('COMPLETED', 'PARTIAL') "
+            "WHERE status IN ('SUCCESS', 'PARTIAL', 'COMPLETED', 'COMPLETE') "
             "ORDER BY started_at DESC LIMIT 1"
         ).fetchone()
 

@@ -70,3 +70,34 @@ def test_enrich_products_null_timestamp(tmp_path):
     res = enrich_products_with_metrics(str(db), products)
     assert res[0]['metrics']['current_price'] == 80.0
 
+
+
+def test_persisted_python_timestamps_are_explicit_utc(tmp_path):
+    from dealhunter.core import process_and_insert_product
+    from dealhunter.time_utils import utc_now_iso
+
+    now = utc_now_iso()
+    assert now.endswith("Z")
+    parsed = __import__("datetime").datetime.fromisoformat(now.replace("Z", "+00:00"))
+    assert parsed.utcoffset().total_seconds() == 0
+
+    db = tmp_path / "utc.db"
+    conn = setup_db(str(db))
+    conn.execute(
+        "INSERT INTO stores (provider, store_id, name, type) VALUES ('rappi', 's1', 'Store', 'market')"
+    )
+    conn.execute(
+        "INSERT INTO runs (run_id, started_at, status) VALUES ('utc-run', CURRENT_TIMESTAMP, 'RUNNING')"
+    )
+    inserted = process_and_insert_product(
+        {"id": "p-utc", "name": "UTC Product", "price": 10.0, "in_stock": True},
+        "utc-run", "s1", "Store", {}, "utc", conn, set(), provider="rappi",
+    )
+    conn.commit()
+    assert inserted is True
+    stored = conn.execute(
+        "SELECT timestamp FROM observations WHERE run_id='utc-run' AND product_id='p-utc'"
+    ).fetchone()[0]
+    assert stored.endswith("Z")
+    assert __import__("datetime").datetime.fromisoformat(stored.replace("Z", "+00:00")).utcoffset().total_seconds() == 0
+    conn.close()

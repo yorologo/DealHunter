@@ -1,9 +1,26 @@
 import time
 import logging
+from dataclasses import dataclass
 from typing import List, Dict, Any, Optional
 from .auth import RappiSessionProvider, AuthenticatedHttpClient
 from .crawler import run_discover
 from .api import fetch_unified_search
+
+@dataclass(frozen=True)
+class CatalogFetchResult:
+    items: List[Dict]
+    complete: bool
+    error_code: Optional[str] = None
+
+    def __iter__(self):
+        return iter(self.items)
+
+    def __len__(self):
+        return len(self.items)
+
+    def __getitem__(self, item):
+        return self.items[item]
+
 
 class CoverageReport:
     def __init__(self):
@@ -116,7 +133,7 @@ class MerchantDiscovery:
     async def discover_targeted(self, query: str, lat: float, lng: float, report: CoverageReport, expected_store_id: str = None) -> tuple[str, Optional[Dict]]:
         stores, err = self._run_query_sync(query, lat, lng, report)
         if err:
-            return "NOT_FOUND", None
+            return "ERROR", None
             
         normalized = [self._normalize_store(s) for s in stores]
         
@@ -151,6 +168,7 @@ class MerchantDiscovery:
 
         # 2. Unified Search Fallback (if A5 fails or we need missing surfaces)
         if a5_err or not a5_stores:
+            report.incomplete_reasons.append("DISCOVERY_FALLBACK")
             if discovery_mode == "full":
                 from collections import deque
                 queue = deque([(c, 1) for c in string.ascii_lowercase])
@@ -159,7 +177,10 @@ class MerchantDiscovery:
                 while queue:
                     query, depth = queue.popleft()
                     stores, err = self._run_query_sync(query, lat, lng, report)
-                    if err: continue
+                    if err:
+                        if "DISCOVERY_QUERY_ERROR" not in report.incomplete_reasons:
+                            report.incomplete_reasons.append("DISCOVERY_QUERY_ERROR")
+                        continue
                     add_stores(stores)
                     if len(stores) >= LIMIT_THRESHOLD and depth < MAX_DEPTH:
                         for c in string.ascii_lowercase:
@@ -171,7 +192,10 @@ class MerchantDiscovery:
                 d1_results = []
                 for c in string.ascii_lowercase:
                     stores, err = self._run_query_sync(c, lat, lng, report)
-                    if err: continue
+                    if err:
+                        if "DISCOVERY_QUERY_ERROR" not in report.incomplete_reasons:
+                            report.incomplete_reasons.append("DISCOVERY_QUERY_ERROR")
+                        continue
                     add_stores(stores)
                     d1_results.append({"query": c, "raw_count": len(stores)})
 
@@ -183,7 +207,10 @@ class MerchantDiscovery:
                     query = item["query"]
                     for c in string.ascii_lowercase:
                         stores, err = self._run_query_sync(query + c, lat, lng, report)
-                        if err: continue
+                        if err:
+                            if "DISCOVERY_QUERY_ERROR" not in report.incomplete_reasons:
+                                report.incomplete_reasons.append("DISCOVERY_QUERY_ERROR")
+                            continue
                         add_stores(stores)
 
         merchants = list(unique_stores.values())
@@ -194,7 +221,7 @@ class CPGCatalogAdapter:
     def __init__(self, client: AuthenticatedHttpClient):
         self.client = client
 
-    async def fetch_full_catalog(self, store_id: str, report: CoverageReport) -> List[Dict]:
+    async def fetch_full_catalog(self, store_id: str, report: CoverageReport) -> CatalogFetchResult:
         report.authenticated_requests += 1
         report.merchants_attempted += 1
         # Implement web scraping catalog via next_data to guarantee 100% catalog size!
@@ -211,7 +238,7 @@ class CPGCatalogAdapter:
                 final_url = response.geturl()
                 if "tipo/market" in final_url or "restaurantNotFound" in final_url:
                     report.merchants_completed += 1
-                    return []
+                    return CatalogFetchResult([], True)
 
                 html = response.read().decode('utf-8')
                 m = re.search(r'<script id="__NEXT_DATA__" type="application/json">(.*?)</script>', html)
@@ -219,7 +246,7 @@ class CPGCatalogAdapter:
                     m = re.search(r'window\.__INITIAL_STATE__=(.*?);', html)
                     if not m:
                         report.merchants_failed += 1
-                        return []
+                        return CatalogFetchResult([], False, "INVALID_RESPONSE")
 
                 data = json.loads(m.group(1))
                 
@@ -340,16 +367,18 @@ class CPGCatalogAdapter:
                 report.merchants_completed += 1
                 report.items_raw += len(items)
                 report.items_unique += len(res)
-                return res
+                return CatalogFetchResult(res, True)
         except Exception as e:
+            from dealhunter.errors import classify_error
             report.merchants_failed += 1
-            return []
+            report.log_error(int(getattr(e, "code", 0) or 0))
+            return CatalogFetchResult([], False, classify_error(e).code)
 
 class RestaurantMenuAdapter:
     def __init__(self, client: AuthenticatedHttpClient):
         self.client = client
 
-    async def fetch_menu(self, store_id: str, report: CoverageReport) -> List[Dict]:
+    async def fetch_menu(self, store_id: str, report: CoverageReport) -> CatalogFetchResult:
         report.authenticated_requests += 1
         report.merchants_attempted += 1
         import urllib.request, json, re
@@ -365,7 +394,7 @@ class RestaurantMenuAdapter:
                 final_url = response.geturl()
                 if "tipo/market" in final_url or "restaurantNotFound" in final_url:
                     report.merchants_completed += 1
-                    return []
+                    return CatalogFetchResult([], True)
 
                 html = response.read().decode('utf-8')
                 # Wait, restaurants may not use __NEXT_DATA__ anymore, or structure is different
@@ -375,7 +404,7 @@ class RestaurantMenuAdapter:
                     m = re.search(r'window\.__INITIAL_STATE__=(.*?);', html)
                     if not m:
                         report.merchants_failed += 1
-                        return []
+                        return CatalogFetchResult([], False, "INVALID_RESPONSE")
 
                 data = json.loads(m.group(1))
                 
@@ -495,7 +524,9 @@ class RestaurantMenuAdapter:
                 report.merchants_completed += 1
                 report.items_raw += len(items)
                 report.items_unique += len(res)
-                return res
+                return CatalogFetchResult(res, True)
         except Exception as e:
+            from dealhunter.errors import classify_error
             report.merchants_failed += 1
-            return []
+            report.log_error(int(getattr(e, "code", 0) or 0))
+            return CatalogFetchResult([], False, classify_error(e).code)

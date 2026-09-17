@@ -1,4 +1,4 @@
-from datetime import datetime
+from dealhunter.time_utils import utc_now_iso
 
 class UberEatsNormalizer:
     def normalize_store(self, parsed_store):
@@ -8,7 +8,7 @@ class UberEatsNormalizer:
             "brand": parsed_store.get("name"),
             "type": "RESTAURANT" # Uber Eats is predominantly restaurants in this context, or we can leave it generic
         }
-        
+
     def normalize_product(self, parsed_product):
         # We leave store_id and product_id as the raw UUIDs.
         return {
@@ -25,15 +25,15 @@ class UberEatsNormalizer:
             "has_toppings": 0,
             "memberships": parsed_product.get("memberships", [])
         }
-        
+
     def normalize_observation(self, parsed_product, run_id):
         price = parsed_product.get("price")
         original_price = parsed_product.get("reference_price")
-        
+
         discount_price = 0.0
         if price is not None and original_price is not None and original_price > 0 and original_price > price:
             discount_price = (1 - (price / original_price)) * 100
-            
+
         return {
             "run_id": run_id,
             "store_id": parsed_product.get("raw_store_id"),
@@ -41,7 +41,7 @@ class UberEatsNormalizer:
             "price": price,
             "original_price": original_price,
             "stock": 1 if parsed_product.get("availability") == "AVAILABLE" else 0,
-            "timestamp": datetime.now().isoformat(),
+            "timestamp": utc_now_iso(),
             "discount_price": discount_price,
             "discount_promotion": 0.0,
             "discount_effective": discount_price,

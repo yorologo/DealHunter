@@ -1,6 +1,7 @@
 import sqlite3
 
 from dealhunter.eligibility import EligibilityEngine
+from dealhunter.commerce import raw_types_for_commerce, raw_types_for_domain
 
 def _build_where(filters: dict, config: dict = None, exclude_dim=None):
     config = config or {}
@@ -52,6 +53,113 @@ def _build_where(filters: dict, config: dict = None, exclude_dim=None):
             store_clauses.append("(p.provider = ? AND p.store_id = ?)")
             params.extend([provider, store_id])
         where_clauses.append("(" + " OR ".join(store_clauses) + ")")
+
+    # 2b. Commercial identity and catalog domain. Values are explicit IDs/enums;
+    # OR within each dimension and AND across dimensions.
+    merchant_ids = filters.get("merchant_ids") or []
+    if merchant_ids and exclude_dim != "merchant_ids":
+        placeholders = ",".join("?" for _ in merchant_ids)
+        where_clauses.append(f"s.merchant_id IN ({placeholders})")
+        params.extend(merchant_ids)
+
+    location_ids = filters.get("location_ids") or []
+    if location_ids and exclude_dim != "location_ids":
+        placeholders = ",".join("?" for _ in location_ids)
+        where_clauses.append(f"s.location_id IN ({placeholders})")
+        params.extend(location_ids)
+
+    excluded_locations = filters.get("exclude_location_ids") or []
+    if excluded_locations and exclude_dim != "exclude_location_ids":
+        placeholders = ",".join("?" for _ in excluded_locations)
+        where_clauses.append(f"(s.location_id IS NULL OR s.location_id NOT IN ({placeholders}))")
+        params.extend(excluded_locations)
+
+    commerce_types = filters.get("commerce_types") or []
+    if commerce_types and exclude_dim != "commerce_types":
+        placeholders = ",".join("?" for _ in commerce_types)
+        raw_types = raw_types_for_commerce(commerce_types)
+        if raw_types:
+            raw_placeholders = ",".join("?" for _ in raw_types)
+            where_clauses.append(
+                f"(s.commerce_type IN ({placeholders}) OR "
+                f"(s.commerce_type = 'UNKNOWN' AND LOWER(TRIM(COALESCE(s.type, ''))) IN ({raw_placeholders})))"
+            )
+            params.extend(commerce_types)
+            params.extend(raw_types)
+        else:
+            where_clauses.append(f"s.commerce_type IN ({placeholders})")
+            params.extend(commerce_types)
+
+    catalog_domains = filters.get("catalog_domains") or []
+    if catalog_domains and exclude_dim != "catalog_domains":
+        placeholders = ",".join("?" for _ in catalog_domains)
+        raw_types = raw_types_for_domain(catalog_domains)
+        if raw_types:
+            raw_placeholders = ",".join("?" for _ in raw_types)
+            where_clauses.append(
+                f"(s.catalog_domain IN ({placeholders}) OR "
+                f"(s.catalog_domain = 'UNKNOWN' AND LOWER(TRIM(COALESCE(s.type, ''))) IN ({raw_placeholders})))"
+            )
+            params.extend(catalog_domains)
+            params.extend(raw_types)
+        else:
+            where_clauses.append(f"s.catalog_domain IN ({placeholders})")
+            params.extend(catalog_domains)
+
+    brands = filters.get("brands") or []
+    if brands and exclude_dim != "brands":
+        placeholders = ",".join("?" for _ in brands)
+        where_clauses.append(f"p.brand IN ({placeholders})")
+        params.extend(brands)
+
+    # 2c. DealHunter browse taxonomy. Raw provider evidence remains in
+    # product_memberships and maps to reviewed browse nodes separately.
+    browse_node_ids = filters.get("browse_node_ids") or []
+    if browse_node_ids and exclude_dim != "browse_node_ids":
+        want_unclassified = "UNCLASSIFIED" in browse_node_ids
+        selected = [node for node in browse_node_ids if node != "UNCLASSIFIED"]
+        browse_clauses = []
+        if selected:
+            placeholders = ",".join("?" for _ in selected)
+            browse_clauses.append(f"""EXISTS (
+                SELECT 1
+                FROM product_memberships pm
+                JOIN browse_mappings bm
+                  ON bm.provider = pm.provider
+                 AND bm.raw_type = COALESCE(pm.raw_type, '')
+                 AND bm.raw_name = pm.raw_name
+                 AND bm.raw_path = COALESCE(pm.path, '')
+                WHERE pm.provider = p.provider
+                  AND pm.store_id = p.store_id
+                  AND pm.product_id = p.product_id
+                  AND bm.browse_node_id IN (
+                    WITH RECURSIVE descendants(browse_node_id) AS (
+                        SELECT browse_node_id FROM browse_nodes
+                        WHERE active = 1 AND browse_node_id IN ({placeholders})
+                        UNION ALL
+                        SELECT child.browse_node_id
+                        FROM browse_nodes child
+                        JOIN descendants parent ON child.parent_id = parent.browse_node_id
+                        WHERE child.active = 1
+                    )
+                    SELECT browse_node_id FROM descendants
+                  )
+            )""")
+            params.extend(selected)
+        if want_unclassified:
+            browse_clauses.append("""NOT EXISTS (
+                SELECT 1
+                FROM product_memberships pm
+                JOIN browse_mappings bm
+                  ON bm.provider = pm.provider
+                 AND bm.raw_type = COALESCE(pm.raw_type, '')
+                 AND bm.raw_name = pm.raw_name
+                 AND bm.raw_path = COALESCE(pm.path, '')
+                WHERE pm.provider = p.provider
+                  AND pm.store_id = p.store_id
+                  AND pm.product_id = p.product_id
+            )""")
+        where_clauses.append("(" + " OR ".join(browse_clauses) + ")")
 
     # 3. Store Facets
     store_facets = filters.get("store_facets")
@@ -132,8 +240,27 @@ def _build_where(filters: dict, config: dict = None, exclude_dim=None):
         where_sql = "WHERE " + " AND ".join(where_clauses)
     return where_sql, params
 
-def _base_query():
+def _latest_observation_join():
     return '''
+        JOIN trusted_observations o
+          ON p.provider = o.provider
+         AND p.product_id = o.product_id
+         AND p.store_id = o.store_id
+         AND o.id = (
+            SELECT o2.id
+            FROM trusted_observations o2
+            WHERE o2.provider = p.provider
+              AND o2.product_id = p.product_id
+              AND o2.store_id = p.store_id
+            ORDER BY o2.timestamp DESC, o2.id DESC
+            LIMIT 1
+         )
+    '''
+
+
+def _base_query(extra_select=""):
+    extra_sql = f", {extra_select}" if extra_select else ""
+    return f'''
         SELECT p.product_id, p.store_id, p.name, s.name as store_name, s.type as store_type, s.vertical as store_vertical, p.brand, p.category as legacy_category,
                CASE WHEN o.price > 0 THEN o.price ELSE NULL END as current_price,
                CASE WHEN o.price > 0 THEN o.original_price ELSE NULL END as original_price,
@@ -143,108 +270,157 @@ def _base_query():
                CASE WHEN o.pro_price > 0 THEN o.pro_price ELSE NULL END as pro_price,
                CASE WHEN o.pro_price > 0 THEN o.pro_discount_effective ELSE 0 END as pro_discount_effective,
                o.limit_info, o.availability, o.timestamp as ts,
-               p.quantity, p.unit, p.normalized_quantity, p.normalized_unit, p.provider
+               p.quantity, p.unit, p.normalized_quantity, p.normalized_unit, p.provider{extra_sql}
         FROM products p
         JOIN stores s ON p.provider = s.provider AND p.store_id = s.store_id
-        JOIN (
-            SELECT provider, product_id, store_id, price, original_price, discount_effective, promotion_type, promotion_label,
-                   has_pro_offer, pro_price, pro_discount_effective, limit_info, availability, timestamp,
-                   ROW_NUMBER() OVER (PARTITION BY provider, store_id, product_id ORDER BY timestamp DESC, id DESC) as rn
-            FROM trusted_observations
-        ) o ON p.provider = o.provider AND p.product_id = o.product_id AND p.store_id = o.store_id AND o.rn = 1
+        {_latest_observation_join()}
     '''
 
+def _ordering_spec(filters: dict, config: dict):
+    """Return deterministic ORDER BY components shared by offset/keyset queries."""
+    sort = filters.get("sort", "discount")
+    desc = filters.get("desc", True)
+    direction = "DESC" if desc else "ASC"
+    channel = filters.get("channel", "PUBLIC")
+
+    engine = EligibilityEngine(config)
+    ranking_expr = "1"
+    if engine.comparison_policy == "show_but_exclude":
+        if engine.get_membership_status("rappi_pro") != "active":
+            ranking_expr = f"CASE WHEN p.provider = 'rappi' AND o.has_pro_offer = 1 THEN 0 ELSE {ranking_expr} END"
+        if engine.get_membership_status("uber_one") != "active":
+            ranking_expr = f"CASE WHEN p.provider = 'uber_eats' AND o.has_pro_offer = 1 THEN 0 ELSE {ranking_expr} END"
+
+    price_expr = "o.pro_price" if channel == "PRO" else "o.price"
+    discount_expr = "o.pro_discount_effective" if channel == "PRO" else "o.discount_effective"
+    valid_expr = f"CASE WHEN {price_expr} > 0 THEN 1 ELSE 0 END"
+
+    if sort == "discount":
+        primary_expr = f"COALESCE({discount_expr}, 0)"
+        secondary_expr = f"COALESCE({price_expr}, 0)"
+        primary_dir, secondary_dir = direction, "ASC"
+    elif sort == "price":
+        primary_expr = f"COALESCE({price_expr}, 0)"
+        secondary_expr = f"COALESCE({discount_expr}, 0)"
+        primary_dir, secondary_dir = direction, "DESC"
+    elif sort == "name":
+        primary_expr = "COALESCE(p.name, '')"
+        secondary_expr = "''"
+        primary_dir, secondary_dir = direction, "ASC"
+    else:
+        # Preserve existing fallback semantics for opportunity/savings/recent until
+        # those sort modes get their own DB-native score columns.
+        primary_expr = "COALESCE(p.product_id, '')"
+        secondary_expr = "''"
+        primary_dir, secondary_dir = direction, "ASC"
+
+    return [
+        (ranking_expr, "DESC", "__rank"),
+        (valid_expr, "DESC", "__valid"),
+        (primary_expr, primary_dir, "__primary"),
+        (secondary_expr, secondary_dir, "__secondary"),
+        ("p.provider", "ASC", "provider"),
+        ("p.store_id", "ASC", "store_id"),
+        ("p.product_id", "ASC", "product_id"),
+    ]
+
+
+def _order_sql(ordering, *, aliases=False):
+    parts = []
+    for expr, direction, alias in ordering:
+        parts.append(f"{alias if aliases else expr} {direction}")
+    return "ORDER BY " + ", ".join(parts)
+
+
+def _cursor_predicate(ordering, cursor_values):
+    """Build a mixed-direction lexicographic 'strictly after cursor' predicate."""
+    if cursor_values is None:
+        return "", []
+    if len(cursor_values) != len(ordering):
+        raise ValueError("cursor shape does not match ordering")
+
+    clauses = []
+    params = []
+    for idx, (_, direction, alias) in enumerate(ordering):
+        prefix = []
+        for prev in range(idx):
+            prefix.append(f"{ordering[prev][2]} = ?")
+            params.append(cursor_values[prev])
+        op = "<" if direction == "DESC" else ">"
+        prefix.append(f"{alias} {op} ?")
+        params.append(cursor_values[idx])
+        clauses.append("(" + " AND ".join(prefix) + ")")
+    return "WHERE " + " OR ".join(clauses), params
+
+
 def build_faceted_query(filters: dict, config: dict = None):
+    """Legacy-compatible offset query with a fully deterministic ordering."""
     config = config or {}
     base_query = _base_query()
     where_sql, params = _build_where(filters, config)
-
-    # Sorting
-    sort = filters.get("sort", "discount")
-    desc = filters.get("desc", True)
-    dir_sql = "DESC" if desc else "ASC"
-
-    channel = filters.get("channel", "PUBLIC")
-
-    # If policy is show_but_exclude, we need to sort those offers to the bottom.
-    engine = EligibilityEngine(config)
-    policy = engine.comparison_policy
-
-    # We construct a CASE statement to determine ranking eligibility at DB level for sorting
-    # A product is ineligible if it requires a membership, the membership is not active, and policy is show_but_exclude
-    ranking_eligible_expr = "1"
-    if policy == "show_but_exclude":
-        # Rappi Pro check
-        if engine.get_membership_status("rappi_pro") != "active":
-            ranking_eligible_expr = f"CASE WHEN p.provider = 'rappi' AND o.has_pro_offer = 1 THEN 0 ELSE {ranking_eligible_expr} END"
-        # Uber One check
-        if engine.get_membership_status("uber_one") != "active":
-            ranking_eligible_expr = f"CASE WHEN p.provider = 'uber_eats' AND o.has_pro_offer = 1 THEN 0 ELSE {ranking_eligible_expr} END"
-
-    # Sort uneligible to the bottom always
-    order_sql = f"ORDER BY {ranking_eligible_expr} DESC, "
-
-    # Guard against invalid prices dominating sorts
-    if channel == "PRO":
-        order_sql += "CASE WHEN o.pro_price > 0 THEN 1 ELSE 0 END DESC, "
-    else:
-        order_sql += "CASE WHEN o.price > 0 THEN 1 ELSE 0 END DESC, "
-
-    if sort == "discount":
-        if channel == "PRO":
-            order_sql += f"o.pro_discount_effective {dir_sql}, o.pro_price ASC"
-        else:
-            order_sql += f"o.discount_effective {dir_sql}, o.price ASC"
-    elif sort == "price":
-        if channel == "PRO":
-            order_sql += f"o.pro_price {dir_sql}, o.pro_discount_effective DESC"
-        else:
-            order_sql += f"o.price {dir_sql}, o.discount_effective DESC"
-    elif sort == "name":
-        order_sql += f"p.name {dir_sql}"
-    else:
-        order_sql += f"p.product_id {dir_sql}"
-
-    order_sql += ", p.product_id ASC"
+    ordering = _ordering_spec(filters, config)
+    order_sql = _order_sql(ordering)
 
     limit = filters.get("limit", 25)
     offset = filters.get("offset", 0)
-
     query = f"""
         {base_query}
         {where_sql}
         {order_sql}
         LIMIT {int(limit)} OFFSET {int(offset)}
     """
-
     count_query = f"""
         SELECT COUNT(*) FROM products p
         JOIN stores s ON p.provider = s.provider AND p.store_id = s.store_id
-        JOIN (
-            SELECT provider, product_id, store_id, price, original_price, discount_effective, promotion_type, promotion_label,
-                   has_pro_offer, pro_price, pro_discount_effective, limit_info, availability, timestamp,
-                   ROW_NUMBER() OVER (PARTITION BY provider, store_id, product_id ORDER BY timestamp DESC, id DESC) as rn
-            FROM trusted_observations
-        ) o ON p.provider = o.provider AND p.product_id = o.product_id AND p.store_id = o.store_id AND o.rn = 1
+        {_latest_observation_join()}
         {where_sql}
     """
-
     return query, count_query, params
+
+
+def build_faceted_cursor_query(filters: dict, cursor_values=None, config: dict = None):
+    """Keyset query for large catalogs while preserving the existing filter contract.
+
+    Returns query/count SQL plus separate parameter lists because cursor parameters
+    apply only to the page query, never to the total count.
+    """
+    config = config or {}
+    base_query = _base_query()
+    where_sql, base_params = _build_where(filters, config)
+    ordering = _ordering_spec(filters, config)
+    cursor_sql, cursor_params = _cursor_predicate(ordering, cursor_values)
+
+    # The first four ordering expressions are appended as hidden page keys. The
+    # final identity keys already exist in the base select (provider/store/product).
+    hidden = ", ".join(f"{expr} AS {alias}" for expr, _, alias in ordering[:4])
+    limit = int(filters.get("limit", 25))
+    query = f"""
+        WITH catalog_rows AS (
+            {_base_query(hidden)}
+            {where_sql}
+        )
+        SELECT * FROM catalog_rows
+        {cursor_sql}
+        {_order_sql(ordering, aliases=True)}
+        LIMIT {limit}
+    """
+    count_query = f"""
+        SELECT COUNT(*) FROM products p
+        JOIN stores s ON p.provider = s.provider AND p.store_id = s.store_id
+        {_latest_observation_join()}
+        {where_sql}
+    """
+    return query, count_query, list(base_params) + cursor_params, list(base_params)
 
 def get_facet_counts(conn, filters: dict, config: dict = None):
     config = config or {}
 
     def get_base_join(w_sql):
         if "o." in w_sql:
-            return '''
+            return f'''
                 FROM products p
                 JOIN stores s ON p.provider = s.provider AND p.store_id = s.store_id
-                JOIN (
-                    SELECT provider, product_id, store_id, price, original_price, discount_effective, promotion_type, promotion_label,
-                           has_pro_offer, pro_price, pro_discount_effective, limit_info, availability, timestamp,
-                           ROW_NUMBER() OVER (PARTITION BY provider, store_id, product_id ORDER BY timestamp DESC, id DESC) as rn
-                    FROM trusted_observations
-                ) o ON p.provider = o.provider AND p.product_id = o.product_id AND p.store_id = o.store_id AND o.rn = 1
+                {_latest_observation_join()}
             '''
         else:
             return '''
@@ -314,6 +490,85 @@ def get_facet_counts(conn, filters: dict, config: dict = None):
     c.execute(sf_query, params)
     counts["store_facets"] = [r[0] for r in c.fetchall()]
 
+
+    # Commercial identity facets
+    where_sql, params = _build_where(filters, config, exclude_dim="merchant_ids")
+    merchant_query = f"""
+        SELECT DISTINCT m.merchant_id, m.name
+        {get_base_join(where_sql)}
+        JOIN merchants m ON s.merchant_id = m.merchant_id
+        {where_sql}
+        ORDER BY m.name, m.merchant_id
+    """
+    c.execute(merchant_query, params)
+    counts["merchants"] = [{"id": r[0], "name": r[1]} for r in c.fetchall()]
+
+    where_sql, params = _build_where(filters, config, exclude_dim="location_ids")
+    location_query = f"""
+        SELECT DISTINCT ml.location_id, ml.merchant_id, ml.name
+        {get_base_join(where_sql)}
+        JOIN merchant_locations ml ON s.location_id = ml.location_id
+        {where_sql}
+        ORDER BY ml.name, ml.location_id
+    """
+    c.execute(location_query, params)
+    counts["locations"] = [
+        {"id": r[0], "merchant_id": r[1], "name": r[2]} for r in c.fetchall()
+    ]
+
+    where_sql, params = _build_where(filters, config, exclude_dim="commerce_types")
+    commerce_query = f"""
+        SELECT DISTINCT s.commerce_type
+        {get_base_join(where_sql)}
+        {where_sql} {'AND' if where_sql else 'WHERE'} s.commerce_type IS NOT NULL AND s.commerce_type != 'UNKNOWN'
+        ORDER BY s.commerce_type
+    """
+    c.execute(commerce_query, params)
+    counts["commerce_types"] = [r[0] for r in c.fetchall()]
+
+    where_sql, params = _build_where(filters, config, exclude_dim="catalog_domains")
+    domain_query = f"""
+        SELECT DISTINCT s.catalog_domain
+        {get_base_join(where_sql)}
+        {where_sql} {'AND' if where_sql else 'WHERE'} s.catalog_domain IS NOT NULL AND s.catalog_domain != 'UNKNOWN'
+        ORDER BY s.catalog_domain
+    """
+    c.execute(domain_query, params)
+    counts["catalog_domains"] = [r[0] for r in c.fetchall()]
+
+    where_sql, params = _build_where(filters, config, exclude_dim="brands")
+    brand_query = f"""
+        SELECT DISTINCT p.brand
+        {get_base_join(where_sql)}
+        {where_sql} {'AND' if where_sql else 'WHERE'} p.brand IS NOT NULL AND TRIM(p.brand) != ''
+        ORDER BY p.brand
+    """
+    c.execute(brand_query, params)
+    counts["brands"] = [r[0] for r in c.fetchall()]
+
+    # Reviewed DealHunter browse taxonomy; raw provider memberships remain the evidence source.
+    where_sql, params = _build_where(filters, config, exclude_dim="browse_node_ids")
+    browse_query = f"""
+        SELECT DISTINCT bn.browse_node_id, bn.parent_id, bn.level, bn.name
+        {get_base_join(where_sql)}
+        JOIN product_memberships pm
+          ON p.provider = pm.provider
+         AND p.store_id = pm.store_id
+         AND p.product_id = pm.product_id
+        JOIN browse_mappings bm
+          ON bm.provider = pm.provider
+         AND bm.raw_type = COALESCE(pm.raw_type, '')
+         AND bm.raw_name = pm.raw_name
+         AND bm.raw_path = COALESCE(pm.path, '')
+        JOIN browse_nodes bn ON bn.browse_node_id = bm.browse_node_id
+        {where_sql} {'AND' if where_sql else 'WHERE'} bn.active = 1
+        ORDER BY bn.sort_order, bn.name, bn.browse_node_id
+    """
+    c.execute(browse_query, params)
+    counts["browse_nodes"] = [
+        {"id": r[0], "parent_id": r[1], "level": r[2], "name": r[3]}
+        for r in c.fetchall()
+    ]
 
     # Stores
     where_sql, params = _build_where(filters, config, exclude_dim="store_ids")

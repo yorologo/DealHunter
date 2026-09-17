@@ -198,3 +198,16 @@ class TestCanaryLeakPrevention:
                 assert str(DEALHUNTER_SUPER_SECRET_CANARY_987654321) not in str(data)
 
         check_no_canary(status)
+
+
+def test_persistent_secret_store_fails_closed_without_cryptography(tmp_path, monkeypatch):
+    import dealhunter.secret_store as secret_store_module
+    from dealhunter.errors import DealHunterError
+
+    monkeypatch.setattr(secret_store_module, "CRYPTO_AVAILABLE", False)
+    store = secret_store_module.SecretStore(config_dir=str(tmp_path))
+
+    with pytest.raises(DealHunterError) as exc:
+        store.store("must-not-be-written")
+    assert exc.value.code == "SECRET_STORE_UNAVAILABLE"
+    assert not (tmp_path / "session.enc").exists()

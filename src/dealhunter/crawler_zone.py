@@ -1,12 +1,13 @@
+from dealhunter.time_utils import utc_now_iso
 from dealhunter.providers.registry import validate_provider
 import time
 import sys
 import asyncio
-from datetime import datetime
 from .checkpoint import RunCheckpoint, save_checkpoint
-from .catalog_sync import AuthenticatedHttpClient, MerchantDiscovery, CPGCatalogAdapter, RestaurantMenuAdapter, CoverageReport
+from .catalog_sync import AuthenticatedHttpClient, MerchantDiscovery, CPGCatalogAdapter, RestaurantMenuAdapter, CoverageReport, CatalogFetchResult
 from .auth import RappiSessionProvider
 from .core import process_and_insert_product
+from .commerce import classify_store
 
 def run_zone_inventory(config, lat, lng, conn, run_id, dry_run=False):
     try:
@@ -75,7 +76,7 @@ async def _run_zone_inventory_async(config, lat, lng, conn, run_id, dry_run=Fals
         # Phase 3A: Vertical normalization
         raw_vsg = m.get("vertical_sub_group")
         parent_type = m.get("type", "supermercado")
-        
+
         vertical = None
         if raw_vsg:
             v_lower = raw_vsg.lower()
@@ -93,66 +94,80 @@ async def _run_zone_inventory_async(config, lat, lng, conn, run_id, dry_run=Fals
             else: vertical = parent_type
 
         provider_id = validate_provider(provider_id)
-        c.execute('''INSERT INTO stores (provider, store_id, name, brand, type, status, last_seen_at, vertical)
-                     VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        commerce_type, catalog_domain = classify_store(parent_type, display_name=s_name)
+        c.execute('''INSERT INTO stores (provider, store_id, name, brand, type, status, last_seen_at, vertical, commerce_type, catalog_domain)
+                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                      ON CONFLICT(provider, store_id) DO UPDATE SET
                      name = COALESCE(excluded.name, name),
                      type = COALESCE(excluded.type, type),
                      vertical = COALESCE(excluded.vertical, vertical),
+                     commerce_type = CASE WHEN excluded.commerce_type != 'UNKNOWN' THEN excluded.commerce_type ELSE commerce_type END,
+                     catalog_domain = CASE WHEN excluded.catalog_domain != 'UNKNOWN' THEN excluded.catalog_domain ELSE catalog_domain END,
                      status = 'ACTIVE',
                      last_seen_at = excluded.last_seen_at''',
-                  (provider_id, s_id, s_name, m.get("brand", ""), parent_type, "ACTIVE", datetime.now().isoformat(), vertical))
-                  
+                  (provider_id, s_id, s_name, m.get("brand", ""), parent_type, "ACTIVE", utc_now_iso(), vertical, commerce_type, catalog_domain))
+
         # Phase 3A: Store Facets
         facets = set()
-        
+
         # tags array
         tags = m.get("tags")
         if isinstance(tags, list):
             for t in tags:
                 if t and isinstance(t, str): facets.add((t.strip(), "tags"))
-                
+
         # categories string
         cats = m.get("categories")
         if isinstance(cats, str) and cats:
             for c_str in cats.split("·"):
                 if c_str.strip(): facets.add((c_str.strip(), "categories"))
-                
+
         # Phase 3A.1: Store Facets Reconciliation
         has_metadata = ("tags" in m and m.get("tags") is not None) or ("categories" in m and m.get("categories") is not None)
-        now_store_facets = datetime.now().isoformat()
-        
+        now_store_facets = utc_now_iso()
+
         for val, src in facets:
             c.execute('''INSERT INTO store_facets (provider, store_id, facet_type, raw_value, source, last_seen)
                          VALUES (?, ?, ?, ?, ?, ?)
                          ON CONFLICT(provider, store_id, facet_type, raw_value) DO UPDATE SET
                          last_seen=excluded.last_seen
                       ''', (provider_id, s_id, "store_subcategory", val, src, now_store_facets))
-                      
+
         if has_metadata:
             c.execute(
                 'DELETE FROM store_facets WHERE provider=? AND store_id=? AND last_seen != ?',
                 (provider_id, s_id, now_store_facets),
             )
-            
+
         conn.commit()
 
-        if m.get("type") and "restaurant" in m.get("type").lower():
-            if not config.get("restaurants", True):
+        try:
+            if m.get("type") and "restaurant" in m.get("type").lower():
+                if not config.get("restaurants", True):
+                    continue
+                result = await rest_adapter.fetch_menu(s_id, report)
+            else:
+                result = await cpg_adapter.fetch_full_catalog(s_id, report)
+        except Exception as exc:
+            # Production adapters return CatalogFetchResult, but retain a safe
+            # boundary for injected/third-party adapters that still raise.
+            if "401" in str(exc):
+                return "SESSION_EXPIRED", report.authenticated_requests
+            report.merchants_failed += 1
+            global_state = "PARTIAL"
+            continue
+
+        if isinstance(result, CatalogFetchResult):
+            if result.error_code == "ACCOUNT_SESSION_UNAVAILABLE":
+                return "SESSION_EXPIRED", report.authenticated_requests
+            if not result.complete:
+                global_state = "PARTIAL"
                 continue
-            try:
-                items = await rest_adapter.fetch_menu(s_id, report)
-            except Exception as e:
-                if "401" in str(e):
-                    return "SESSION_EXPIRED", report.authenticated_requests
-                continue
+            items = result.items
         else:
-            try:
-                items = await cpg_adapter.fetch_full_catalog(s_id, report)
-            except Exception as e:
-                if "401" in str(e):
-                    return "SESSION_EXPIRED", report.authenticated_requests
-                continue
+            # Compatibility for injected/test adapters; production adapters use
+            # CatalogFetchResult so empty data cannot hide transport/parser failure.
+            items = result
 
         # Product reconciliation:
         # If catalog was fetched successfully, we can mark absent products as UNAVAILABLE.
@@ -186,19 +201,24 @@ async def _run_zone_inventory_async(config, lat, lng, conn, run_id, dry_run=Fals
                                      discount_price, discount_promotion, discount_effective, discount_source, promotion_type, promotion_label, query_term, availability,
                                      has_pro_offer, pro_price, pro_discount_effective, limit_info)
                                      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
-                                     (run_id, provider_id, s_id, kpid, 0, 0, 0, datetime.now().isoformat(),
+                                     (run_id, provider_id, s_id, kpid, 0, 0, 0, utc_now_iso(),
                                       0, 0, 0, "", "", "", "*", "UNAVAILABLE", None, None, None, None))
                     else:
                         c.execute('''INSERT OR IGNORE INTO observations
                                      (run_id, store_id, product_id, price, original_price, stock, timestamp,
                                      discount_price, discount_promotion, discount_effective, discount_source, promotion_type, promotion_label, query_term, availability)
                                      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
-                                     (run_id, s_id, kpid, 0, 0, 0, datetime.now().isoformat(),
+                                     (run_id, s_id, kpid, 0, 0, 0, utc_now_iso(),
                                       0, 0, 0, "", "", "", "*", "UNAVAILABLE"))
             conn.commit()
 
         if not dry_run:
             time.sleep(2)
+
+    # Any merchant fetch failure makes zone coverage incomplete. Fail closed
+    # before reconciliation so missing data can never mark stores/products stale.
+    if (report.merchants_failed > 0 or report.incomplete_reasons) and global_state == "COMPLETED":
+        global_state = "PARTIAL"
 
     # Stores not seen in a full discovery should be marked STALE
     if global_state == "COMPLETED" and not dry_run:
@@ -234,7 +254,8 @@ async def _run_zone_inventory_async(config, lat, lng, conn, run_id, dry_run=Fals
         "merchants_failed": report.merchants_failed,
         "items_raw": report.items_raw,
         "items_unique": report.items_unique,
-        "authenticated_requests": report.authenticated_requests
+        "authenticated_requests": report.authenticated_requests,
+        "incomplete_reasons": report.incomplete_reasons
     })
 
     cov_comp = 1 if (global_state == "COMPLETED" and discovery_mode == "full") else 0

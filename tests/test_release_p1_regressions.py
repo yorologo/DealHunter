@@ -127,3 +127,33 @@ def test_documented_cli_commands_are_exposed_by_real_parsers(tmp_path):
         )
         assert result.returncode == 0, result.stderr
         assert "usage:" in result.stdout.lower()
+
+
+def test_dealwatcher_processes_canonical_success_run(tmp_path, monkeypatch):
+    db_path = tmp_path / "watcher.db"
+    with setup_db(str(db_path)) as conn:
+        conn.execute(
+            "INSERT INTO runs (run_id, started_at, finished_at, status) "
+            "VALUES ('success-run', '2026-09-16T10:00:00Z', '2026-09-16T10:01:00Z', 'SUCCESS')"
+        )
+        conn.commit()
+
+    module = _load_dealwatcher_module()
+    monkeypatch.setenv("RAPPI_DB_PATH", str(db_path))
+
+    processed = []
+
+    class FakeWatcher:
+        def __init__(self, path):
+            assert path == str(db_path)
+        def process_run(self, run_id):
+            processed.append(run_id)
+            return []
+        def persist_events(self, events):
+            raise AssertionError("no events expected")
+
+    monkeypatch.setattr("dealhunter.alerts_engine.DealWatcher", FakeWatcher)
+    monkeypatch.setattr("dealhunter.delivery.send_pending_events", lambda *args, **kwargs: None)
+
+    assert module.run() == 0
+    assert processed == ["success-run"]

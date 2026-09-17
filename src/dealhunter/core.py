@@ -1,6 +1,6 @@
+from dealhunter.time_utils import utc_now_iso
 from dealhunter.providers.registry import validate_provider
 from dealhunter.semantic import classify_membership
-from datetime import datetime
 from .discounts import calculate_discount
 from .normalization import parse_product_name, generate_fingerprint
 
@@ -14,7 +14,7 @@ def matches_filters(name, brand, store, cat, config, eff_discount, promo_type, e
                 break
         if not found:
             return False
-            
+
     if config.get("exclude"):
         for ex in config["exclude"]:
             if ex.lower() in name.lower() or ex.lower() in brand.lower():
@@ -24,13 +24,57 @@ def matches_filters(name, brand, store, cat, config, eff_discount, promo_type, e
         stores = [s.lower() for s in config["store"]]
         if store.lower() not in stores:
             return False
-            
+
     if config.get("exclude_store"):
         for ex in config["exclude_store"]:
             if ex.lower() in store.lower():
                 return False
 
     return True
+
+
+
+def persist_raw_memberships(conn, provider, store_id, product_id, memberships, *, category=None, category_source="unknown", source="provider"):
+    """Persist provider taxonomy evidence without inventing or broadening it.
+
+    ``memberships is None`` means the source supplied no taxonomy evidence, so
+    existing evidence is preserved. An explicit list is authoritative for this
+    complete product observation and may reconcile stale memberships.
+    """
+    if memberships is None:
+        return
+
+    import json
+    from datetime import datetime as _dt, timezone as _timezone
+
+    provider = validate_provider(provider)
+    c = conn.cursor()
+    now = _dt.now(_timezone.utc).isoformat()
+    for membership in memberships:
+        if not isinstance(membership, dict):
+            continue
+        raw_type = str(membership.get("raw_type") or "")
+        raw_name = str(membership.get("raw_name") or "").strip()
+        if not raw_name:
+            continue
+        raw_id = str(membership.get("raw_id") or "")
+        path = membership.get("path")
+        path_str = json.dumps(path if isinstance(path, list) else [], ensure_ascii=False)
+        evidence_source = str(membership.get("source") or source)
+        semantic_type, semantic_reason = classify_membership(
+            raw_name, category, category_source, raw_type
+        )
+        c.execute('''INSERT INTO product_memberships
+                     (provider, store_id, product_id, raw_type, raw_name, raw_id, path, source, last_seen, semantic_type, semantic_reason)
+                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                     ON CONFLICT(provider, store_id, product_id, raw_type, raw_name, path) DO UPDATE SET
+                     last_seen=excluded.last_seen, raw_id=excluded.raw_id, source=excluded.source,
+                     semantic_type=excluded.semantic_type, semantic_reason=excluded.semantic_reason
+                  ''', (provider, store_id, product_id, raw_type, raw_name, raw_id, path_str, evidence_source, now, semantic_type, semantic_reason))
+
+    c.execute('''DELETE FROM product_memberships
+                 WHERE provider=? AND store_id=? AND product_id=? AND last_seen != ?''',
+              (provider, store_id, product_id, now))
 
 def process_and_insert_product(p, run_id, s_id, s_name, config, q, conn, seen_in_run, provider="rappi"):
     c = conn.cursor()
@@ -39,7 +83,7 @@ def process_and_insert_product(p, run_id, s_id, s_name, config, q, conn, seen_in
     uid = f"{s_id}_{p_id}"
     if not p_id or not pname:
         return False
-        
+
     if uid in seen_in_run:
         return False
     seen_in_run.add(uid)
@@ -55,27 +99,27 @@ def process_and_insert_product(p, run_id, s_id, s_name, config, q, conn, seen_in
     stock_val = p.get("stock")
     if stock_val is not None and stock_val <= 0:
         is_in_stock = False
-        
+
     availability = "AVAILABLE" if is_in_stock else "UNAVAILABLE"
-        
+
     d_price, d_promo, d_eff, d_src, p_type, p_label, eff_price, eff_real, comm_extra = calculate_discount(p)
-    
+
     if not matches_filters(pname, brand, s_name, cat or "", config, d_eff, p_type, eff_price):
         return False
-        
+
     img = p.get("image", "")
     if img and not img.startswith("http") and not img.startswith("data:"):
         img = "https://images.rappi.com.mx/products/" + img
-        
+
     norm = parse_product_name(pname, brand)
     fingerprint = generate_fingerprint(
         norm["brand"], norm["normalized_name"],
         norm["normalized_quantity"], norm["normalized_unit"],
         norm["pack_count"]
     )
-        
+
     provider = validate_provider(provider)
-    c.execute('''INSERT INTO products (provider, product_id, store_id, name, brand, image, 
+    c.execute('''INSERT INTO products (provider, product_id, store_id, name, brand, image,
                  normalized_name, quantity, unit, normalized_quantity, normalized_unit,
                  fingerprint, pack_count, category, has_toppings, category_source)
                  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -92,7 +136,7 @@ def process_and_insert_product(p, run_id, s_id, s_name, config, q, conn, seen_in
                  category_source = COALESCE(NULLIF(excluded.category_source, 'unknown'), category_source),
                  image = COALESCE(NULLIF(image, ''), excluded.image),
                  name = COALESCE(NULLIF(name, ''), excluded.name),
-                 fingerprint = CASE 
+                 fingerprint = CASE
                     WHEN NULLIF(brand, '') IS NULL AND NULLIF(excluded.brand, '') IS NOT NULL THEN excluded.fingerprint
                     WHEN quantity IS NULL AND excluded.quantity IS NOT NULL THEN excluded.fingerprint
                     WHEN NULLIF(fingerprint, '') IS NULL THEN excluded.fingerprint
@@ -100,54 +144,34 @@ def process_and_insert_product(p, run_id, s_id, s_name, config, q, conn, seen_in
                  END
                  ''',
               (provider, p_id, s_id, pname, brand, img,
-               norm["normalized_name"], norm["quantity"], norm["unit"], 
+               norm["normalized_name"], norm["quantity"], norm["unit"],
                norm["normalized_quantity"], norm["normalized_unit"], fingerprint,
                norm["pack_count"], cat, has_toppings, cat_source))
-    
-    # Phase 3A: Persist RAW memberships
-    import json
-    from datetime import datetime as _dt
-    memberships = p.get("memberships", [])
-    now = _dt.now().isoformat()
-    for m in memberships:
-        raw_type = m.get("raw_type", "")
-        raw_name = m.get("raw_name", "")
-        raw_id = str(m.get("raw_id", ""))
-        path_str = json.dumps(m.get("path", []))
-        # Re-classify membership on every observation
-        stype, sreason = classify_membership(raw_name, cat, cat_source, raw_type)
-        
-        c.execute('''INSERT INTO product_memberships
-                     (provider, store_id, product_id, raw_type, raw_name, raw_id, path, source, last_seen, semantic_type, semantic_reason)
-                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                     ON CONFLICT(provider, store_id, product_id, raw_type, raw_name, path) DO UPDATE SET
-                     last_seen=excluded.last_seen, raw_id=excluded.raw_id,
-                     semantic_type=excluded.semantic_type, semantic_reason=excluded.semantic_reason
-                  ''', (provider, s_id, p_id, raw_type, raw_name, raw_id, path_str, "catalog_sync", now, stype, sreason))
-    
-    # Phase 3A.1: Safe Facet Reconciliation
-    # Remove stale memberships for this product that were not seen in this complete observation
-    c.execute('''DELETE FROM product_memberships 
-                 WHERE provider=? AND store_id=? AND product_id=? AND last_seen != ?''', 
-              (provider, s_id, p_id, now))
-    
+
+    # Preserve provider taxonomy exactly as supplied. Missing membership data is
+    # not evidence that previously observed taxonomy disappeared.
+    persist_raw_memberships(
+        conn, provider, s_id, p_id, p.get("memberships"),
+        category=cat, category_source=cat_source, source="catalog_sync",
+    )
+
     from dealhunter.db import CURRENT_SCHEMA_VERSION
     if CURRENT_SCHEMA_VERSION >= 12:
         provider = validate_provider(provider)
-        c.execute('''INSERT OR IGNORE INTO observations (run_id, provider, store_id, product_id, price, original_price, stock, timestamp, 
+        c.execute('''INSERT OR IGNORE INTO observations (run_id, provider, store_id, product_id, price, original_price, stock, timestamp,
                      discount_price, discount_promotion, discount_effective, discount_source, promotion_type, promotion_label, query_term, availability,
                      has_pro_offer, pro_price, pro_discount_effective, limit_info)
-                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''', 
-                     (run_id, provider, s_id, p_id, eff_price, eff_real, stock_val, datetime.now().isoformat(), 
+                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
+                     (run_id, provider, s_id, p_id, eff_price, eff_real, stock_val, utc_now_iso(),
                       d_price, d_promo, d_eff, d_src, p_type, p_label, q, availability,
                       1 if comm_extra.get("has_pro_offer") else (None if availability == "UNAVAILABLE" else 0),
                       comm_extra.get("pro_price"),
                       comm_extra.get("pro_discount_effective"),
                       str(comm_extra.get("limit")) if comm_extra.get("limit") is not None else None))
     else:
-        c.execute('''INSERT OR IGNORE INTO observations (run_id, store_id, product_id, price, original_price, stock, timestamp, 
+        c.execute('''INSERT OR IGNORE INTO observations (run_id, store_id, product_id, price, original_price, stock, timestamp,
                      discount_price, discount_promotion, discount_effective, discount_source, promotion_type, promotion_label, query_term, availability)
-                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''', 
-                     (run_id, provider, s_id, p_id, eff_price, eff_real, stock_val, datetime.now().isoformat(), 
+                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
+                     (run_id, provider, s_id, p_id, eff_price, eff_real, stock_val, utc_now_iso(),
                       d_price, d_promo, d_eff, d_src, p_type, p_label, q, availability))
     return True

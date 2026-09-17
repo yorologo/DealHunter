@@ -5,6 +5,35 @@ from .db import setup_db
 from .price_intelligence import compute_price_metrics
 from .normalization import calculate_unit_price, compute_match, format_unit_price
 
+
+def _fetch_candidate_observations(cursor, keys, batch_size=200):
+    """Fetch history only for provider/store/product candidates.
+
+    A VALUES CTE kept as the outer side of a CROSS JOIN prevents SQLite from
+    turning a small candidate set into a full trusted-observation scan.
+    """
+    keys = list(dict.fromkeys(keys))
+    if not keys:
+        return []
+
+    rows = []
+    for start in range(0, len(keys), batch_size):
+        batch = keys[start:start + batch_size]
+        values_sql = ",".join("(?,?,?)" for _ in batch)
+        params = [value for key in batch for value in key]
+        query = f"""
+            WITH wanted(provider, product_id, store_id) AS (VALUES {values_sql})
+            SELECT o.provider, o.product_id, o.store_id, o.price, o.timestamp, o.original_price
+            FROM wanted w
+            CROSS JOIN trusted_observations o
+              ON o.provider = w.provider
+             AND o.product_id = w.product_id
+             AND o.store_id = w.store_id
+            ORDER BY o.provider, o.store_id, o.product_id, o.timestamp ASC, o.id ASC
+        """
+        rows.extend(cursor.execute(query, params).fetchall())
+    return rows
+
 def analyze_history(db_path, config, store=None, product=None):
     conn = setup_db(db_path)
     c = conn.cursor()
@@ -142,12 +171,7 @@ def compare_stores(db_path, query, exact_only=False, no_fuzzy=False):
             "pack_count": r[12], "obs": []
         }
         
-    c.execute('''
-        SELECT provider, product_id, store_id, price, timestamp, original_price
-        FROM trusted_observations
-        ORDER BY timestamp ASC, id ASC
-    ''')
-    obs_rows = c.fetchall()
+    obs_rows = _fetch_candidate_observations(c, products_map.keys())
     
     for r in obs_rows:
         provider, pid, sid, price, ts_str, orig_price = r
@@ -306,12 +330,7 @@ def compare_with_anchor(db_path, provider, store_id, product_id):
     products_map[(anchor["provider"], anchor["product_id"], anchor["store_id"])] = anchor
         
     # Fetch observations for these candidates
-    c.execute('''
-        SELECT provider, product_id, store_id, price, timestamp, original_price
-        FROM trusted_observations
-        ORDER BY timestamp ASC, id ASC
-    ''')
-    obs_rows = c.fetchall()
+    obs_rows = _fetch_candidate_observations(c, products_map.keys())
     for r in obs_rows:
         provider, pid, sid, price, ts_str, orig_price = r
         key = (provider, pid, sid)
