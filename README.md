@@ -20,16 +20,16 @@ DealHunter es un motor local-first de inteligencia de precios y oportunidades pa
 
 ### Current development (`develop`)
 
-- **Base pública**: `v3.2.0`. La rama `develop` contiene trabajo posterior a esa release.
-- **Candidato de versión**: `v3.3.0` (minor), por cambios aditivos/migrables de schema, dominio, UX y CLI sin romper las superficies soportadas de v3.2.0.
-- **Runtime version actual**: `3.3.0` (`dealhunter.metadata.VERSION`).
+- **Base pública**: `v3.3.0`. La rama `develop` contiene el hotfix posterior a esa release.
+- **Candidato de versión**: `v3.3.1` (patch), corrige el primer arranque Web sobre una DB aún inexistente; schema permanece v17.
+- **Runtime version actual**: `3.3.1` (`dealhunter.metadata.VERSION`).
 - **Schema DB**: `17` (`dealhunter.db.CURRENT_SCHEMA_VERSION`).
 - **Validación**: el conteo exacto se obtiene con `PYTHONPATH=src pytest -q`; no se mantiene duplicado como verdad estática.
 
-### Última release pública
+### Base pública del hotfix
 
-- **v3.2.0**, publicada el **2026-09-01**.
-- Tag `v3.2.0` → commit `258b449557b3e55f716eabcf566c9455a7d62960`.
+- **v3.3.0**, publicada el **2026-09-16**; `v3.3.1` corrige exclusivamente el primer arranque Web sobre una DB inexistente.
+- Tag `v3.3.0` → commit `1c2e5ff6ed338df192cf0a4e00b974d9273bb147`.
 - La publicación se verifica con Git tag remoto + GitHub Releases; no se infiere del README.
 
 ### Estado de capacidades

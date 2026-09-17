@@ -1,8 +1,8 @@
 # Documentation Index
 
-Este es el índice oficial de documentación para el desarrollo posterior a la release pública `v3.2.0` (schema v16). La rama de integración es `develop`; el candidato actual es `v3.3.0` (schema v17) y sólo se publica tras cerrar los gates de promoción.
+Este es el índice oficial de documentación para el desarrollo posterior a la release pública `v3.3.0` (schema v17). La rama de integración es `develop`; el candidato actual es `v3.3.1` (schema v17) y sólo se publica tras cerrar los gates de promoción.
 
-La última release pública verificada es `v3.2.0` (2026-09-01), tag remoto y GitHub Release sobre `258b449557b3e55f716eabcf566c9455a7d62960`.
+La base pública verificada de este hotfix es `v3.3.0` (2026-09-16), tag remoto y GitHub Release sobre `1c2e5ff6ed338df192cf0a4e00b974d9273bb147`; `v3.3.1` mantiene schema v17 y corrige el primer arranque Web.
 
 ## Getting Started
 - [⚡ Very Very Easy Quick Start](VERY_EASY_QUICK_START.md) (Recomendado)

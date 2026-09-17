@@ -2,7 +2,19 @@
 
 ## [Unreleased]
 
-Development after the public `v3.2.0` baseline. Version decision: **v3.3.0 (minor)** because this cycle adds backward-compatible schema/domain/UX/CLI capability; tag and publication remain deferred until promotion gates pass.
+No unreleased changes.
+
+## [v3.3.1] - 2026-09-16
+
+Patch release on top of public `v3.3.0`; schema remains v17.
+
+### Fixed
+- Initialize/migrate the default SQLite database before starting the Web server, so a first `rappi-historico web` launch cannot serve against an empty zero-byte database and fail with missing-table errors.
+- Added a regression that starts the Web server path against a nonexistent database and verifies schema v17 plus core tables before serving.
+
+## [v3.3.0] - 2026-09-16
+
+Public minor release from the completed schema/domain/UX/CLI cycle. Annotated tag `v3.3.0` resolves to `1c2e5ff6ed338df192cf0a4e00b974d9273bb147`.
 
 ### Added
 - **Schema v17 commercial identity**: explicit `merchants`, `merchant_locations`, `stores.merchant_id/location_id`, `commerce_type` and `catalog_domain` without display-name inference.
