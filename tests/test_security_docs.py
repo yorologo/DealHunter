@@ -13,9 +13,9 @@ def test_root_security_policy_matches_session_capabilities():
     assert "plaintext" in text
 
 
-def test_account_diagnostics_does_not_claim_sessions_are_never_persisted():
-    text = (ROOT / "docs" / "account-diagnostics.md").read_text()
+def test_maintained_security_docs_describe_persistent_sessions_correctly():
+    text = (ROOT / "docs" / "security.md").read_text()
     assert "never persisted by DealHunter" not in text
     assert "SecretStore" in text
-    assert "persistentes" in text
+    assert "sesiones persistentes" in text
     assert "SQLite" in text

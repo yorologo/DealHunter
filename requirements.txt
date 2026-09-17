@@ -1,4 +1,0 @@
-flask>=3.0,<4
-cryptography>=44,<51; sys_platform != "android"
-websockets>=14,<18
-aiohttp>=3.10,<4

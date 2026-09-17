@@ -1,8 +1,7 @@
-# Contribuir a Rappi Deal Hunter
+# Contribuir a DealHunter
 
-¡Gracias por tu interés!
-
-1. **Privacidad Primero:** NUNCA subas archivos `rappi-deals.db`, `logs`, o coordenadas GPS exactas. Todo JSON que subas como ejemplo debe estar sanitizado y ubicado en `tests/fixtures/`.
-2. **Entorno:** El código está pensado primariamente para Termux (CLI/Linux).
-3. **Tests:** Cualquier cambio a las matemáticas de `discount_effective` debe venir acompañado de pruebas en `tests/test_discounts.py`.
-4. **Rate Limiting:** No aceptamos Pull Requests que introduzcan evasión activa de Cloudflare u otros mecanismos agresivos de WAF.
+1. **Privacidad primero:** nunca subas DBs, logs, tokens ni coordenadas personales. Fixtures/JSON deben estar sanitizados.
+2. **Entorno:** Android/Termux es el runtime primario; Python soportado y setup de desarrollo están en [`docs/development.md`](docs/development.md).
+3. **Tests:** cada cambio de comportamiento necesita regresión; el gate canónico es `python -m compileall -q src tests && pytest -q` después de instalar `.[test]`.
+4. **Seguridad:** no se aceptan bypasses de WAF/rate-limit, fallbacks débiles de secretos ni SQL/shell arbitrario desde la Web.
+5. **Documentación:** README/`docs/operations.md` describen operación vigente. No actualices archivos de `docs/archive/` para convertirlos en fuente de verdad.

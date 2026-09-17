@@ -92,7 +92,7 @@ def test_dealwatcher_help_and_unknown_arg_leave_database_unchanged(tmp_path):
 
 
 def test_documented_install_directory_matches_clone_default():
-    guide = (REPO_ROOT / "docs" / "installation-termux.md").read_text()
+    guide = (REPO_ROOT / "docs" / "operations.md").read_text()
     assert "git clone https://github.com/yorologo/DealHunter.git\ncd DealHunter" in guide
     assert "cd rappi-deal-hunter" not in guide
 

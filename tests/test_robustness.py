@@ -263,11 +263,17 @@ def test_doctor_healthy_db():
         else:
             os.environ.pop("RAPPI_DB_PATH", None)
 
-def test_doctor_missing_db():
-    """Doctor should report ERROR for missing database."""
-    checks = run_doctor(db_path="/tmp/nonexistent_dealhunter_test.db")
+def test_doctor_missing_db_is_clean_first_run(tmp_path):
+    """A fresh install is healthy and Doctor must not create SQLite files."""
+    db_path = tmp_path / "nested" / "fresh.db"
+    checks = run_doctor(db_path=str(db_path))
     output = format_doctor_output(checks)
-    assert "ERROR" in output
+    names = {name: status for name, status, _ in checks}
+    assert names["Database"] == "NOT_INITIALIZED"
+    assert names["Permissions"] == "OK"
+    assert "Overall              HEALTHY" in output
+    assert not db_path.exists()
+    assert not db_path.parent.exists()
 
 def test_doctor_partial_runs_count():
     """Doctor should detect partial runs."""

@@ -45,20 +45,22 @@ def run_doctor(conn=None, db_path=None, check_network=False):
     checks.extend(_check_background_runtime())
 
 
-    # Let's get crawler mode from last run
-    import sqlite3
-    try:
-        tmp_conn = sqlite3.connect(db_path)
-        cur = tmp_conn.cursor()
-        cur.execute("SELECT crawler_mode FROM runs ORDER BY started_at DESC LIMIT 1")
-        row = cur.fetchone()
-        last_mode = row[0]
-        if last_mode is None:
-            last_mode = "LEGACY (Pre-Zone Inventory)"
-        elif not last_mode:
-            last_mode = "UNKNOWN"
-        tmp_conn.close()
-    except Exception:
+    # Read-only diagnostic: never create a database just to inspect crawler mode.
+    if os.path.exists(db_path):
+        try:
+            uri = f"file:{os.path.abspath(db_path)}?mode=ro"
+            with sqlite3.connect(uri, uri=True) as tmp_conn:
+                row = tmp_conn.execute(
+                    "SELECT crawler_mode FROM runs ORDER BY started_at DESC LIMIT 1"
+                ).fetchone()
+            last_mode = row[0] if row else "Aún no determinado"
+            if last_mode is None:
+                last_mode = "LEGACY (Pre-Zone Inventory)"
+            elif not last_mode:
+                last_mode = "UNKNOWN"
+        except Exception:
+            last_mode = "Aún no determinado"
+    else:
         last_mode = "Aún no determinado"
         
     from .account import get_account_status
@@ -124,9 +126,8 @@ def _check_config():
 def _check_db_access(db_path):
     """Check database file exists and is accessible."""
     if not os.path.exists(db_path):
-        return ("Database", "ERROR", {
-            "reason": "DB file not found",
-            "action": f"Expected at: {db_path}",
+        return ("Database", "NOT_INITIALIZED", {
+            "info": f"Will be created on first Web/crawler start: {db_path}",
         })
     try:
         conn = sqlite3.connect(db_path)
@@ -189,13 +190,20 @@ def _check_schema(db_path):
 def _check_permissions(db_path):
     """Check read/write permissions on DB file."""
     if not os.path.exists(db_path):
-        # Check if parent dir is writable
-        parent = os.path.dirname(db_path)
-        if os.path.isdir(parent) and os.access(parent, os.W_OK):
-            return ("Permissions", "OK", None)
+        # A fresh install may not have created the data directory yet. Check the
+        # nearest existing ancestor without mutating the filesystem.
+        parent = os.path.abspath(os.path.dirname(db_path) or ".")
+        probe = parent
+        while not os.path.exists(probe):
+            next_probe = os.path.dirname(probe)
+            if next_probe == probe:
+                break
+            probe = next_probe
+        if os.path.isdir(probe) and os.access(probe, os.W_OK | os.X_OK):
+            return ("Permissions", "OK", {"info": f"Data directory can be created under: {probe}"})
         return ("Permissions", "ERROR", {
-            "reason": "Cannot write to database directory",
-            "action": f"Check permissions on: {parent}",
+            "reason": "Cannot create database directory",
+            "action": f"Check permissions on nearest existing path: {probe}",
         })
     readable = os.access(db_path, os.R_OK)
     writable = os.access(db_path, os.W_OK)

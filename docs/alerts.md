@@ -1,14 +1,21 @@
 # Alerts Engine
 
-El motor local evalúa notificaciones sin utilizar infraestructura cloud. Se ejecuta en `src/dealhunter/alerts.py`.
+El motor local evalúa cambios relevantes entre runs sin infraestructura cloud. La autoridad ejecutable está en `src/dealhunter/alerts.py` / `alert_events`.
 
-## Tipos Soportados
-- `TARGET_PRICE`: El precio baja a, o por debajo del, umbral del usuario establecido en la *Watchlist*.
-- `NEW_LOW`: Mínimo histórico roto.
-- `REAL_DEAL`: Ventaja estadística fuerte contra mediana móvil de 30 días.
-- `PRICE_DROP`: Cualquier baja de precio consecutiva entre runs.
-- `BACK_IN_STOCK`: El producto regresa al inventario tras registrar una observación de ausencia (stock depletion).
+## Eventos
 
-El motor persiste los eventos en la base local y mantiene deduplicación temporal, garantizando que el usuario no reciba la misma alerta por una promoción estática prolongada.
+- `TARGET_PRICE`: alcanza el umbral de Watchlist.
+- `NEW_LOW`: nuevo mínimo histórico.
+- `REAL_DEAL`: evidencia histórica fuerte.
+- `PRICE_DROP`: caída entre observaciones.
+- `BACK_IN_STOCK`: retorno después de ausencia confirmada.
 
-> NOTA: La gestión web (UI) completa y notificaciones push de Android están planificadas para v2.10.
+## Invariantes
+
+1. **Incremental**: evalúa el alcance afectado por el run.
+2. **Partial-run safe**: un run incompleto no inventa desapariciones en tiendas no cubiertas.
+3. **Snapshot completeness**: ausencia sólo es evidencia negativa cuando la cobertura aplicable fue completa.
+4. **Canales separados**: precio público y de membresía no se mezclan silenciosamente.
+5. **Idempotencia**: re-evaluar el mismo run no duplica eventos.
+
+La Web `/alerts` es una vista local de sólo lectura sobre este motor. La entrega Android puede usar DealWatcher/Termux:API cuando está disponible; una falla de notificación no debe romper el crawler.

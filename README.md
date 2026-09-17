@@ -1,163 +1,131 @@
 # DealHunter
 
-[⚡ Very Very Easy Android Quick Start](docs/VERY_EASY_QUICK_START.md) — (Recomendado para principiantes absolutos)
+DealHunter es un motor **local-first** de inteligencia de precios para Rappi y Uber Eats. Guarda el histórico en SQLite, compara precios reales y expone una Web local para explorar oportunidades sin depender de un backend de DealHunter.
 
-DealHunter es un motor local-first de inteligencia de precios y oportunidades para Rappi y Uber Eats. Su misión NO es perseguir el descuento anunciado más grande (que a menudo es engañoso o ficticio), sino **encontrar el mejor valor demostrable con datos históricos**.
+Última release pública: **v3.3.1**. La rama `develop` contiene trabajo posterior aún no publicado como una nueva versión.
 
-## Características Principales
+## Instalación rápida — Android / Termux
 
-- **Historial de Precios**: Rastrea la evolución de precios, combatiendo inflaciones artificiales y falsos descuentos.
-- **Inteligencia de Precios**: Califica las ofertas (`NEW_LOW`, `REAL_DEAL`, `GOOD_PRICE`) evaluando el precio actual contra medianas móviles de 30 días y mínimos históricos.
-- **Comparación Cruzada**: Combina resultados de múltiples tiendas (`/compare`) para identificar la tienda más conveniente y el mejor precio por unidad.
-- **Alertas Locales**: Evalúa caídas de precio (`PRICE_DROP`), alcance de objetivos (`TARGET_PRICE`), y restock (`BACK_IN_STOCK`) sin requerir backend cloud.
-- **Arquitectura Local-first**: No envía tus datos a un backend de DealHunter y funciona con una base de datos SQLite embebida. Las credenciales de sesión sólo pueden persistirse localmente mediante el almacén seguro y con consentimiento explícito; nunca entran en SQLite, plantillas ni backups generales. Toda la interfaz web funciona offline sin CDNs.
-- **Filtros Avanzados**: Permite encontrar ofertas basándose en descuento histórico en lugar de descuentos anunciados engañosos (`--new-low`, `--real-deal`).
-- **Contexto Geográfico Auditable**: Cada run conserva `lat/lng`; el crawler exige una ubicación configurada y advierte cambios significativos sin borrar histórico automáticamente.
-- **Navegación Nativa a Tienda**: “🛵 Abrir en Rappi” usa el deep link nativo con `store_id`, dirigido exclusivamente a `com.grability.rappi`; no tiene fallback a Home, web o navegador.
-- **Arquitectura multiprovider**: adquisición productiva para Rappi y Uber Eats, con identidad raw y precios de membresía aislados por provider.
-
-## Estado Actual
-
-### Current development (`develop`)
-
-- **Última release pública**: `v3.3.1` (`9f5f3c3c12f084190d0aea8f28e4950afb51bca8`).
-- **Rama de integración**: `develop`, actualmente con trabajo post-`v3.3.1` del backlog A01–A32; aún no se ha decidido la siguiente versión.
-- **Runtime version actual**: `3.3.1` (`dealhunter.metadata.VERSION`) hasta que exista una decisión de release validada.
-- **Schema DB**: `17` (`dealhunter.db.CURRENT_SCHEMA_VERSION`).
-- **Validación**: el conteo exacto se obtiene con `PYTHONPATH=src pytest -q`; no se mantiene duplicado como verdad estática.
-
-### Última release pública
-
-- **v3.3.1**, publicada como patch sobre v3.3.0.
-- Tag `v3.3.1` → commit `9f5f3c3c12f084190d0aea8f28e4950afb51bca8`.
-- La publicación se verifica con Git tag remoto + GitHub Releases; no se infiere del README.
-
-### Estado de capacidades
-
-| Capacidad | Estado actual del RC |
-|---|---|
-| Rappi acquisition | Production |
-| Uber Eats acquisition | Production, phone-only |
-| Provider configuration | Production |
-| Membership configuration | Production |
-| Product canonical infrastructure | Introduced in schema v16; matcher remains shadow/experimental |
-| Commercial identity (`merchant/location`) | Schema v17 + explicit reviewed mapping workflow; unresolved listings remain `UNRESOLVED` |
-| Browse taxonomy | Schema v17 + explicit reviewed mapping workflow; unmapped evidence remains `UNCLASSIFIED` |
-| Large catalog pagination | Keyset/cursor in Web; legacy `page=N` links remain compatible |
-| Canonical matcher | Shadow / experimental |
-| Automatic canonicalization | OFF; no automatic membership write path |
-| Human ground truth | Insufficient |
-| Statistical identity gate | `NOT_MET` |
-
-## Arquitectura multiprovider
-
-- La identidad raw es siempre `(provider, store_id, product_id)`; los IDs originales nunca son reemplazados por una identidad canónica.
-- Rappi y Uber Eats pueden habilitarse o deshabilitarse por separado con `provider <name> enable|disable`.
-- Rappi Pro y Uber One se configuran como estados de membresía independientes con `membership <name> active|inactive|unknown`; no participan en identidad de producto.
-- Uber Eats corre normalmente en el propio teléfono mediante Chromium headless nativo de Termux y CDP. No requiere PC ni servidor X durante los runs normales.
-- Carbonyl se reserva para setup o renovación de la sesión/perfil. El bridge de PC es una alternativa opcional de setup, no una dependencia operativa.
-- La infraestructura de producto canónico introducida en schema v16 sigue en modo shadow; no escribe membresías canónicas automáticamente.
-- Schema v17 separa `merchant`, `location`, tipo de comercio y dominio de catálogo de la identidad raw del provider; no infiere estas relaciones desde nombres visibles.
-- La taxonomía de navegación de DealHunter se mantiene separada de la evidencia raw del provider: sólo mappings revisados clasifican productos; lo demás permanece `UNCLASSIFIED`.
-
-### Experiencia Web
-
-DealHunter incluye una Interfaz Web responsiva (UI/UX) para navegar ofertas sin usar la terminal:
-
-#### COMPRAR
-- Inicio
-- Oportunidades
-- Supermercados
-- Turbo
-- Restaurantes
-- Categorías
-- Tiendas
-
-#### INVESTIGAR
-- Productos
-- Product Detail
-- Histórico
-- Comparador
-- Búsqueda global
-
-#### SEGUIR
-- Watchlist core/CLI + vista Web de solo lectura operativa.
-- Alerts Engine existente + vista Web `/alerts` de solo lectura operativa.
-
-#### ADMINISTRAR
-- Admin Home
-- Cuenta
-- Runs
-- Events/Errors
-- Doctor
-- Database
-- Backup
-- Settings
-
-## Quick Start
+Requisito previo: Termux con acceso a Internet y `git` para clonar el repositorio.
 
 ```bash
-# 1. Clonar el repositorio
-git clone git@github.com:yorologo/DealHunter.git
+pkg install git
+git clone https://github.com/yorologo/DealHunter.git
 cd DealHunter
-
-# 2. Explorar CLI
-bin/rappi-historico --help
-bin/rappi-ofertas --help
-bin/rappi-ofertas doctor --help
-bin/rappi-ofertas account --help
-
-# 3. Configurar localmente la ubicación de entrega que usa Rappi
-bin/rappi-ofertas config set lat TU_LATITUD
-bin/rappi-ofertas config set lng TU_LONGITUD
-
-# 4. Capturar un baseline de esa zona
-bin/rappi-ofertas discover --vertical general
-
-# 5. Lanzar interfaz Web local
-bin/rappi-historico web --port 8765
+git checkout main
+./install.sh
 ```
 
-Abre tu navegador en `http://127.0.0.1:8765`. 
+El instalador:
 
-> [!NOTE]
-> Por defecto, la Interfaz Web está vinculada (`bound`) a `127.0.0.1` (localhost) por razones de seguridad, y no es accesible desde otros dispositivos de la red.
+- instala sólo dependencias Termux faltantes; no ejecuta `pkg upgrade`;
+- usa `python-cryptography` nativo en Android;
+- instala DealHunter desde `pyproject.toml` con `pip install .`;
+- verifica Python, `cryptography` y el comando `dealhunter`;
+- puede ejecutarse de nuevo de forma segura después de una actualización.
 
-> [!IMPORTANT]
-> Los datos de DealHunter dependen de la ubicación. `lat/lng` viven en el `config.toml` local y no deben añadirse a Git. Cambiar de zona puede invalidar la comparabilidad del histórico; DealHunter emite un warning y conserva los datos hasta que exista una decisión explícita y un backup válido.
+Inicia la Web:
 
-### Abrir una tienda en Rappi
+```bash
+dealhunter web
+```
 
-En el Android servidor debe estar instalada la app oficial (`com.grability.rappi`) y Shizuku debe estar activo con Termux autorizado. El backend resuelve `store_id → type` en SQLite y entrega el deep link nativo `gbrappi` como Android shell. Solo están habilitados los tipos comprobados en la app instalada: Restaurants, Market, Turbo y Turbo Market.
+Abre `http://127.0.0.1:8765`. Antes del primer sync configura **lat/lng** en **Admin → Settings**. Ésa es la única configuración obligatoria para adquirir datos de una zona.
 
-Si el tipo, Shizuku o el Intent fallan, la operación falla cerrada: nunca abre Chrome, `rappi.com.mx` ni la pantalla Home como falso éxito. La inspección UI/OCR se limita a diagnóstico y validación manual; el crawler normal sigue usando la API estructurada y no captura precios desde la pantalla.
+Para quien prefiera CLI:
 
-## Documentación
+```bash
+dealhunter config set lat TU_LATITUD
+dealhunter config set lng TU_LONGITUD
+dealhunter doctor
+dealhunter sync --provider rappi
+```
 
-El índice completo de documentación, cubriendo arquitectura, flujos de datos, administración y uso avanzado de la CLI se encuentra en [docs/README.md](docs/README.md).
+La sesión autenticada de Rappi, Uber Eats, membresías y scheduler son opcionales; DealHunter no necesita credenciales para arrancar la Web.
 
-## Licencia
+## Uso diario
 
-[MIT](LICENSE)
+```bash
+# Web local
+dealhunter web
 
+# Diagnóstico local
+dealhunter doctor
 
-### Ejecución en Segundo Plano (Android)
-Para mantener DealHunter Web activo en Android/Termux, DealHunter adquiere el `termux-wake-lock` automáticamente al iniciar. Nota: dado que el Wake Lock es compartido (app-wide) en Termux, DealHunter NO lo libera automáticamente al salir para no interrumpir otros procesos. Utiliza `termux-wake-unlock` manualmente cuando desees liberarlo.
-- DealHunter ahora usa **Zone Inventory** si tienes sesión válida, y **Search Discovery** como fallback.
+# Sincronización manual
+dealhunter sync --provider rappi
+dealhunter sync --provider uber_eats
 
-## Automated Alerts
-DealHunter Phase 4I supports automated background execution and push notifications via `termux-notification`.
-See [docs/SCHEDULER.md](docs/SCHEDULER.md) for instructions on setting up `cron`, configuring the DealWatcher, and managing Termux battery optimizations.
+# Estado/backup/integridad de SQLite
+dealhunter db status
+dealhunter db backup
+dealhunter db integrity
 
-## Histórico: DealHunter v3.2.0 — Public Release Baseline
+# Scheduler administrado por DealHunter
+dealhunter scheduler enable
+dealhunter scheduler status
+```
 
-Esta versión estabiliza la infraestructura de multi-proveedor e introduce el schema v16.
+El scheduler exige `lat/lng` válidos y usa una sola política administrada: Rappi a `07:00/10:00/13:00/19:00` y Uber Eats a `07:30/10:30/13:30/19:30`, con `flock` para evitar solapamientos. En Termux debe existir un `crond` activo.
 
-### Key Features
-- **A5** endpoint for primary CPG discovery with safe fallback.
-- **Faceted Taxonomy** with M:N memberships (CATEGORY/COLLECTION/UNKNOWN) and structured `aisle_type` enrichment.
-- **Commercial Intelligence**: **PUBLIC/PRO** separation, **Progressive**, **NxM**, and high price integrity.
-- **Web Faceted Query Layer**: dynamic facets and multiselect.
-- **Alerts Engine**: Temporal transitions, idempotent `alert_events`, canary Watch, and **termux-notification** delivery.
-- **Operations**: Robust background **scheduler 07/10/13/19** with **flock** to prevent overlapping crawls, automatic SQLite **backup/restore**, and longitudinal validation.
-- Safe **historical cutover** from v9 to v14 schemas.
+## Actualizar una instalación de release
+
+Con un checkout limpio en `main`:
+
+```bash
+./update.sh
+```
+
+`update.sh` crea un backup SQLite cuando DealHunter ya está instalado, exige actualización Git **fast-forward**, reinstala el paquete y termina con `db integrity` + `doctor`. Nunca hace `reset --hard`, merge forzado ni borra la configuración.
+
+Consulta [docs/operations.md](docs/operations.md) para instalación detallada, configuración, scheduler, mantenimiento, backups y recuperación.
+
+## Qué hace DealHunter
+
+- **Historial de precios**: conserva observaciones por proveedor/tienda/producto y su procedencia por run.
+- **Price Intelligence**: clasifica `NEW_LOW`, `REAL_DEAL`, `GOOD_PRICE` y calcula `deal-score-v1` con histórico demostrable.
+- **Comparación multiprovider**: Rappi y Uber Eats conservan identidad raw separada.
+- **Alertas y Watchlist**: motor local con vista Web de sólo lectura.
+- **Web local**: Flask + Jinja + HTMX + Bootstrap, assets vendorizados y sin CDN en runtime.
+- **Seguridad local**: POST mutable con CSRF, SecretStore Fernet opt-in y ausencia de fallback débil para secretos.
+- **Schema actual**: SQLite v17; las migraciones son automáticas y generan backup previo al subir de versión.
+
+### Límites importantes
+
+- La identidad raw `(provider, store_id, product_id)` sigue siendo autoridad.
+- El matching canónico de producto continúa **shadow/experimental**; la canonicalización automática está desactivada.
+- Los datos dependen de la ubicación configurada; cambiar de zona no borra histórico y puede afectar comparabilidad.
+- La Web se vincula por defecto a `127.0.0.1` y no se expone automáticamente a la LAN.
+
+## Documentación mantenida
+
+El README es el punto de entrada. La documentación vigente se reduce deliberadamente a referencias con una responsabilidad clara:
+
+- [Operación](docs/operations.md): instalar, configurar, iniciar, actualizar, scheduler, mantener y recuperar.
+- [Arquitectura](docs/architecture.md): límites y flujo del sistema.
+- [Web](docs/web.md): arquitectura UI y límites de seguridad.
+- [CLI](docs/cli.md): comandos para automatización/uso avanzado.
+- [Base de datos](docs/database-schema.md): schema y migraciones.
+- [Seguridad](docs/security.md): secretos, CSRF, archivos y runtime.
+- [Desarrollo y releases](docs/development.md): entorno dev, gates y publicación.
+- [Índice técnico](docs/README.md): referencias de dominio adicionales.
+
+Los reportes de fases, experimentos y guías sustituidas se conservan en [`docs/archive/`](docs/archive/) y [`docs/audit/`](docs/audit/) **como evidencia histórica, no como instrucciones actuales**.
+
+## Desarrollo
+
+```bash
+python -m venv .venv
+. .venv/bin/activate
+python -m pip install -e '.[test]'
+python -m compileall -q src tests
+pytest -q
+```
+
+En Termux, si se usa venv, créalo con `--system-site-packages` para reutilizar `python-cryptography` nativo. Ver [docs/development.md](docs/development.md).
+
+## Privacidad y licencia
+
+DealHunter no envía tu base de datos a un backend propio. Las sesiones persistentes son opcionales y se cifran localmente; no deben entrar en SQLite, `config.toml`, logs ni Git. Consulta [SECURITY.md](SECURITY.md) y [docs/security.md](docs/security.md).
+
+Licencia: [MIT](LICENSE).

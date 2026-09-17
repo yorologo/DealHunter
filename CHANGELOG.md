@@ -5,6 +5,7 @@
 Post-v3.3.1 work on `develop`; no next release version has been selected yet.
 
 ### Added
+- KISS onboarding/operations path: `install.sh`, `update.sh`, installed `dealhunter web` / `dealhunter scheduler` commands, and one canonical operations guide.
 - Web `/alerts` read-only view over the existing AlertEngine, local search coverage for products/merchants/branches/categories, cursor-based `Cargar más`, and visible IA/filter UX without a frontend framework rewrite.
 - Bounded operational maintenance for scheduler logs/diagnostics while preserving commercial observation history.
 - Installed-package CI on Python 3.11 and 3.14, explicit dependency bounds, packaged `dealwatcher`, and reproducible third-party Web asset inventory.
@@ -13,6 +14,7 @@ Post-v3.3.1 work on `develop`; no next release version has been selected yet.
 - Explicit reviewed CLI workflows for `Provider Listing → Merchant → Location` and raw taxonomy/path → DealHunter browse node. Unknown/ambiguous evidence remains `UNRESOLVED` / `UNCLASSIFIED`; no name-based automatic merge was introduced.
 
 ### Fixed
+- Fresh-install diagnostics and DB maintenance are side-effect free: Doctor reports an uninitialized DB as healthy, while integrity/backup/vacuum no longer create an empty SQLite file.
 - Concurrent fresh SQLite initialization now retries only transient WAL-mode lock contention instead of failing before the migration lock can serialize setup.
 - Catalog Sync reuses the common authenticated HTTP client where auth/timeout/error contracts are equivalent.
 - Installed scheduler commands resolve correctly from checkout or installed console scripts instead of deriving an invalid repo root from `site-packages`.
@@ -24,6 +26,11 @@ Post-v3.3.1 work on `develop`; no next release version has been selected yet.
 - Admin provider/membership/comparison/boolean settings reuse canonical validators, and mutable redirects reject external/scheme-relative targets.
 
 ### Documentation
+- Simplified the maintained documentation surface: `README.md` is the user entry point, `docs/operations.md` is the canonical install/update/recovery guide, and historical phase/research/Web guides moved under `docs/archive/` without rewriting their evidence.
+- Added idempotent `install.sh` and fail-safe `update.sh`; dependencies now have one packaging authority in `pyproject.toml` instead of duplicated `requirements*.txt`.
+- Added installed CLI entry points for `web` and managed `scheduler`, plus fresh-install Doctor/DB behavior that does not create SQLite files during read-only diagnostics.
+
+- Consolidated current documentation around README + `docs/operations.md`; superseded phase/research/Web guides moved under `docs/archive/` and dependency authority reduced to `pyproject.toml`.
 - The old #1–#74 closure ledger moved under `docs/audit/` as historical v3.3.1 evidence. A01–A32 is now the stable current audit vocabulary.
 
 ## [v3.3.1] - 2026-09-16

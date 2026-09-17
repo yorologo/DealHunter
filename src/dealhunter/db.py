@@ -724,11 +724,11 @@ def db_status(db_path):
     }
 
 def db_integrity(db_path):
-    conn = sqlite3.connect(db_path)
-    c = conn.cursor()
-    c.execute("PRAGMA integrity_check;")
-    result = c.fetchone()[0]
-    return result
+    if not os.path.exists(db_path):
+        return "not_initialized"
+    with sqlite3.connect(db_path) as conn:
+        row = conn.execute("PRAGMA integrity_check;").fetchone()
+        return row[0]
 
 def db_vacuum(db_path):
     conn = sqlite3.connect(db_path)

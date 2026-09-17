@@ -183,6 +183,12 @@ def build_parser():
     maintenance_p = subparsers.add_parser("maintenance", help="Rotate DealHunter logs and temporary diagnostics")
     maintenance_p.add_argument("action", choices=["run"])
 
+    web_p = subparsers.add_parser("web", help="Start the local DealHunter Web UI")
+    web_p.add_argument("--port", type=int, default=8765)
+
+    scheduler_p = subparsers.add_parser("scheduler", help="Manage the Termux scheduler")
+    scheduler_p.add_argument("action", choices=["status", "enable", "disable"])
+
     # Phase 5E settings
     providers_p = subparsers.add_parser("providers", help="List configured providers")
 
@@ -267,11 +273,10 @@ def main(args_list=None):
         return
 
     if args.command == "doctor":
-        import os
         db_path = get_default_db_path()
         checks = run_doctor(db_path=db_path, check_network=getattr(args, "network", False))
         print(format_doctor_output(checks))
-        return
+        return 1 if any(status == "ERROR" for _, status, _ in checks) else 0
 
     if args.command == "account":
         from .account import get_account_status
@@ -528,6 +533,45 @@ def main(args_list=None):
         print(json.dumps(run_maintenance(), indent=2))
         return
 
+    if args.command == "web":
+        from .web.app import run_server
+        run_server(port=args.port)
+        return
+
+    if args.command == "scheduler":
+        from .scheduler import disable_scheduler, enable_scheduler, get_next_run, is_scheduler_enabled
+        if args.action == "enable":
+            enable_scheduler(config)
+        elif args.action == "disable":
+            disable_scheduler()
+        enabled = is_scheduler_enabled()
+        next_run = get_next_run() if enabled else None
+        print(f"scheduler={'enabled' if enabled else 'disabled'}")
+        if next_run is not None:
+            print(f"next_run={next_run.isoformat(timespec='minutes')}")
+        return
+
+    if args.command == "db":
+        db_path = get_default_db_path()
+        if args.action == "status":
+            import json
+            print(json.dumps(db_status(db_path), indent=2))
+        elif args.action == "integrity":
+            print(db_integrity(db_path))
+        elif args.action == "backup":
+            path = backup_db(db_path)
+            if path is None:
+                print("No database exists yet; nothing to back up.", file=sys.stderr)
+            else:
+                print(f"Backup created at {path}")
+        elif args.action == "vacuum":
+            if not os.path.exists(db_path):
+                print("No database exists yet; nothing to vacuum.", file=sys.stderr)
+            else:
+                db_vacuum(db_path)
+                print("Vacuum complete")
+        return
+
     if args.command in crawler_commands:
         location = _require_location(parser, config)
 
@@ -671,24 +715,6 @@ def main(args_list=None):
                 print("Browse mapping cleared; taxonomy is UNCLASSIFIED.")
         finally:
             conn.close()
-        return
-
-    if args.command == "db":
-
-        import os
-        db_path = get_default_db_path()
-
-        if args.action == "status":
-            import json
-            print(json.dumps(db_status(db_path), indent=2))
-        elif args.action == "integrity":
-            print(db_integrity(db_path))
-        elif args.action == "backup":
-            path = backup_db(db_path)
-            print(f"Backup created at {path}")
-        elif args.action == "vacuum":
-            db_vacuum(db_path)
-            print("Vacuum complete")
         return
 
     elif args.command == "uber":
