@@ -48,6 +48,30 @@ def test_catalog_recent_sort_uses_observation_timestamp_and_matches_offset(curre
     assert cursor_ids == offset_ids
 
 
+def test_catalog_constant_ranking_key_is_not_sqlite_column_ordinal(current_schema_db):
+    conn = current_schema_db
+    _catalog_fixture(conn)
+    config = {
+        'providers': {'rappi': {'enabled': True}, 'uber_eats': {'enabled': True}},
+        'memberships': {
+            'rappi_pro': {'status': 'active'},
+            'uber_one': {'status': 'active'},
+        },
+        'comparison': {'inactive_membership_offers': 'exclude'},
+    }
+    filters = {'sort': 'discount', 'desc': True, 'limit': 10, 'offset': 0}
+    offset_sql, _, params = build_faceted_query(filters, config)
+    cursor_sql, _, cursor_params, _ = build_faceted_cursor_query(filters, config=config)
+    offset_rows = conn.execute(offset_sql, params).fetchall()
+    cursor_rows = conn.execute(cursor_sql, cursor_params).fetchall()
+    offset_ids = [r[0] for r in offset_rows]
+    cursor_ids = [r[0] for r in cursor_rows]
+
+    assert offset_ids == ['a-high', 'm-mid', 'z-low']
+    assert cursor_ids == offset_ids
+    assert 'ORDER BY 1 DESC' not in offset_sql
+
+
 def test_catalog_does_not_advertise_unimplemented_opportunity(current_schema_db_path):
     app = create_app({'DATABASE': current_schema_db_path, 'TESTING': True, 'SECRET_KEY': 'test'})
     client = app.test_client()

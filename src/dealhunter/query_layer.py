@@ -284,7 +284,8 @@ def _ordering_spec(filters: dict, config: dict):
     channel = filters.get("channel", "PUBLIC")
 
     engine = EligibilityEngine(config)
-    ranking_expr = "1"
+    # Avoid SQLite positional ORDER BY 1 syntax when ranking is constant.
+    ranking_expr = "CAST(1 AS INTEGER)"
     if engine.comparison_policy == "show_but_exclude":
         if engine.get_membership_status("rappi_pro") != "active":
             ranking_expr = f"CASE WHEN p.provider = 'rappi' AND o.has_pro_offer = 1 THEN 0 ELSE {ranking_expr} END"
